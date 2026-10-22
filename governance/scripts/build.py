@@ -552,7 +552,8 @@ def main(argv=None) -> int:
             body = ctx.render(code, body, overrides)
             cover_md, header, stem = cover(ctx, code, front)
             rendered.append((stem, header, ctx.render(code, cover_md, None, is_body=False) + '\n' + body))
-        rendered += summaries(ctx)
+        if not only:
+            rendered += summaries(ctx)  # 清单和参数表只在完整生成时输出，避免被部分结果覆盖
     except BuildError as e:
         print(f'错误：{e}', file=sys.stderr)
         return 1
@@ -560,7 +561,7 @@ def main(argv=None) -> int:
     for w in sorted(set(ctx.warnings)):
         print(f'提示：{w}', file=sys.stderr)
     if args.check:
-        print(f'检查通过：{len(rendered)} 个文件；待确认 {len(ctx.pending_items)} 处。')
+        print(f'检查通过：{len(rendered)} 个文件；待确认事项 {len(dict.fromkeys(ctx.pending_items))} 项。')
         return 0
 
     out = (args.out or (instance / 'build' if instance else Path('build'))).resolve()
