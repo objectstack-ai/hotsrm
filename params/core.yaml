@@ -1,0 +1,135 @@
+# 核心参数：定义与示例默认值。
+#
+# 体系文件模板用 {{param.<键>}} 引用这里的参数，应用包配置也以这里为准，保证制度与系统
+# 一致（见 docs/adr/0005）。客户的取值写在客户私有仓库的 governance/params.yaml，
+# 没写的参数取这里的示例默认值。
+#
+# 每项的字段：
+#   label    中文名
+#   unit     单位（可省略）
+#   example  示例默认值；可以是数值、文字、列表或键值表
+#   format   渲染格式，{} 处填值；值为列表时逐项套用后用「、」连接（可省略）
+#   display  值为键值表时，在参数表和待确认事项清单中的显示格式（可省略）
+#   used_in  使用它的模板与条款
+#   system   对应的系统控制位置；「制度要求」表示系统只记录、不强制
+
+registration_accept_days:
+  label: 注册申请受理时限
+  unit: 工作日
+  example: 3
+  used_in: [QP-01 6.2.3]
+  system: 制度要求；受理时的查重与黑名单比对由 flow srm_application_intake 自动完成（核心 03 §3）
+
+trial_period:
+  label: 试供期
+  example: { months: 3, batches: 3 }
+  display: "{months} 个月或 {batches} 个批次"
+  used_in: [QP-01 6.3.5]
+  system: 制度要求；品类资格 trial → qualified 由品类经理评价后变更（核心 02 srm_supplier_category）
+
+emergency_backfill_days:
+  label: 紧急采购补办准入时限
+  unit: 日历日
+  example: 30
+  used_in: [QP-01 6.3.7]
+  system: 制度要求
+
+cert_reminder_days:
+  label: 资质证书到期提醒
+  unit: 日历日（到期前）
+  example: [30, 15, 7]
+  format: "{} 日"
+  used_in: [QP-01 6.6.1]
+  system: 证书到期提醒 flow，time_relative 触发（核心 03 §11）
+
+bank_change_verification:
+  label: 收款账户变更的核实方式
+  example: 通过对公账户验证或向供应商法定代表人电话核实等方式
+  used_in: [QP-01 6.5.2]
+  system: 变更审批 flow srm_change_approval 的第 2 级财务复核，核实结果记入审批意见（核心 03 §5）
+
+perf_cycle:
+  label: 绩效评价周期（按物资类别）
+  example: { A: 每月, B: 每季度, C: 每年 }
+  display: A 类{A}，B 类{B}，C 类{C}
+  used_in: [QP-01 6.7.1, QP-01 附录 A]
+  system: 考评计划的周期设置（核心 03 §10）
+
+perf_grade_min:
+  label: 绩效等级下限分
+  unit: 分
+  example: { A: 90, B: 80, C: 70 }
+  display: A 级 ≥ {A}，B 级 ≥ {B}，C 级 ≥ {C}
+  used_in: [QP-01 6.7.3]
+  system: 考评单汇总分级规则（核心 03 §10 第 4 步）
+
+perf_appeal_days:
+  label: 绩效结果申诉期限
+  unit: 日历日（发布后）
+  example: 7
+  used_in: [QP-01 6.7.5]
+  system: 申诉 screen flow srm_appeal_submit 的时限校验（核心 03 §10 第 7 步）
+
+perf_d_exit_periods:
+  label: 启动淘汰的连续 D 级期数
+  unit: 期
+  example: 2
+  used_in: [QP-01 6.7.4, QP-01 6.9.1]
+  system: 考评发布后触发的淘汰评审 flow（核心 01 BR-18）
+
+scar_containment_hours:
+  label: 整改临时措施提交时限
+  unit: 小时
+  example: 72
+  used_in: [QP-01 6.8.2, GL-07]
+  system: srm_quality_issue.containment_due 的计算规则（核心 03 §8）
+
+scar_final_days:
+  label: 整改根本原因与永久措施提交时限
+  unit: 日历日
+  example: 30
+  used_in: [QP-01 6.8.2, GL-07]
+  system: srm_quality_issue.final_due 的计算规则（核心 03 §8）
+
+inactivity_exit_months:
+  label: 无交易淘汰期限
+  unit: 个月
+  example: 24
+  used_in: [QP-01 6.9.2]
+  system: 制度要求；可由报表列出超期无交易的供应商，人工发起淘汰
+
+blacklist_years:
+  label: 黑名单禁入期限
+  unit: 年
+  example: 5
+  used_in: [QP-01 6.9.3]
+  system: 制度要求；黑名单状态由处置单设置，解除需单独审批（核心 03 §5）
+
+record_retention_years:
+  label: 供应商管理记录保存期限
+  unit: 年
+  example: 3
+  used_in: [QP-01 第 8 章]
+  system: 制度要求
+
+contract_reminder_days:
+  label: 合同到期提醒
+  unit: 日历日（到期前）
+  example: [60, 30, 7]
+  format: "{} 日"
+  used_in: [GL-03]
+  system: 合同到期提醒 flow，time_relative 触发（核心 03 §6）
+
+po_ack_remind_hours:
+  label: 订单未确认提醒供应商
+  unit: 小时（下发后）
+  example: 24
+  used_in: [QP-02]
+  system: 追赶式扫描 srm_po_ack_sweep（核心 03 §7）
+
+po_ack_escalate_hours:
+  label: 订单未确认升级采购主管
+  unit: 小时（下发后）
+  example: 48
+  used_in: [QP-02]
+  system: 同上

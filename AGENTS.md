@@ -56,6 +56,8 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 - 新的关键决定写 ADR；改变已有决定时写新的 ADR 取代旧的，不改写旧记录的「决定」部分。
 - `docs/reference/` 由脚本从元数据生成，禁止手改。
 - 体系文件条款与系统控制点同步修改：改了一边，检查另一边（[ADR-0005](./docs/adr/0005-governance-and-system-share-parameters.md)）。
+- 体系文件模板只写通用表述，不写【待确认】和任何客户信息；客户的取值、标注和专属段落放
+  客户私有仓库（见 [governance/README.md §5](./governance/README.md#5-客户实例与生成方式)）。
 
 ## 5. 提交与 PR
 
@@ -68,4 +70,7 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 ## 6. 验证
 
 - 文档：所有相对链接和锚点有效。
+- 体系文件：`python3 governance/scripts/build.py --check` 与
+  `python3 governance/scripts/build.py --check --packs bulk,hazmat,soe` 都通过；改了模板的，
+  生成 Word 打开检查版式。
 - 元数据（有代码之后）：校验、类型检查、lint、构建、测试全部通过；每种扩展包组合都能构建。

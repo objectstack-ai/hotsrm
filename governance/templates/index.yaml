@@ -1,0 +1,54 @@
+# 模板登记表：每个通用文件与表单的代号、名称、所属（core 或扩展包）。
+#
+# 模板正文放在 templates/<所属>/<代号>.md。模板中用 {{doc.<代号>}} 引用其他文件，生成时
+# 换成客户的文件编号与名称（客户私有仓库 governance/documents.yaml）；客户没有登记的，
+# 用 org.doc_prefix + 代号和这里的名称。
+#
+# status：written 已编写；planned 计划编写（见 ../README.md §6）。
+
+documents:
+  QP-01: { title: 供应商管理控制程序, level: 二级, pack: core, status: written }
+  QP-02: { title: 采购控制程序, level: 二级, pack: core, status: planned }
+  QP-03: { title: 进货检验与不合格品控制程序, level: 二级, pack: core, status: planned }
+  QP-04: { title: 纠正措施控制程序, level: 二级, pack: core, status: planned }
+  GL-01: { title: 供应商准入与资质管理办法, level: 三级, pack: core, status: planned }
+  WI-01: { title: 供应商现场审核作业指导书, level: 三级, pack: core, status: planned }
+  GL-02: { title: 采购寻源与定价管理办法, level: 三级, pack: core, status: planned }
+  GL-03: { title: 采购合同管理办法, level: 三级, pack: core, status: planned }
+  GL-04: { title: 供应商信息变更与收款账户管理规定, level: 三级, pack: core, status: planned }
+  GL-05: { title: 采购廉洁与利益冲突回避规定, level: 三级, pack: core, status: planned }
+  GL-06: { title: 供应商绩效评价管理办法, level: 三级, pack: core, status: planned }
+  GL-07: { title: 供应商质量问题整改管理办法, level: 三级, pack: core, status: planned }
+  GL-08: { title: 供应商处置管理办法, level: 三级, pack: core, status: planned }
+  GL-09: { title: 供应商对账与付款管理办法, level: 三级, pack: core, status: planned }
+  GL-10: { title: 供应商门户账号与信息安全管理规定, level: 三级, pack: core, status: planned }
+  BK-01: { title: 大宗原料采购管理办法, level: 三级, pack: bulk, status: planned }
+  BK-02: { title: 大宗原料取样化验与质量异议处理规定, level: 三级, pack: bulk, status: planned }
+  BK-03: { title: 计量与运输损耗管理规定, level: 三级, pack: bulk, status: planned }
+  HZ-01: { title: 危险化学品采购安全管理规定, level: 三级, pack: hazmat, status: planned }
+  HZ-02: { title: 危险化学品承运商管理办法, level: 三级, pack: hazmat, status: planned }
+  HZ-03: { title: 危险化学品入厂与卸车安全管理规定, level: 三级, pack: hazmat, status: planned }
+  SO-01: { title: 采购管理办法（国有企业适用）, level: 三级, pack: soe, status: planned }
+  SO-02: { title: 评审专家管理办法, level: 三级, pack: soe, status: planned }
+  SO-03: { title: 采购信息公开管理规定, level: 三级, pack: soe, status: planned }
+  SO-04: { title: 采购异议处理规定, level: 三级, pack: soe, status: planned }
+  SO-05: { title: 采购档案管理规定, level: 三级, pack: soe, status: planned }
+
+# 四级表单。系统上线后由系统单据代替，模板只登记名称和对应单据。
+forms:
+  QR-01: { title: 供应商注册申请表, pack: core, system: 公开注册表单 → srm_supplier_application }
+  QR-02: { title: 供应商资质文件清单, pack: core, system: srm_supplier_certificate }
+  QR-03: { title: 供应商现场审核评分表, pack: core, system: srm_supplier_audit }
+  QR-04: { title: 供应商准入评审表, pack: core, system: 准入审批 flow 的审批记录 }
+  QR-05: { title: 合格供应商名录, pack: core, system: srm_supplier_category 列表视图 }
+  QR-06: { title: 询价单 / 招标文件, pack: core, system: srm_sourcing_event }
+  QR-07: { title: 报价比价表, pack: core, system: 比价矩阵报表 }
+  QR-08: { title: 定标审批表, pack: core, system: 定标审批 flow 的审批记录 }
+  QR-09: { title: 供应商信息变更申请表, pack: core, system: srm_supplier_change_request }
+  QR-10: { title: 收款账户变更核实记录, pack: core, system: 变更审批 flow 的财务复核记录 }
+  QR-11: { title: 采购合同审批表, pack: core, system: 合同审批 flow 的审批记录 }
+  QR-12: { title: 供应商绩效考评表, pack: core, system: srm_performance_review }
+  QR-13: { title: 供应商纠正措施报告（8D）, pack: core, system: srm_quality_issue }
+  QR-14: { title: 供应商处置申请表, pack: core, system: srm_supplier_disposition }
+  QR-15: { title: 廉洁承诺书, pack: core, system: 注册时签署，附件存档 }
+  QR-16: { title: 关联关系申报表, pack: core, system: 注册与评审时申报 }

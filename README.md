@@ -60,7 +60,7 @@ hotsrm/
 │   ├── packs/                     扩展包设计
 │   └── adr/                       决策记录
 ├── governance/                    体系文件模板与生成脚本
-├── params/                        参数定义与示例默认值（制度与系统共用）      〔待建〕
+├── params/                        参数定义与示例默认值（制度与系统共用）
 ├── src/                                                                    〔待建〕
 │   ├── core/                      核心（type: app）
 │   ├── bulk/  hazmat/  soe/       三个扩展包（type: module）
@@ -73,8 +73,9 @@ hotsrm/
 
 ## 当前状态
 
-设计阶段：核心设计、三个扩展包设计和第一批决策记录已完成。文档目录见
+设计阶段：核心设计、三个扩展包设计、第一批决策记录、参数文件首版、体系文件生成脚本和
+第一份模板（QP-01）已完成。文档目录见
 [docs/README.md](./docs/README.md)；参与开发前先读 [AGENTS.md](./AGENTS.md)。
 
-下一步：补齐第一批体系文件模板与参数文件，然后按[核心设计第一期](./docs/design/07-delivery-plan.md)
+下一步：补齐第一批体系文件模板，然后按[核心设计第一期](./docs/design/07-delivery-plan.md)
 实现应用包。

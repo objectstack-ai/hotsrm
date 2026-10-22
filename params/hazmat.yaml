@@ -1,0 +1,37 @@
+# 危化品包参数：定义与示例默认值（见 docs/packs/hazmat.md §6）。
+# 字段含义见 core.yaml 文件头。
+
+hz_credential_reminder_days:
+  label: 承运商证件到期提醒
+  unit: 日历日（到期前）
+  example: [30, 15, 7]
+  format: "{} 日"
+  used_in: [HZ-02]
+  system: 车辆与人员证件到期提醒 flow，time_relative 触发
+
+hz_booking_lead_hours:
+  label: 入厂预约最晚提交时间
+  unit: 小时（预计到达前）
+  example: 4
+  used_in: [HZ-03]
+  system: 入厂预约单的时间校验规则
+
+hz_unloading_window:
+  label: 可卸车时段
+  example: 08:00–18:00
+  used_in: [HZ-03]
+  system: 入厂预约单的时段校验规则，按收货单位配置
+
+hz_incident_penalty_points:
+  label: 一般安全事件绩效扣分
+  unit: 分/次
+  example: 5
+  used_in: [HZ-02, GL-06]
+  system: 安全事件计入考评的扣分规则
+
+hz_severe_incident_review_count:
+  label: 进入黑名单评审的严重事件次数
+  unit: 次/年度
+  example: 2
+  used_in: [HZ-02]
+  system: 严重事件触发承运商冻结；同一年度达到次数时生成黑名单评审处置单

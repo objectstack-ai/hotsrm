@@ -1,0 +1,45 @@
+# 大宗物料包参数：定义与示例默认值（见 docs/packs/bulk-materials.md §6）。
+# 字段含义见 core.yaml 文件头。
+
+bk_quota_tolerance_pct:
+  label: 月度配额数量容差
+  unit: "%"
+  example: 10
+  format: "±{}%"
+  used_in: [BK-01]
+  system: 月度计划校验规则：配额合计偏离协议月均量的允许范围
+
+bk_loss_rate_pct:
+  label: 合理运输损耗率
+  unit: "%"
+  example: 0.3
+  format: "{}%"
+  used_in: [BK-01, BK-03]
+  system: 年度供货协议上的默认损耗率，可逐个协议约定
+
+bk_assay_objection_hours:
+  label: 化验结果异议时限
+  unit: 小时（结果发布后）
+  example: 24
+  used_in: [BK-02]
+  system: 异议 screen flow 的时限校验；超时视为认可
+
+bk_sample_retention_days:
+  label: 留样保存期
+  unit: 日历日
+  example: 30
+  used_in: [BK-02]
+  system: 制度要求
+
+bk_price_confirm_days:
+  label: 价格确认时限
+  unit: 工作日（生成后）
+  example: 2
+  used_in: [BK-01]
+  system: 价格确认单的超时提醒；超时由采购部跟进，不自动视为确认
+
+bk_concession_approvers:
+  label: 让步接收审批人
+  example: 质量负责人、生产负责人、采购负责人
+  used_in: [BK-01, BK-02]
+  system: 让步接收审批 flow 的审批节点
