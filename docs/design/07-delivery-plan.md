@@ -69,28 +69,33 @@ gantt
 
 ### 3.1 目录结构
 
+核心的源码放在仓库的 `src/core/`（`type: app`，命名空间 `srm`）；扩展包和组合方式见
+仓库根目录的 [README](../../README.md) 与 [ADR-0002](../adr/0002-packs-composed-into-one-app.md)。
+
 ```
-srm/
-├── objectstack.config.ts        # defineStack：manifest（namespace: 'srm'）、对象、应用、权限、flow
-├── src/
-│   ├── objects/                 # 每个对象一个文件：supplier.object.ts …
-│   ├── validations/             # 状态机与校验规则（也可内联在对象里）
-│   ├── flows/                   # 按流程分目录：admission/、sourcing/、order/ …
-│   ├── security/
-│   │   ├── positions.ts         # 内部岗位
-│   │   ├── permission-sets.ts   # 内部权限集
-│   │   └── portal.ts            # 门户权限集与 RLS（见 04 §3.4）
-│   ├── apps/                    # srm_workbench、srm_portal 两个应用外壳
-│   ├── views/                   # 列表、看板、日历、甘特
-│   ├── reports/                 # 比价矩阵等
-│   ├── dashboards/
-│   ├── forms/                   # 公开注册表单
-│   ├── notifications/           # 中英文通知模板
-│   └── data/                    # 种子数据：品类、指标库、演示供应商
-└── test/
-    ├── portal-isolation.test.ts # 04 §3.7 的交叉越权用例
-    ├── sealed-bid.test.ts       # 封标与截止锁价
-    └── flows/*.test.ts          # 每条 flow 的正向与异常路径
+src/core/
+├── index.ts                     # defineStack：manifest（type: app，namespace: srm）
+├── objects/                     # 每个对象一个文件：supplier.object.ts …
+├── picklists/                   # 共享选项列表，供扩展包追加选项（02 §1 第 13 条）
+├── flows/                       # 按流程分目录：admission/、sourcing/、order/ …
+├── security/
+│   ├── positions.ts             # 内部岗位
+│   ├── permission-sets.ts       # 内部权限集
+│   └── portal.ts                # 门户权限集与 RLS（见 04 §3.4）
+├── apps/                        # srm_workbench、srm_portal 两个应用外壳（导航按分组，供扩展包挂菜单）
+├── views/                       # 列表、看板、日历、甘特
+├── reports/                     # 比价矩阵等
+├── dashboards/
+├── forms/                       # 公开注册表单
+├── notifications/               # 中英文通知模板
+├── translations/
+└── data/                        # 种子数据：品类、指标库、演示供应商
+
+test/                            # 仓库根目录，覆盖核心与各种扩展包组合
+├── portal-isolation.test.ts     # 04 §3.7 的交叉越权用例
+├── sealed-bid.test.ts           # 封标与截止锁价
+├── composition.test.ts          # 每种扩展包组合都能构建、校验通过
+└── flows/*.test.ts              # 每条 flow 的正向与异常路径
 ```
 
 ### 3.2 规范

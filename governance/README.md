@@ -52,9 +52,9 @@ hotsrm 把管理制度和系统放在一起维护：
 
 | 扩展包 | 模板 |
 |---|---|
-| 大宗物料包 | 大宗原料采购管理办法；大宗原料取样化验与质量异议处理规定；计量与运输损耗管理规定（见 [大宗物料包 §8](../packs/bulk-materials.md#8-体系文件模板)） |
-| 危化品包 | 危险化学品采购安全管理规定；危险化学品承运商管理办法；危险化学品入厂与卸车安全管理规定（见 [危化品包 §7](../packs/hazmat.md#7-体系文件模板)） |
-| 国企采购合规包 | 采购管理办法（国有企业适用）；评审专家管理办法；采购信息公开管理规定；采购异议处理规定；采购档案管理规定（见 [国企采购合规包 §8](../packs/soe-procurement.md#8-体系文件模板)） |
+| 大宗物料包 | 大宗原料采购管理办法；大宗原料取样化验与质量异议处理规定；计量与运输损耗管理规定（见 [大宗物料包 §8](../docs/packs/bulk-materials.md#8-体系文件模板)） |
+| 危化品包 | 危险化学品采购安全管理规定；危险化学品承运商管理办法；危险化学品入厂与卸车安全管理规定（见 [危化品包 §7](../docs/packs/hazmat.md#7-体系文件模板)） |
+| 国企采购合规包 | 采购管理办法（国有企业适用）；评审专家管理办法；采购信息公开管理规定；采购异议处理规定；采购档案管理规定（见 [国企采购合规包 §8](../docs/packs/soe-procurement.md#8-体系文件模板)） |
 
 安装扩展包后，核心模板中的相关章节也会带上扩展内容，例如：装了大宗物料包，
 QP-01 的物资分类会加入大宗原料的准入要求；装了危化品包，必备资质清单会加入
@@ -62,18 +62,25 @@ QP-01 的物资分类会加入大宗原料的准入要求；装了危化品包�
 
 ## 4. 模板与参数的格式
 
-模板正文用 Markdown 编写，放在本仓库：
+模板正文用 Markdown 编写。参数文件放在仓库根目录的 `params/`，因为应用包构建时也要
+读它（见 [ADR-0005](../docs/adr/0005-governance-and-system-share-parameters.md)）：
 
 ```
-docs/governance/
+params/                           参数定义与示例默认值（制度与系统共用）
+├── core.yaml
+├── bulk.yaml
+├── hazmat.yaml
+└── soe.yaml
+
+governance/
 ├── README.md                     本文
-├── params.yaml                   参数定义与示例默认值（核心 + 各扩展包）
-└── templates/
-    ├── core/                     QP-01 … GL-10
-    └── packs/
-        ├── bulk-materials/
-        ├── hazmat/
-        └── soe-procurement/
+├── templates/
+│   ├── core/                     QP-01 … GL-10
+│   ├── bulk/                     大宗物料包的模板
+│   ├── hazmat/                   危化品包的模板
+│   └── soe/                      国企采购合规包的模板
+├── reference.docx                通用 Word 样式
+└── scripts/                      填参数 → Markdown → Word / PDF
 ```
 
 模板里用三种标记：
@@ -82,7 +89,7 @@ docs/governance/
 |---|---|---|
 | `{{param.<键>}}` | 引用参数值 | 整改临时措施时限 `{{param.scar_containment_hours}}` 小时 |
 | `{{org.<键>}}` | 引用客户的组织信息 | `{{org.company_name}}`、`{{org.dept.procurement}}` |
-| `<!-- pack:<包名> -->` … `<!-- /pack -->` | 只在安装了该扩展包时保留的段落 | 大宗原料的准入要求 |
+| `<!-- pack:<包名> -->` … `<!-- /pack -->` | 只在组合了该扩展包时保留的段落（包名为 `bulk` / `hazmat` / `soe`） | 大宗原料的准入要求 |
 
 参数定义的每一项包括：键、中文名、单位、示例默认值、使用它的文件与条款、对应的系统
 配置位置。例如：
@@ -98,16 +105,22 @@ scar_containment_hours:
 
 ## 5. 客户实例与生成方式
 
-客户的私有仓库只放与 hotsrm 不同的部分：
+客户的私有仓库只放与 hotsrm 不同的部分。它同时负责组合客户的系统发行版和生成客户的
+体系文件（发行版的组合方式见 [ADR-0002](../docs/adr/0002-packs-composed-into-one-app.md)）：
 
 ```
-<客户私有仓库>/
-├── org.yaml            公司名称、部门名称、文件编号规则
-├── params.yaml         参数取值（覆盖 hotsrm 的示例默认值）
-├── packs.yaml          启用的扩展包
-├── overrides/          个别条款的专属表述（尽量少）
-├── reference.docx      客户的 Word 样式模板（字体、页眉页脚、文件控制表）
-└── build/              生成的 Word / PDF（交付物）
+hotsrm-<客户>/
+├── package.json                引用 hotsrm 的某个固定版本
+├── objectstack.config.ts       组合：核心 + 选定扩展包 + 客户初始化数据
+├── objectstack.manifest.json   客户发行版的标识，只发布到客户自己的组织
+├── data/                       品类、物资分类目录、资质清单、组织结构等初始化数据
+└── governance/
+    ├── org.yaml                公司名称、部门名称、文件编号规则
+    ├── params.yaml             参数取值（覆盖 hotsrm 的示例默认值）
+    ├── packs.yaml              组合的扩展包（与 objectstack.config.ts 一致）
+    ├── overrides/              个别条款的专属表述（尽量少）
+    ├── reference.docx          客户的 Word 样式模板（字体、页眉页脚、文件控制表）
+    └── build/                  生成的 Word / PDF（交付物）
 ```
 
 生成与评审流程：
@@ -128,4 +141,4 @@ scar_containment_hours:
 | 第二批 | QP-03、QP-04、GL-03、GL-06、GL-07、GL-08；各扩展包其余模板 | 支撑核心第二、三期 |
 | 第三批 | GL-09、GL-10 | 支撑核心第四期与门户全面推广 |
 
-另需完成生成脚本（模板渲染 + pandoc 转换 + 文件控制表填充）和 `params.yaml` 的首版。
+另需完成生成脚本（模板渲染 + pandoc 转换 + 文件控制表填充）和 `params/` 下参数文件的首版。

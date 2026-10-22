@@ -8,37 +8,73 @@ ERP 记账，hotsrm 不做第二套账。
 
 ## 三层结构
 
-| 层 | 内容 | 位置 |
-|---|---|---|
-| 通用核心 | 所有企业都需要的功能与管理制度 | [`docs/design/`](./docs/design/README.md) |
-| 行业扩展包 | 同类企业共有的做法，按需安装：[大宗物料包](./docs/packs/bulk-materials.md)、[危化品包](./docs/packs/hazmat.md)、[国企采购合规包](./docs/packs/soe-procurement.md) | [`docs/packs/`](./docs/packs/README.md) |
-| 客户配置 | 某个客户的参数取值、组织结构、物资目录、审批权限、文件样式 | 客户的私有仓库与客户环境，不在本仓库 |
+| 层 | 内容 | 设计 | 源码 |
+|---|---|---|---|
+| 通用核心 | 所有企业都需要的功能与管理制度 | [`docs/design/`](./docs/design/README.md) | `src/core/`（`type: app`） |
+| 行业扩展包 | 同类企业共有的做法，按需组合：[大宗物料包](./docs/packs/bulk-materials.md)、[危化品包](./docs/packs/hazmat.md)、[国企采购合规包](./docs/packs/soe-procurement.md) | [`docs/packs/`](./docs/packs/README.md) | `src/bulk/`、`src/hazmat/`、`src/soe/`（`type: module`） |
+| 客户配置 | 某个客户的参数取值、组织结构、物资目录、审批权限、文件样式 | — | 客户的私有仓库，不在本仓库 |
 
 客户需求按「通用核心 → 扩展包 → 参数 → 定制」的顺序归位，定制尽量少（见
 [扩展包总览](./docs/packs/README.md#1-三层结构)）。
 
+## 扩展包怎么组合与安装
+
+ObjectStack 中客户能安装的只有应用（`type: app`）。扩展包是模块，**在构建时和核心合成
+一个应用**，而不是装完核心后再单独安装（见 [ADR-0002](./docs/adr/0002-packs-composed-into-one-app.md)）：
+
+| 发行版 | 组合 | 在哪里组合 | 发布到 |
+|---|---|---|---|
+| 标准版 | 核心 | 本仓库 | 公开应用市场 |
+| 客户版 | 核心 + 客户选定的扩展包 + 客户初始化数据 | 客户的私有仓库 | 只发布到该客户的组织 |
+
+扩展包只通过对象扩展、选项列表扩展和导航贡献接入核心，不修改核心；两个扩展包之间的
+联动放在桥接模块里。客户后来要加扩展包，发布同一个应用的新版本并升级即可（见
+[扩展包总览 §3](./docs/packs/README.md#3-扩展包怎么组合与安装)）。
+
 ## 管理制度与系统同源
 
-hotsrm 附带一套供应商管理体系文件模板（程序文件、管理办法、表单）。制度条款与系统控制点
-一一对应，审批金额、时限、等级线等参数只维护一处，同时用于生成制度文本和配置系统。见
-[`docs/governance/`](./docs/governance/README.md)。
+hotsrm 附带一套供应商管理体系文件模板（程序文件、管理办法、表单），源文件用 Markdown，
+交付给客户的是生成的 Word / PDF。制度条款与系统控制点一一对应，审批金额、时限、等级线
+等参数只在 `params/` 维护一处，同时用于生成制度文本和配置系统。见
+[`governance/`](./governance/README.md) 与 [ADR-0005](./docs/adr/0005-governance-and-system-share-parameters.md)。
 
 ## 设计原则
 
 - **只用元数据实现**：对象、校验规则、行级权限、flow、审批全部用平台元数据表达，在托管云
-  上无需应用代码即可运行；需要代码的增强只在自托管部署中启用。
-- **供应商之间零可见**：门户按供应商隔离，取不到隔离依据时一行也不放行。
-- **封标**：报价截止前，内部任何角色（包括 AI 助手）都读不到报价。
+  上无需应用代码即可运行（[ADR-0001](./docs/adr/0001-declarative-only.md)）。
+- **供应商之间零可见**：门户按供应商隔离，取不到隔离依据时一行也不放行
+  （[ADR-0003](./docs/adr/0003-portal-isolation-by-supplier-position.md)）。
+- **封标**：开标前，内部任何角色（包括 AI 助手）都读不到报价
+  （[ADR-0004](./docs/adr/0004-sealed-bid.md)）。
 - **流程即 flow**：单据状态是对象上的字段，审批是 flow 节点，审批历史由平台保存。
+
+## 仓库结构
+
+```
+hotsrm/
+├── README.md
+├── AGENTS.md                      开发规则与红线（人和 AI agent 共用）
+├── CLAUDE.md                      指向 AGENTS.md
+├── docs/                          文档，地图见 docs/README.md
+│   ├── design/                    核心设计
+│   ├── packs/                     扩展包设计
+│   └── adr/                       决策记录
+├── governance/                    体系文件模板与生成脚本
+├── params/                        参数定义与示例默认值（制度与系统共用）      〔待建〕
+├── src/                                                                    〔待建〕
+│   ├── core/                      核心（type: app）
+│   ├── bulk/  hazmat/  soe/       三个扩展包（type: module）
+│   └── bridges/                   扩展包之间的联动（type: module）
+├── test/                          门户隔离、封标、组合构建、flow 测试          〔待建〕
+├── objectstack.composition.ts     按开关选出要组合的模块                      〔待建〕
+├── objectstack.config.ts          合成一个发布制品                            〔待建〕
+└── objectstack.manifest.json      标准版的应用标识                            〔待建〕
+```
 
 ## 当前状态
 
-设计阶段。文档目录：
+设计阶段：核心设计、三个扩展包设计和第一批决策记录已完成。文档目录见
+[docs/README.md](./docs/README.md)；参与开发前先读 [AGENTS.md](./AGENTS.md)。
 
-| 文档 | 内容 |
-|---|---|
-| [核心设计](./docs/design/README.md) | 需求、领域模型、流程与自动化、权限与门户、界面与分析、集成与 AI、交付计划 |
-| [行业扩展包](./docs/packs/README.md) | 三个扩展包的场景、流程、对象、自动化、参数和制度模板 |
-| [体系文件模板](./docs/governance/README.md) | 模板结构、参数、生成方式与编写计划 |
-
-下一步：补齐第一批体系文件模板与参数文件，然后按核心设计第一期实现应用包。
+下一步：补齐第一批体系文件模板与参数文件，然后按[核心设计第一期](./docs/design/07-delivery-plan.md)
+实现应用包。

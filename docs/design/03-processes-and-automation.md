@@ -264,7 +264,7 @@ stateDiagram-v2
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 生成 | `schedule`：每月 1 日 02:00（追赶式：处理所有 `reconciled == false` 且收货日期早于本月的记录） | 按「供应商 × 法人」分组，建对账单与明细：收货行、退货行、`claim_status == 'supplier_accepted'` 的索赔扣款行；把纳入的收货记录置为 `reconciled = true`、纳入的索赔置为 `settled`（防止下月重复扣款）；按明细税率算 `tax_amount`；状态 `draft`（FR-801） |
+| 1 生成 | `schedule`：每月 1 日 02:00（追赶式：处理所有 `reconciled == false`、`settlement_mode == 'standard'` 且收货日期早于本月的记录；其他结算方式的收货由对应扩展包自己生成对账明细） | 按「供应商 × 法人」分组，建对账单与明细：收货行、退货行、`claim_status == 'supplier_accepted'` 的索赔扣款行；把纳入的收货记录置为 `reconciled = true`、纳入的索赔置为 `settled`（防止下月重复扣款）；按明细税率算 `tax_amount`；状态 `draft`（FR-801） |
 | 2 内部复核 | 采购员 / 应付会计 | 检查后发送：状态→`sent`，通知供应商 `finance` 联系人 |
 | 3 供应商确认 | 门户 | 确认→`supplier_confirmed`（锁定，BR-16）；或标记差异行并填写原因→`disputed`，通知采购员 |
 | 4 差异处理 | 采购员 | 调整明细（补录 / 剔除 / 改价须有原因）后重新发送 |

@@ -51,6 +51,14 @@
     读不到时拒绝写入。两跳以上或需要汇总的判断依据，要么在创建时由 flow 冗余到本
     记录并设为只读（如把寻源单的截止时间复制到报价单，报价明细再经一跳读取），
     要么改走以系统身份运行的 screen flow。
+13. **为扩展包预留接口**：扩展包不修改核心，只能给核心对象加字段与校验
+    （`objectExtensions`）、给共享选项列表追加选项（`picklistExtensions`）、往核心
+    应用的导航分组里挂菜单（见[扩展包 §3.2](../packs/README.md#32-扩展包怎么接入核心)）。
+    所以可能被扩展包追加选项的枚举，在核心里做成**共享选项列表**（picklist），不直接写在
+    字段上：`srm_sourcing_event.sourcing_type`、`srm_contract.contract_type`、`srm_supplier_certificate.cert_type`、
+    `srm_quality_issue.source`、`srm_kpi.dimension`、`srm_risk_event.risk_type`、
+    `srm_statement_line.line_type`、`srm_receipt.settlement_mode`。状态字段（stageField）
+    不做成可扩展的，状态机只由核心定义。
 
 ## 2. 对象总览
 
@@ -410,7 +418,9 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 `received_quantity`、`accepted_quantity`、`rejected_quantity`、`movement_type`
 （`receipt` 收货 / `return` 退货）、`amount`（currency，数量 × 订单行单价，flow 写入，
 采购支出口径）、`on_time`（boolean，收货 flow 按
-`receipt_date <= promised_date` 判定）、`reconciled`（boolean，是否已进对账单）。
+`receipt_date <= promised_date` 判定）、`reconciled`（boolean，是否已进对账单）、
+`settlement_mode`（共享选项列表，核心只有 `standard` 一项，默认 `standard`；扩展包可以追加
+自己的结算方式，例如大宗物料包的 `bulk`，核心的月度对账只处理 `standard` 的收货）。
 
 ### 4.6 质量
 

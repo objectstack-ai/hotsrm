@@ -2,7 +2,7 @@
 
 > 状态：设计草案 v0.1（2026-10-22）
 > 适用：hotsrm 的通用核心，即在 ObjectStack（ObjectOS 元数据驱动运行时）上构建的 SRM 应用包。
-> 行业差异见 [扩展包](../packs/README.md)，管理制度模板见 [体系文件](../governance/README.md)
+> 行业差异见 [扩展包](../packs/README.md)，管理制度模板见 [体系文件](../../governance/README.md)
 > 受众：产品、实施顾问、开发，以及采购 / 质量 / 财务业务方
 > 约定：对象、字段、选项值等机器名用 snake_case 英文；标签、正文用中文
 
@@ -55,7 +55,7 @@
 | [06-integration-and-ai.md](./06-integration-and-ai.md) | ERP 集成方案与字段映射、外部服务、AI 助手用例与治理 | 开发、架构 |
 | [07-delivery-plan.md](./07-delivery-plan.md) | 分期路线图、MVP 验收、应用包结构、风险、待决策事项、平台依赖与待验证项 | 项目经理、全体 |
 | [../packs/](../packs/README.md) | 行业扩展包：大宗物料包、危化品包、国企采购合规包 | 产品、实施 |
-| [../governance/](../governance/README.md) | 体系文件（管理制度）模板与参数 | 实施顾问、客户体系工程师 |
+| [governance/](../../governance/README.md) | 体系文件（管理制度）模板与参数 | 实施顾问、客户体系工程师 |
 
 ## 3. 默认业务画像（设计假设）
 
