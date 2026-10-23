@@ -4,4 +4,5 @@ export { SupplierViews } from './supplier.view.js';
 export { SupplierCertificateViews } from './supplier-certificate.view.js';
 export { SupplierApplicationViews } from './supplier-application.view.js';
 export { SupplierBankAccountViews } from './supplier-bank-account.view.js';
+export { SupplierChangeRequestViews } from './supplier-change-request.view.js';
 export { MaterialViews } from './material.view.js';

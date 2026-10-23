@@ -190,13 +190,24 @@ flowchart TD
 `verified_by`。flow 拒绝三种情况：启动人不是应付会计、账户不是待核验、启动人就是新建人
 （双人原则）。已有账户的修改不直接编辑，走下面的信息变更单。
 
-**信息变更**（v0.2，FR-207）：供应商在门户经「提交变更申请」screen flow 提交变更单（v0.6 前由采购员代供应商发起）→
-`before_value` 自动快照当前档案 → 审批 flow `srm_change_approval`：第 1 级
-`position = srm_buyer_lead`（采购确认）；`change_type == 'bank_account'` 时增加第 2 级
-`position = srm_ap_accountant`（财务复核），
-两级审批人由不同岗位担任（BR-11）→ 通过后 flow 把 `after_value` 写回供应商或银行
-账户，新银行账户为 `active`，旧账户为 `inactive`。驳回时通知供应商并写明原因。ERP 侧的
-银行账户由财务按 SRM 的审批记录维护（ERP 集成为预留集成点）。
+**信息变更**（v0.2，FR-207）：门户上线前由采购侧代供应商在供应商档案下新建变更单（v0.6 起供应商在门户经
+「提交变更申请」screen flow 提交），填写变更后的值 → 审批 flow `srm_change_approval` 新建即触发，先把当前档案
+快照到 `before_value` → 第 1 级 `position = srm_buyer_lead`（采购确认）；`change_type == 'bank_account'` 时
+增加第 2 级 `position = srm_ap_accountant`（财务复核，核实方式按 `params/core.yaml` 的 `bank_change_verification`）
+→ 通过后子 flow `srm_change_apply` 以系统身份写回：基本信息、地址写回供应商（同时写 `last_change_request`，
+见 02 §4.1 关键信息锁定），联系人写回联系人；银行账户变更停用原账户（是默认账户的同时取消默认）、按新值建一个
+`active` 账户，核验人记为财务复核人，原账户是默认的新账户接着做默认 → 写回后的档案快照到 `after_value`，
+变更单为 `applied`，通知发起人。
+
+- **驳回**：不改主记录，审批意见写入 `reject_reason`，通知发起人。
+- **退回修改**：第 1 级可以退回（`revise` → `approval_revise`，至多 3 次），记录解锁，发起人改完重新提交，
+  从第 1 级重新审批。**临时做法**：第 2 级只能通过或驳回、不能退回——平台 18.0.0 把第 2 个审批节点的提交人记成
+  第 1 级审批人，退回后发起人无法重新提交（objectstack#24817 已在主干修复、未发版）；发版后加回退回。
+- **职责分离（BR-11）**：发起人不能审批本人的变更单，两级审批人不能是同一人。平台没有「提交人不得审批」开关
+  （objectstack#25446），岗位又可能兼任，所以每级通过后 flow 读审批记录比对，撞人时这次通过不算数，通知审批人
+  并重新开一轮同级审批。审批人在节点开启时按岗位解析：只有一位采购主管且他就是发起人时，要再任命一位。
+
+ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预留集成点）。
 
 **供应商处置**（v0.3，FR-208）：品类经理发起处置单 → 审批：冻结 / 解冻为品类经理 →
 采购总监；淘汰与黑名单再加 `position = srm_general_manager`；解除黑名单单独走同一条
@@ -377,7 +388,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_certificate_expiry_notice` | time_relative：`valid_to` −30 / −15 / −7 天 | 资质证书 | v0.1 |
 | `srm_certificate_expire_sweep` | schedule：每日 01:00（追赶式） | 资质证书 | v0.1 |
 | `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商 | v0.1 |
-| `srm_change_approval` / `srm_change_apply` | record_change | 变更单、银行账户 | v0.2 |
+| `srm_change_approval` / `srm_change_apply` | record_change：变更单新建 / 子 flow | 变更单 → 供应商、银行账户、联系人 | v0.2 |
 | `srm_contract_approval` | record_change：状态→`in_review` | 合同 | v0.3 |
 | `srm_contract_expiry_notice` / `srm_contract_expire_sweep` | time_relative / schedule | 合同 | v0.3 |
 | `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单 | v0.3 |
@@ -408,7 +419,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_certificate_verify` 核验证书 | 资质证书 | SQE | v0.1 |
 | `srm_primary_contact_set` 设为主联系人 | 供应商联系人 | `srm_supplier_admin` | v0.1 |
 | `srm_bank_verify` 核验银行账户 | 银行账户 | 应付会计 | v0.2 |
-| `srm_change_submit` 提交变更申请 | 供应商档案（v0.6 起门户：公司资料） | 采购员；v0.6 起门户管理员 | v0.2 |
+| `srm_change_submit` 提交变更申请 | 门户：公司资料（v0.6 前内部在供应商档案下直接新建变更单） | 门户管理员 | v0.6 |
 | `srm_audit_finding_to_scar` 转整改单 | 供应商审核 | SQE | v0.4 |
 | `srm_score_submit` 提交评分 | 考评单 | 评分人 | v0.5 |
 | `srm_appeal_submit` 申诉 | 门户：绩效 | 门户管理员 | v0.6 |

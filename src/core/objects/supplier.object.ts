@@ -2,6 +2,12 @@ import { P, cel } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 供应商（02 §4.1、§5.1）。门户岗位、绩效等级等字段随对应版本加入。
+// 关键信息在准入期间可以直接改；准入通过后只能经信息变更单修改（03 §5，FR-207）：
+// srm_change_apply 写回时同时写只读字段 last_change_request，校验规则 key_info_via_change_request
+// 只放行带着它的修改。不用 readonlyWhen：它连系统身份的写入也挡（flow 写不回去）。
+const keyInfoFields = ['name', 'country', 'credit_code', 'registration_no', 'legal_representative', 'registered_capital', 'address'];
+const changed = (k: string) => `(has(record.${k}) ? record.${k} : null) != (has(previous.${k}) ? previous.${k} : null)`;
+
 export const Supplier = ObjectSchema.create({
   name: 'srm_supplier',
   label: '供应商',
@@ -97,6 +103,8 @@ export const Supplier = ObjectSchema.create({
       readonlyWhen: P`previous.legacy_imported != true`,
     }),
     legacy_reviewed: Field.boolean({ label: '存量已复核', group: 'qualification', defaultValue: false }),
+    // 最近一次写回本档案的信息变更单，由 srm_change_apply 写入（v0.2）
+    last_change_request: Field.lookup('srm_supplier_change_request', { label: '最近变更单', group: 'registration', readonly: true }),
     erp_vendor_code: Field.text({ label: 'ERP 供应商编码', group: 'registration', unique: true, maxLength: 40 }),
     contact_count: Field.summary({
       label: '联系人数',
@@ -164,6 +172,19 @@ export const Supplier = ObjectSchema.create({
       events: ['insert'],
       message: '新建供应商须从「潜在」开始准入；只有存量导入的供应商建档即为「合格」',
       condition: P`(record.legacy_imported == true) != (record.status == 'qualified')`,
+    },
+    {
+      name: 'key_info_via_change_request',
+      type: 'script',
+      severity: 'error',
+      events: ['update'],
+      message: '合格供应商的全称、信用代码、注册号、法定代表人、注册资本、注册地址请经信息变更单修改',
+      condition: {
+        dialect: 'cel',
+        source:
+          `previous.status != 'potential' && previous.status != 'qualifying' && `
+          + `${changed('last_change_request')} == false && (${keyInfoFields.map(changed).join(' || ')})`,
+      },
     },
     {
       name: 'credit_code_format',
