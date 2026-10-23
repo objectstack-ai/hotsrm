@@ -21,6 +21,18 @@ dept:
   finance: 财务部
   legal: 法务部门
   oversight: 法务、审计、纪检监察部门
+  audit: 审计部门
+  discipline: 监察部门
+  # 上市公司负责关联交易审议与披露的部门（国企采购合规包的风险控制用到）
+  board_office: 董事会办公室
+
+# 决策机构：批准政策层文件、决定重大采购事项的机构；设立采购管理委员会的写其名称
+body:
+  approval: 总经理办公会
+  committee: 采购管理委员会
+
+# 本企业须遵守其授权规定的上级，如「集团公司」「控股股东」；没有的写「上级单位」
+superior: 上级单位
 
 role:
   vp_procurement: 分管采购的副总经理
@@ -30,6 +42,14 @@ role:
 terms:
   bulk: 大宗原料
   hazmat: 危险化学品
+  # 战略物资的典型名称，用在政策层文件（如「主要原材料、主要燃料等战略物资」）
+  strategic: 主要原材料、主要燃料
+
+# 举报渠道，用在供应商行为准则
+whistleblow:
+  phone: （举报电话）
+  email: （举报邮箱）
+  address: （信函地址）
 
 # 物资分类的典型物资：examples 用于正文列举，brief 用于附录表格
 material_classes:

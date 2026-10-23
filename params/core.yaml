@@ -133,3 +133,34 @@ po_ack_escalate_hours:
   example: 48
   used_in: [QP-02]
   system: 同上
+
+# ---- 政策层文件（ZC-01 管理目标、ZC-02 授权审批表、ZC-03 风险控制矩阵） ----
+
+award_approval_tiers:
+  label: 定标审批金额档
+  unit: 万元（单次事项含税总金额）
+  example: { mid: 10, high: 100 }
+  display: 不足 {mid} 万元、{mid} 万元至不足 {high} 万元、{high} 万元及以上三档
+  used_in: [ZC-02 3]
+  system: 定标审批 flow 按定标金额选择审批层级；单一来源达到 high 档时加一级（核心 01 FR-308、03 §4）
+
+min_valid_quotes:
+  label: 定标所需的有效报价家数
+  unit: 家
+  example: 3
+  used_in: [ZC-02 1.3, ZC-03 2.2]
+  system: 定标审批 flow：有效报价少于该数时必须填写理由，审批升级一级（核心 01 FR-308）
+
+split_purchase_window_months:
+  label: 拆分采购的累计计算期
+  unit: 个月
+  example: 12
+  used_in: [ZC-02 1.3, ZC-03 2.2]
+  system: 制度要求；内控评价与审计抽查
+
+management_targets:
+  label: 采购与供应商管理目标
+  example: { avl_spend: 98%, competitive: 85%, exception: 5%, admission_days: 30 日, lot_pass: 98%, scar_ontime: 90% }
+  display: 名录内采购金额占比 ≥ {avl_spend}，竞争性采购比例 ≥ {competitive}，单一来源与紧急采购比例 ≤ {exception}，准入周期 ≤ {admission_days}，来料批次合格率 ≥ {lot_pass}，整改按时关闭率 ≥ {scar_ontime}
+  used_in: [ZC-01 6]
+  system: 采购总览、寻源、供应商、质量仪表盘对照的目标值（核心 05 §4）
