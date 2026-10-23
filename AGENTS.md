@@ -9,16 +9,24 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 管理（SRM）应用，由三层组成：
 
 - **通用核心**：设计在 `docs/design/`，源码在 `src/core/`（`type: app`）；
-- **行业扩展包**：设计在 `docs/packs/`，源码在 `src/bulk/`、`src/hazmat/`、`src/soe/`
-  （`type: module`），构建时与核心合成一个应用（[ADR-0002](./docs/adr/0002-packs-composed-into-one-app.md)）；
-- **客户配置**：参数取值、组织、物资目录、样式等，放在客户的私有仓库，**不进本仓库**。
+- **行业扩展包**：设计在 `docs/packs/`，源码将放在 `src/bulk/`、`src/hazmat/`、`src/soe/`
+  （`type: module`），构建时与核心合成一个应用（[ADR-0002](./docs/adr/0002-packs-composed-into-one-app.md)）。
+  **现阶段只做核心包**，三个扩展包保留为设计、未排期（[ADR-0009](./docs/adr/0009-core-first-pack-criteria-and-customer-layer.md)）；
+- **客户配置**：参数取值、组织、物资目录、样式、Studio 覆盖层、客户私有包，放在客户的
+  私有仓库和客户环境，**不进本仓库**（ADR-0009）。
+
+核心做什么、不做什么：供应商生命周期、合同、质量、绩效、风险、门户、寻源在核心；
+采购订单、收货、对账、发票、付款留在 ERP，SRM 只记结论、不记过程
+（[ADR-0008](./docs/adr/0008-order-to-pay-stays-in-erp.md)）。路线：内部核心 → 门户 → 寻源，
+见 [docs/design/07](./docs/design/07-delivery-plan.md)。
 
 文档地图见 [docs/README.md](./docs/README.md)，关键决定见 [docs/adr/](./docs/adr/README.md)。
 
 ## 2. 红线（违反即退回）
 
 1. **只用元数据**（[ADR-0001](./docs/adr/0001-declarative-only.md)）：业务规则不得依赖生命周期
-   钩子、插件或服务端函数。托管云不执行应用包代码，依赖它们的规则会静默失效。
+   钩子、插件或服务端函数。平台本身有沙箱钩子，但本仓库不用：托管云可以关闭应用包
+   代码，依赖它们的规则会静默失效。例外只能按包写新的 ADR。
 2. **供应商之间零可见**（[ADR-0003](./docs/adr/0003-portal-isolation-by-supplier-position.md)）：
    - 新增面向供应商的顶层对象，必须同时有 `portal_position` 字段、前缀校验规则、门户 RLS
      和隔离测试；
@@ -26,19 +34,26 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
    - 不得删除或跳过隔离测试。
 3. **封标**（[ADR-0004](./docs/adr/0004-sealed-bid.md)）：任何能读到报价的权限集、报表、视图
    都必须受 `bid_opened == true` 约束；不得给任何角色报价对象的全量读取权限。
-4. **扩展包不改核心**：扩展包只能用 `objectExtensions`、`picklistExtensions`、导航贡献三种
-   方式接入核心，不修改 `src/core/` 下的文件；扩展包之间不互相引用，联动放
-   `src/bridges/<A>-<B>/`。
+4. **扩展包不改核心**（[ADR-0009](./docs/adr/0009-core-first-pack-criteria-and-customer-layer.md)）：
+   扩展包只能用 `objectExtensions`、`picklistExtensions`、导航贡献三种方式接入核心，不修改
+   `src/core/` 下的文件；包主要新增自己的对象并用 `lookup` 关联核心，对核心对象的
+   `objectExtensions` 每包不超过 2–3 个字段；扩展包之间不互相引用，桥接模块现阶段不做。
+   新包必须满足准入标准（受法规约束 / 三家以上复用 / 保护测试资产）之一才立项。
 5. **不写客户信息**：本仓库是公开仓库。不写客户名称，也不写能认出客户的组合（某客户的
    物料清单、组织形态、合同条款）；参数只用标明「示例」的行业常见值。
 6. **不提交密钥**：连接串、令牌、密码、证书私钥一律不进仓库、提交信息、PR 和文档。
+7. **核心 API 名冻结**（ADR-0009）：对象名、字段名、字段类型一旦合入主干不再改；改必须附
+   ADR，门槛 2（v0.7 结束）之后还要附迁移说明。客户个性化放客户层，核心字段只能隐藏，
+   不能删除。
 
 ## 3. 元数据约定
 
 - `@objectstack/spec` 是唯一契约。元数据跑不通时改元数据，不去放宽运行时；不确定某个
   写法是否合法时，查框架源码中的规范定义，不要猜。
 - 命名：核心对象 `srm_*`；扩展包对象 `srm_bulk_*`、`srm_hz_*`、`srm_soe_*`；字段名和选项值
-  用 snake_case，不以数字开头。
+  用 snake_case，不以数字开头；字段名不含 `role`（平台保留词，联系人角色叫 `contact_function`）。
+- 字段谓词（`requiredWhen`、`readonlyWhen`、`visibleWhen`）只能读本记录；关联记录只在
+  `script` 校验规则里经一跳读取。其余建模规则见 [docs/engineering/](./docs/engineering/README.md)。
 - 建模原则见[核心 02 §1](./docs/design/02-domain-model.md#1-建模原则)，要点：
   - 状态是主对象上的 `select` 字段，作为 `stageField`，每个选项带 `kind`；
     `state_machine` 校验同时声明 `transitions` 和 `initialStates`；
@@ -56,7 +71,10 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 
 - 正文用简体中文，机器名用英文。
 - 先改设计再改元数据：行为变化先更新 `docs/design/` 或 `docs/packs/` 的对应章节，再改源码。
-- 新的关键决定写 ADR；改变已有决定时写新的 ADR 取代旧的，不改写旧记录的「决定」部分。
+- 新的关键决定写 ADR；改变已有决定时写新的 ADR 取代旧的，不改写旧记录的「决定」部分；
+  「待验证」有结论后在该条下追加「结果（日期）」。
+- 版本出口时同步 `docs/design/07` 的路线表和根 README 的对象数；模板里不写死会进系统的
+  数字，一律引用 `params/`。
 - `docs/reference/` 由脚本从元数据生成，禁止手改。
 - 体系文件条款与系统控制点同步修改：改了一边，检查另一边（[ADR-0005](./docs/adr/0005-governance-and-system-share-parameters.md)）。
 - 体系文件模板只写通用表述，不写【待确认】和任何客户信息；客户的取值、标注和专属段落放

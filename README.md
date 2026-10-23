@@ -2,20 +2,20 @@
 
 基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) 的通用供应商关系管理（SRM）应用。
 
-hotsrm 管企业**与供应商协同**的那一半：供应商全生命周期、寻源定价、合同、订单与送货协同、
-质量整改、绩效、对账开票、风险，以及面向供应商的门户。物料、库存、应付凭证和付款仍由
-ERP 记账，hotsrm 不做第二套账。
+hotsrm 管企业**与供应商协同**的那一半：供应商全生命周期、合同、质量整改、绩效、风险、
+寻源定价，以及面向供应商的门户。采购订单、收货、对账、发票、付款留在 ERP，hotsrm 只记
+结论、不做第二套账（[ADR-0008](./docs/adr/0008-order-to-pay-stays-in-erp.md)）。
 
 ## 三层结构
 
 | 层 | 内容 | 设计 | 源码 |
 |---|---|---|---|
 | 通用核心 | 所有企业都需要的功能与管理制度 | [`docs/design/`](./docs/design/README.md) | `src/core/`（`type: app`） |
-| 行业扩展包 | 同类企业共有的做法，按需组合：[大宗物料包](./docs/packs/bulk-materials.md)、[危化品包](./docs/packs/hazmat.md)、[国企采购合规包](./docs/packs/soe-procurement.md) | [`docs/packs/`](./docs/packs/README.md) | `src/bulk/`、`src/hazmat/`、`src/soe/`（`type: module`） |
-| 客户配置 | 某个客户的参数取值、组织结构、物资目录、审批权限、文件样式 | — | 客户的私有仓库，不在本仓库 |
+| 行业扩展包 | 同类企业共有的做法，按需组合：[大宗物料包](./docs/packs/bulk-materials.md)、[危化品包](./docs/packs/hazmat.md)、[国企采购合规包](./docs/packs/soe-procurement.md)。**设计保留，未排期**（[ADR-0009](./docs/adr/0009-core-first-pack-criteria-and-customer-layer.md)） | [`docs/packs/`](./docs/packs/README.md) | 将来放 `src/bulk/`、`src/hazmat/`、`src/soe/`（`type: module`） |
+| 客户配置 | 某个客户的参数取值、组织结构、物资目录、审批权限、文件样式、Studio 覆盖层、客户私有包 | — | 客户的私有仓库与客户环境，不在本仓库 |
 
-客户需求按「通用核心 → 扩展包 → 参数 → 定制」的顺序归位，定制尽量少（见
-[扩展包总览](./docs/packs/README.md#1-三层结构)）。
+客户需求按「通用核心 → 扩展包 → 参数 → 定制」的顺序归位；现阶段只做核心包，客户个性化
+放客户层，核心 API 名冻结（见 [扩展包总览](./docs/packs/README.md#1-三层结构) 与 ADR-0009）。
 
 ## 扩展包怎么组合与安装
 
@@ -27,8 +27,8 @@ ObjectStack 中客户能安装的只有应用（`type: app`）。扩展包是模
 | 标准版 | 核心 | 本仓库 | 公开应用市场 |
 | 客户版 | 核心 + 客户选定的扩展包 + 客户初始化数据 | 客户的私有仓库 | 只发布到该客户的组织 |
 
-扩展包只通过对象扩展、选项列表扩展和导航贡献接入核心，不修改核心；两个扩展包之间的
-联动放在桥接模块里。客户后来要加扩展包，发布同一个应用的新版本并升级即可（见
+扩展包只通过对象扩展、选项列表扩展和导航贡献接入核心，不修改核心；桥接模块等第二个
+包出现再做。客户后来要加扩展包，发布同一个应用的新版本并升级即可（见
 [扩展包总览 §3](./docs/packs/README.md#3-扩展包怎么组合与安装)）。
 
 ## 管理制度与系统同源
@@ -42,6 +42,8 @@ hotsrm 附带一套供应商管理体系文件模板（程序文件、管理办�
 
 - **只用元数据实现**：对象、校验规则、行级权限、flow、审批全部用平台元数据表达，在托管云
   上无需应用代码即可运行（[ADR-0001](./docs/adr/0001-declarative-only.md)）。
+- **记结论、不记过程**：订单到付款留在 ERP，SRM 用导入的交付记录算绩效，预留集成点
+  （[ADR-0008](./docs/adr/0008-order-to-pay-stays-in-erp.md)）。
 - **供应商之间零可见**：门户按供应商隔离，取不到隔离依据时一行也不放行
   （[ADR-0003](./docs/adr/0003-portal-isolation-by-supplier-position.md)）。
 - **封标**：开标前，内部任何角色（包括 AI 助手）都读不到报价
@@ -57,25 +59,35 @@ hotsrm/
 ├── CLAUDE.md                      指向 AGENTS.md
 ├── docs/                          文档，地图见 docs/README.md
 │   ├── design/                    核心设计
-│   ├── packs/                     扩展包设计
+│   ├── packs/                     扩展包设计（设计保留，未排期）
+│   ├── engineering/               建模规范、CI 门禁、测试与版本策略
 │   └── adr/                       决策记录
 ├── governance/                    体系文件模板与生成脚本
 ├── params/                        参数定义与示例默认值（制度与系统共用）
-├── src/                                                                    〔待建〕
-│   ├── core/                      核心（type: app）
-│   ├── bulk/  hazmat/  soe/       三个扩展包（type: module）
-│   └── bridges/                   扩展包之间的联动（type: module）
-├── test/                          门户隔离、封标、组合构建、flow 测试          〔待建〕
-├── objectstack.composition.ts     按开关选出要组合的模块                      〔待建〕
-├── objectstack.config.ts          合成一个发布制品                            〔待建〕
-└── objectstack.manifest.json      标准版的应用标识                            〔待建〕
+├── src/
+│   └── core/                      核心（type: app）；v0.1 骨架与主数据已合入
+│       （扩展包 bulk/ hazmat/ soe/ 与桥接模块等有客户要求时再建）
+├── test/                          flow 测试；门户隔离（v0.6 起）、封标（v0.7 起）
+├── objectstack.config.ts          发布制品
+└── objectstack.manifest.json      标准版的应用标识
 ```
 
 ## 当前状态
 
-设计阶段：核心设计、三个扩展包设计、第一批决策记录、参数文件首版、体系文件生成脚本和
-第一份模板（QP-01）已完成。文档目录见
-[docs/README.md](./docs/README.md)；参与开发前先读 [AGENTS.md](./AGENTS.md)。
+2026-10-23：范围与路线重定（ADR-0008、ADR-0009）。核心收到 **27 个对象**，按版本交付：
 
-下一步：补齐第一批体系文件模板，然后按[核心设计第一期](./docs/design/07-delivery-plan.md)
-实现应用包。
+| 版本 | 内容 | 累计对象 |
+|---|---|---|
+| v0.1（进行中） | 内部工作台：主数据、两级准入审批、资质到期扫描 | 7 |
+| v0.2 | 物料只读副本、银行账户、存量导入、信息变更单 | 10 |
+| v0.3 | 合同与协议、供应商处置 | 13 |
+| v0.4 | 交付记录导入、质量问题 / SCAR、供应商审核 | 17 |
+| v0.5 | 绩效、风险事件、管理报表 = 内部版 MVP，试运行 | 20 |
+| v0.6 | 供应商门户（依赖 objectstack#25233） | 21 |
+| v0.7 | 寻源与封标、价格库；核心对象冻结 | 27 |
+
+已完成：核心设计、三个扩展包设计（保留）、ADR-0001～0009、参数文件首版、体系文件生成脚本
+和 12 份模板、v0.1 的骨架与主数据（PR #5）。文档目录见 [docs/README.md](./docs/README.md)；
+参与开发前先读 [AGENTS.md](./AGENTS.md)。
+
+下一步：完成 v0.1 的准入审批、资质扫描、权限与导航（[07 §1](./docs/design/07-delivery-plan.md#1-分期路线图)）。
