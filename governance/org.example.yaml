@@ -39,6 +39,17 @@ role:
   vp_procurement: 分管采购的副总经理
   gm: 总经理
 
+# 审批岗位的称谓。核心设计 03 §12 的审批矩阵按这些岗位解析审批人，SRM 中的岗位（position）
+# 与之一一对应；客户按本企业的叫法改称谓，不改矩阵。
+position:
+  category_manager: 品类经理
+  buyer_lead: 采购主管
+  procurement_director: 采购总监
+  quality_manager: 质量经理
+  sqe: 供应商质量工程师
+  ap_accountant: 应付会计
+  legal: 法务
+
 # 本企业对行业物资的称呼，用在扩展包段落里
 terms:
   bulk: 大宗原料

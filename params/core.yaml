@@ -53,7 +53,7 @@ perf_cycle:
   example: { A: 每月, B: 每季度, C: 每年 }
   display: A 类{A}，B 类{B}，C 类{C}
   used_in: [QP-01 6.7.1, QP-01 附录 A]
-  system: 考评计划的周期设置（核心 03 §10）
+  system: 考评生成 flow 按供应商所供最高物资类别（srm_category.material_class）取周期（核心 03 §10，v0.5）
 
 perf_grade_min:
   label: 绩效等级下限分
@@ -105,6 +105,13 @@ blacklist_years:
   used_in: [QP-01 6.9.3]
   system: 制度要求；黑名单状态由处置单设置，解除需单独审批（核心 03 §5）
 
+change_review_days:
+  label: 信息变更审核时限
+  unit: 工作日
+  example: 5
+  used_in: [GL-04 6.3.5]
+  system: 变更审批 flow srm_change_approval 审批节点的 timeoutHours（核心 03 §5）
+
 record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
@@ -125,14 +132,14 @@ po_ack_remind_hours:
   unit: 小时（下发后）
   example: 24
   used_in: [QP-02]
-  system: 追赶式扫描 srm_po_ack_sweep（核心 03 §7）
+  system: 制度要求；订单镜像在 ERP 集成后才有（核心 03 §7 预留，ADR-0008）
 
 po_ack_escalate_hours:
   label: 订单未确认升级采购主管
   unit: 小时（下发后）
   example: 48
   used_in: [QP-02]
-  system: 同上
+  system: 同上（ERP 集成后）
 
 # ---- 准入与现场审核（GL-01、WI-01） ----
 
@@ -149,6 +156,13 @@ cert_min_remaining_months:
   example: 3
   used_in: [GL-01 6.2.2]
   system: 制度要求；核验证书时由核验人判断
+
+admission_approval_days:
+  label: 准入评审每级审批时限
+  unit: 工作日
+  example: 3
+  used_in: [GL-01 附录 B]
+  system: 准入审批 flow 各审批节点的 timeoutHours（按日历小时换算，核心 03 §3）；到期提醒审批人
 
 doc_return_limit:
   label: 准入资料退回补充的次数上限
@@ -206,7 +220,7 @@ award_approval_tiers:
   example: { mid: 10, high: 100 }
   display: 不足 {mid} 万元、{mid} 万元至不足 {high} 万元、{high} 万元及以上三档
   used_in: [ZC-02 3, GL-02 附录 A]
-  system: 定标审批 flow 按定标金额选择审批层级；单一来源达到 high 档时加一级（核心 01 FR-308、03 §4）
+  system: 定标审批 flow 按定标金额选择审批层级，单一来源寻源达到 high 档时加总经理一级（核心 03 §12 审批矩阵，v0.7）
 
 min_valid_quotes:
   label: 定标所需的有效报价家数
@@ -236,7 +250,7 @@ invoice_tolerance:
   unit: 元（不含税金额和税额分别比较）
   example: 1
   used_in: [QP-02 6.8.4]
-  system: 发票登记校验，超出容差拒绝提交（核心 01 FR-804）
+  system: 制度要求；发票在 ERP 中处理，SRM 不做（ADR-0008）
 
 open_tender_threshold:
   label: 公开招标的金额标准
