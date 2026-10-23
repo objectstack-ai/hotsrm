@@ -105,7 +105,8 @@ flowchart TD
 
 ## 6. 参数（示例默认值）
 
-以下为示例，实施时按企业制度和授权文件赋值。
+以下为示例，实施时按企业制度和授权文件赋值。前三项是通用概念，参数定义在核心的 `params/core.yaml`
+（`open_tender_threshold`、`min_bidders`、`panel_min_size`），本包的采购方式规则表直接引用。
 
 | 参数 | 示例默认值 |
 |---|---|

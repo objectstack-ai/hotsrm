@@ -22,6 +22,7 @@ dept:
   legal: 法务部门
   oversight: 法务、审计、纪检监察部门
   audit: 审计部门
+  warehouse: 仓储部门
   discipline: 监察部门
   # 上市公司负责关联交易审议与披露的部门（国企采购合规包的风险控制用到）
   board_office: 董事会办公室
