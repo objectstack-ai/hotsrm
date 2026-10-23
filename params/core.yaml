@@ -109,7 +109,7 @@ record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
   example: 3
-  used_in: [QP-01 第 8 章]
+  used_in: [QP-01 第 8 章, QP-02 第 8 章, GL-04 6.7.1]
   system: 制度要求
 
 contract_reminder_days:
@@ -141,21 +141,21 @@ award_approval_tiers:
   unit: 万元（单次事项含税总金额）
   example: { mid: 10, high: 100 }
   display: 不足 {mid} 万元、{mid} 万元至不足 {high} 万元、{high} 万元及以上三档
-  used_in: [ZC-02 3]
+  used_in: [ZC-02 3, GL-02 附录 A]
   system: 定标审批 flow 按定标金额选择审批层级；单一来源达到 high 档时加一级（核心 01 FR-308、03 §4）
 
 min_valid_quotes:
   label: 定标所需的有效报价家数
   unit: 家
   example: 3
-  used_in: [ZC-02 1.3, ZC-03 2.2]
+  used_in: [ZC-02 1.3, ZC-03 2.2, GL-02 8.2, GL-02 附录 A]
   system: 定标审批 flow：有效报价少于该数时必须填写理由，审批升级一级（核心 01 FR-308）
 
 split_purchase_window_months:
   label: 拆分采购的累计计算期
   unit: 个月
   example: 12
-  used_in: [ZC-02 1.3, ZC-03 2.2]
+  used_in: [ZC-02 1.3, ZC-03 2.2, QP-02 6.2.4]
   system: 制度要求；内控评价与审计抽查
 
 management_targets:
@@ -164,3 +164,49 @@ management_targets:
   display: 名录内采购金额占比 ≥ {avl_spend}，竞争性采购比例 ≥ {competitive}，单一来源与紧急采购比例 ≤ {exception}，准入周期 ≤ {admission_days}，来料批次合格率 ≥ {lot_pass}，整改按时关闭率 ≥ {scar_ontime}
   used_in: [ZC-01 6]
   system: 采购总览、寻源、供应商、质量仪表盘对照的目标值（核心 05 §4）
+
+# ---- 采购与寻源（QP-02、GL-02） ----
+
+invoice_tolerance:
+  label: 发票与对账单的金额容差
+  unit: 元（不含税金额和税额分别比较）
+  example: 1
+  used_in: [QP-02 6.8.4]
+  system: 发票登记校验，超出容差拒绝提交（核心 01 FR-804）
+
+open_tender_threshold:
+  label: 公开招标的金额标准
+  unit: 万元（单项预计含税金额）
+  example: { goods: 50, services: 30 }
+  display: 货物 {goods} 万元，服务 {services} 万元
+  used_in: [GL-02 附录 B]
+  system: 制度要求；组合国企采购合规包时，作为采购方式规则表 srm_soe_method_rule 的公开采购下限
+
+min_bidders:
+  label: 询比价、竞争性谈判、竞价的最少参与供应商数
+  unit: 家
+  example: 3
+  used_in: [GL-02 3.2, GL-02 附录 B]
+  system: 寻源单发布前校验邀请家数；组合国企采购合规包时由采购方式规则表执行
+
+panel_min_size:
+  label: 评审小组最少人数（须为单数）
+  unit: 人
+  example: 3
+  used_in: [GL-02 7.2]
+  system: 评审小组成员数校验；组合国企采购合规包时用于专家抽取记录
+
+tech_weight_max:
+  label: 综合评分法的技术权重上限
+  example: 40%
+  used_in: [GL-02 7.1]
+  system: 寻源单评分权重校验（核心 01 FR-306）
+
+# ---- 廉洁（GL-05、SP-01） ----
+
+former_employee_years:
+  label: 离职员工的利益冲突期
+  unit: 年
+  example: 3
+  used_in: [GL-05 4.1, SP-01 1.2]
+  system: 关联关系申报的申报项（核心 01 FR-904）

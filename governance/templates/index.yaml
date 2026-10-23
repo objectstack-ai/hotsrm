@@ -14,15 +14,15 @@ documents:
   SP-01: { title: 供应商行为准则, level: 对外, pack: core, status: written }
   SP-02: { title: 大宗原料供应商手册, level: 对外, pack: bulk, status: planned }
   QP-01: { title: 供应商管理控制程序, level: 二级, pack: core, status: written }
-  QP-02: { title: 采购控制程序, level: 二级, pack: core, status: planned }
+  QP-02: { title: 采购控制程序, level: 二级, pack: core, status: written }
   QP-03: { title: 进货检验与不合格品控制程序, level: 二级, pack: core, status: planned }
   QP-04: { title: 纠正措施控制程序, level: 二级, pack: core, status: planned }
   GL-01: { title: 供应商准入与资质管理办法, level: 三级, pack: core, status: planned }
   WI-01: { title: 供应商现场审核作业指导书, level: 三级, pack: core, status: planned }
-  GL-02: { title: 采购寻源与定价管理办法, level: 三级, pack: core, status: planned }
+  GL-02: { title: 采购寻源与定价管理办法, level: 三级, pack: core, status: written }
   GL-03: { title: 采购合同管理办法, level: 三级, pack: core, status: planned }
-  GL-04: { title: 供应商信息变更与收款账户管理规定, level: 三级, pack: core, status: planned }
-  GL-05: { title: 采购廉洁与利益冲突回避规定, level: 三级, pack: core, status: planned }
+  GL-04: { title: 供应商信息变更与收款账户管理规定, level: 三级, pack: core, status: written }
+  GL-05: { title: 采购廉洁与利益冲突回避规定, level: 三级, pack: core, status: written }
   GL-06: { title: 供应商绩效评价管理办法, level: 三级, pack: core, status: planned }
   GL-07: { title: 供应商质量问题整改管理办法, level: 三级, pack: core, status: planned }
   GL-08: { title: 供应商处置管理办法, level: 三级, pack: core, status: planned }
