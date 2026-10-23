@@ -47,7 +47,10 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
   - 每个对象显式声明 `sharingModel`；
   - 布尔字段不设必填，给默认值；人员字段默认非必填；
   - 可能被扩展包追加选项的枚举做成共享选项列表。
-- 一个对象一个文件；标签用中文，并补英文翻译。
+- 一个对象一个文件；标签用中文，英文翻译覆盖全部对象、字段、选项、视图和通知模板，
+  缺少英文词条时 `os i18n check --strict` 不通过（[ADR-0007](./docs/adr/0007-china-first-with-overseas-seams.md)）。
+- 中国特有的做法直接写进核心或扩展包，不为「通用」做抽象；但供应商身份不能只认统一
+  社会信用代码，境外供应商按「国家 / 地区 + 注册号」建档（ADR-0007）。
 
 ## 4. 文档约定
 
@@ -58,6 +61,8 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 - 体系文件条款与系统控制点同步修改：改了一边，检查另一边（[ADR-0005](./docs/adr/0005-governance-and-system-share-parameters.md)）。
 - 体系文件模板只写通用表述，不写【待确认】和任何客户信息；客户的取值、标注和专属段落放
   客户私有仓库（见 [governance/README.md §5](./governance/README.md#5-客户实例与生成方式)）。
+- 体系文件做中国版、对标国际（ADR-0007）：法规和标准的名称集中写在每份文件的「引用
+  文件」一节，条款只写要求；资质名称放资质清单，条款写「按资质清单」。
 
 ## 5. 提交与 PR
 
