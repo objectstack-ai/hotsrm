@@ -1,8 +1,10 @@
 import { defineStack } from '@objectstack/spec';
 import * as objects from './objects/index.js';
+import * as picklists from './picklists/index.js';
 import * as views from './views/index.js';
 import * as apps from './apps/index.js';
 import * as translations from './translations/index.js';
+import { SrmSeedData } from './data/index.js';
 
 // 通用核心（type: app，命名空间 srm）。扩展包在 objectstack.config.ts 里与它合成一个应用。
 export default defineStack({
@@ -19,7 +21,10 @@ export default defineStack({
   // auth + ui：本地 `pnpm dev` 有登录页和控制台。flow 与审批在用到时再加 automation、triggers、approvals。
   requires: ['auth', 'ui'],
 
+  data: SrmSeedData,
+
   objects: Object.values(objects),
+  picklists: Object.values(picklists),
   views: Object.values(views),
   apps: Object.values(apps),
 

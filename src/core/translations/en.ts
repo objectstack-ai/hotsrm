@@ -1,11 +1,12 @@
 import type { TranslationData } from '@objectstack/spec/system';
 
-// 源码里的标签是中文；英文词条覆盖全部对象、字段、选项与导航（ADR-0007）。
+// 源码里的标签是中文；英文词条覆盖全部对象、字段、选项、视图与导航（ADR-0007）。
 export const en: TranslationData = {
   objects: {
     srm_category: {
       label: 'Purchasing Category',
       pluralLabel: 'Purchasing Categories',
+      _sections: { basic: { label: 'Basic Information' }, admission: { label: 'Admission Requirements' } },
       fields: {
         code: { label: 'Category Code' },
         name: { label: 'Category Name' },
@@ -17,16 +18,170 @@ export const en: TranslationData = {
           label: 'Risk Class',
           options: { high: 'High', medium: 'Medium', low: 'Low' },
         },
+        mandatory_cert_types: { label: 'Mandatory Certificate Types' },
       },
       _views: { default: { label: 'All Categories' } },
+    },
+    srm_plant: {
+      label: 'Plant',
+      pluralLabel: 'Plants',
+      _sections: { basic: { label: 'Basic Information' } },
+      fields: {
+        code: { label: 'Plant Code' },
+        name: { label: 'Plant Name' },
+        erp_plant_id: { label: 'ERP Plant ID' },
+        legal_entity: { label: 'Legal Entity' },
+        address: { label: 'Address' },
+      },
+      _views: { default: { label: 'All Plants' } },
+    },
+    srm_supplier: {
+      label: 'Supplier',
+      pluralLabel: 'Suppliers',
+      _sections: {
+        basic: { label: 'Basic Information' },
+        registration: { label: 'Registration and Tax' },
+        qualification: { label: 'Admission and Qualification' },
+      },
+      _validations: {
+        supplier_status_flow: { message: 'This supplier status change is not allowed' },
+        credit_code_format: { message: 'The Unified Social Credit Code must be 18 digits or uppercase letters' },
+      },
+      fields: {
+        supplier_no: { label: 'Supplier No.' },
+        name: { label: 'Legal Name' },
+        short_name: { label: 'Short Name' },
+        country: { label: 'Country / Region' },
+        credit_code: { label: 'Unified Social Credit Code' },
+        registration_no: { label: 'Registration / Tax No.' },
+        supplier_type: {
+          label: 'Supplier Type',
+          options: { manufacturer: 'Manufacturer', distributor: 'Distributor', service: 'Service Provider', logistics: 'Logistics Provider' },
+        },
+        status: {
+          label: 'Status',
+          options: {
+            potential: 'Potential',
+            qualifying: 'Qualifying',
+            qualified: 'Qualified',
+            frozen: 'Frozen',
+            eliminated: 'Eliminated',
+            blacklisted: 'Blacklisted',
+          },
+        },
+        qualification_alert: { label: 'Qualification Alert' },
+        risk_level: { label: 'Risk Level', options: { low: 'Low', medium: 'Medium', high: 'High' } },
+        registered_capital: { label: 'Registered Capital' },
+        established_date: { label: 'Established Date' },
+        legal_representative: { label: 'Legal Representative' },
+        taxpayer_type: {
+          label: 'Taxpayer Type',
+          options: { general: 'General Taxpayer', small_scale: 'Small-scale Taxpayer', overseas: 'Overseas' },
+        },
+        address: { label: 'Registered Address' },
+        website: { label: 'Website' },
+        is_related_party: { label: 'Related Party' },
+        erp_vendor_code: { label: 'ERP Vendor Code' },
+        contact_count: { label: 'Contacts' },
+        expired_certificate_count: { label: 'Expired Certificates' },
+      },
+      _views: {
+        default: { label: 'All Suppliers' },
+        qualification_alert: { label: 'Qualification Alerts' },
+      },
+    },
+    srm_supplier_contact: {
+      label: 'Supplier Contact',
+      pluralLabel: 'Supplier Contacts',
+      _sections: { contact: { label: 'Contact Information' } },
+      fields: {
+        supplier: { label: 'Supplier' },
+        name: { label: 'Name' },
+        contact_function: {
+          label: 'Function',
+          options: { admin: 'Primary Account', sales: 'Sales', logistics: 'Logistics', quality: 'Quality', finance: 'Finance' },
+        },
+        mobile: { label: 'Mobile' },
+        email: { label: 'Email' },
+        is_primary: { label: 'Primary Contact' },
+        active: { label: 'Active' },
+      },
+    },
+    srm_supplier_certificate: {
+      label: 'Certificate',
+      pluralLabel: 'Certificates',
+      _sections: { certificate: { label: 'Certificate' }, review: { label: 'Status and Verification' } },
+      _validations: { valid_to_after_valid_from: { message: 'Valid To cannot be earlier than Valid From' } },
+      fields: {
+        supplier: { label: 'Supplier' },
+        cert_type: { label: 'Certificate Type' },
+        is_mandatory: { label: 'Mandatory' },
+        cert_no: { label: 'Certificate No.' },
+        issuer: { label: 'Issuer' },
+        valid_from: { label: 'Valid From' },
+        valid_to: { label: 'Valid To' },
+        attachment: { label: 'Scan' },
+        status: { label: 'Status', options: { valid: 'Valid', expiring: 'Expiring', expired: 'Expired' } },
+        verified: { label: 'Verified' },
+      },
+      _views: {
+        default: { label: 'All Certificates' },
+        expiring: { label: 'Expiring and Expired' },
+      },
+    },
+    srm_supplier_category: {
+      label: 'Category Qualification',
+      pluralLabel: 'Category Qualifications',
+      _sections: { qualification: { label: 'Category Qualification' } },
+      fields: {
+        supplier: { label: 'Supplier' },
+        category: { label: 'Category' },
+        status: { label: 'Qualification Status', options: { trial: 'Trial', qualified: 'Qualified', suspended: 'Suspended' } },
+        approved_date: { label: 'Approved Date' },
+      },
+    },
+  },
+  picklists: {
+    srm_country: {
+      label: 'Country / Region',
+      options: {
+        cn: 'China',
+        hk: 'Hong Kong SAR, China',
+        mo: 'Macao SAR, China',
+        tw: 'Taiwan, China',
+        jp: 'Japan',
+        kr: 'South Korea',
+        sg: 'Singapore',
+        us: 'United States',
+        de: 'Germany',
+        gb: 'United Kingdom',
+        fr: 'France',
+      },
+    },
+    srm_cert_type: {
+      label: 'Certificate Type',
+      options: {
+        business_license: 'Business License',
+        iso9001: 'ISO 9001',
+        iatf16949: 'IATF 16949',
+        iso14001: 'ISO 14001',
+        iso45001: 'ISO 45001',
+        production_license: 'Production License',
+        ccc: 'CCC Certification',
+        other: 'Other',
+      },
     },
   },
   apps: {
     srm_workbench: {
       label: 'SRM Workbench',
       navigation: {
+        group_supplier: { label: 'Suppliers' },
+        nav_supplier: { label: 'Suppliers' },
+        nav_certificate: { label: 'Certificates' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },
+        nav_plant: { label: 'Plants' },
       },
     },
   },

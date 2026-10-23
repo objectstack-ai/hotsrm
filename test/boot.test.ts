@@ -34,9 +34,9 @@ describe('core boots', () => {
     const row = await stack.hooks.run(
       Category.name,
       'insert',
-      { code: 'ELEC', name: '电子元器件' },
+      { code: 'BOOT', name: '启动测试品类' },
       { as: admin },
     );
-    expect(row).toMatchObject({ code: 'ELEC', risk_class: 'medium', is_direct: true });
+    expect(row).toMatchObject({ code: 'BOOT', risk_class: 'medium', is_direct: true });
   });
 });

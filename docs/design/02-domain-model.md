@@ -202,7 +202,7 @@ erDiagram
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `name` | text | 必填 |
-| `contact_role` | multiselect | `admin` 主账号 / `sales` 商务 / `logistics` 物流 / `quality` 质量 / `finance` 财务 |
+| `contact_function` | multiselect | `admin` 主账号 / `sales` 商务 / `logistics` 物流 / `quality` 质量 / `finance` 财务 |
 | `mobile` / `email` | phone / email | email 必填（门户邀请与通知用） |
 | `portal_user` | user | 已开通门户账号时关联的平台用户；该用户同时被任命到供应商的门户岗位（见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)） |
 | `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人（校验规则） |
