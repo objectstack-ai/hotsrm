@@ -145,6 +145,32 @@ describe('internal permissions', () => {
     expect(row!.status).toBe('potential');
   });
 
+  // 供应商 OWD 暂为 public_read_write（objectstack#25470）：维护者能改别人建的供应商，但删不了
+  it('lets supplier maintainers edit a supplier they do not own but not delete it', async () => {
+    const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { system: true });
+    for (const position of ['srm_category_manager', 'srm_buyer_lead']) {
+      const maintainer = await person(position);
+      await stack.hooks.run(Supplier.name, 'update', { id: supplier.id, short_name: `改名 ${position}` }, { as: maintainer });
+      await expect(stack.hooks.run(Supplier.name, 'delete', { id: supplier.id }, { as: maintainer })).rejects.toBeTruthy();
+    }
+    expect(await stack.rows(Supplier.name, { id: supplier.id })).toHaveLength(1);
+  });
+
+  it('keeps supplier fields read-only for an SQE', async () => {
+    const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { system: true });
+    const sqe = await person('srm_sqe');
+    await expect(stack.hooks.run(Supplier.name, 'update', { id: supplier.id, short_name: 'SQE 改名' }, { as: sqe })).rejects.toBeTruthy();
+    await expect(stack.hooks.run(Supplier.name, 'delete', { id: supplier.id }, { as: sqe })).rejects.toBeTruthy();
+  });
+
+  it('does not let a buyer or an AP accountant edit a supplier', async () => {
+    const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { system: true });
+    for (const position of ['srm_buyer', 'srm_ap_accountant']) {
+      const reader = await person(position);
+      await expect(stack.hooks.run(Supplier.name, 'update', { id: supplier.id, short_name: '越权改名' }, { as: reader })).rejects.toBeTruthy();
+    }
+  });
+
   it('keeps admission applications out of a buyer\'s reach', async () => {
     const buyer = await person('srm_buyer');
     await expect(stack.rows(SupplierApplication.name, {}, { as: buyer })).rejects.toBeTruthy();

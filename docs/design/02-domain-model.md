@@ -176,7 +176,7 @@ erDiagram
 
 ### 4.1 供应商主数据
 
-**`srm_supplier` 供应商**（OWD `public_read`；开启字段历史；表单分组：基本信息、工商与税务〔`credit_code`、`registration_no`、`taxpayer_type`、`registered_capital`、`legal_representative`〕、外部系统〔`erp_vendor_code`〕）
+**`srm_supplier` 供应商**（OWD `public_read`，暂用 `public_read_write`：品类经理要能改别人建的供应商，`modifyAllRecords` 会连删除一起放开，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)；能改哪些字段由 `allowEdit` 与 FLS 决定，删除仍受 `allowDelete` 约束；开启字段历史；表单分组：基本信息、工商与税务〔`credit_code`、`registration_no`、`taxpayer_type`、`registered_capital`、`legal_representative`〕、外部系统〔`erp_vendor_code`〕）
 
 | 字段 | 类型 | 说明 / 约束 |
 |---|---|---|
