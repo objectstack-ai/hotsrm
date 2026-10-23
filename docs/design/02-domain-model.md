@@ -255,16 +255,18 @@ erDiagram
 （lookup）、`status`（`trial` 试供 / `qualified` 合格 / `suspended` 暂停）、
 `approved_date`、`source_application`（lookup 准入申请）。同一供应商同一品类唯一。
 
-**`srm_material` 物料**（只读副本，OWD `public_read_write`；v0.2）：`erp_material_no`
+**`srm_material` 物料**（只读副本，OWD `public_read`，暂用 `public_read_write`，见下方说明；v0.2）：`erp_material_no`
 （组织内唯一，导入匹配键）、`material_code`、`name`、`specification`、`uom`、`category`（lookup）、
 `active`。用平台导入按 `erp_material_no` 从 ERP 导出表格导入，可重复执行；采购员只
 维护 `category` 关联，其他字段对采购员只读（FLS），新建、删除只有 `srm_admin`。ERP 集成后改为
 upsert 写入，结构不变。
 
-> OWD 取 `public_read_write` 而不是 `public_read`：物料归执行导入的管理员所有，`public_read`
-> 下采购员要改别人的记录只能授予 `modifyAllRecords`，而平台的 `modifyAllRecords` 同时放开删除。
-> 改为 `public_read_write` 后，能写哪些字段由权限集的 `allowEdit` 与 FLS 决定，删除仍受 `allowDelete`
-> 约束。日常重复导入的表格**不带** `category` 列，以免覆盖采购员维护的关联；导入说明见
+> **临时做法**：目标 OWD 是 `public_read`，现阶段先用 `public_read_write`。物料归执行导入的管理员
+> 所有，`public_read` 下采购员要改别人的记录只能授予 `modifyAllRecords`，而平台的
+> `modifyAllRecords` 同时放开删除（平台需求 [objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)）。
+> 用 `public_read_write` 时，能写哪些字段由权限集的 `allowEdit` 与 FLS 决定，删除仍受 `allowDelete`
+> 约束；代价是今后任何授予 `allowEdit` 的权限集都能改全部物料。平台支持「可改不可删」后改回
+> `public_read`。日常重复导入的表格**不带** `category` 列，以免覆盖采购员维护的关联；导入说明见
 > [`data/samples/README.md`](../../data/samples/README.md)。
 
 **`srm_plant` 工厂 / 收货地点**（手工维护或导入）：`erp_plant_id`（预留）、`code`、`name`、
