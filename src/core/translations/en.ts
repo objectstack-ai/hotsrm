@@ -140,6 +140,41 @@ export const en: TranslationData = {
         approved_date: { label: 'Approved Date' },
       },
     },
+    srm_supplier_application: {
+      label: 'Admission Application',
+      pluralLabel: 'Admission Applications',
+      _sections: { application: { label: 'Application' }, review: { label: 'Review' } },
+      _validations: {
+        application_status_flow: { message: 'This application status change is not allowed' },
+        supplier_admissible: { message: 'Only a Potential or Eliminated supplier can apply for admission' },
+        reviewer_before_review: { message: 'Assign a reviewer before the admission review' },
+        reject_reason_required: { message: 'Enter a reason when rejecting' },
+      },
+      fields: {
+        application_no: { label: 'Application No.' },
+        supplier: { label: 'Supplier' },
+        applied_categories: { label: 'Applied Categories' },
+        status: {
+          label: 'Status',
+          options: {
+            submitted: 'Submitted',
+            doc_review: 'Document Review',
+            returned: 'Returned',
+            admission_review: 'Admission Review',
+            approved: 'Approved',
+            rejected: 'Rejected',
+          },
+        },
+        reviewer: { label: 'Reviewer' },
+        approval_status: { label: 'Approval Result', options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' } },
+        approved_date: { label: 'Approved Date' },
+        reject_reason: { label: 'Rejection Reason' },
+      },
+      _views: {
+        default: { label: 'All Applications' },
+        in_progress: { label: 'In Progress' },
+      },
+    },
   },
   picklists: {
     srm_country: {
@@ -178,6 +213,7 @@ export const en: TranslationData = {
       navigation: {
         group_supplier: { label: 'Suppliers' },
         nav_supplier: { label: 'Suppliers' },
+        nav_application: { label: 'Admission Applications' },
         nav_certificate: { label: 'Certificates' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },

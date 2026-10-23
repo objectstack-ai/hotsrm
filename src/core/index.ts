@@ -2,6 +2,7 @@ import { defineStack } from '@objectstack/spec';
 import * as objects from './objects/index.js';
 import * as picklists from './picklists/index.js';
 import * as views from './views/index.js';
+import * as flows from './flows/index.js';
 import * as apps from './apps/index.js';
 import * as translations from './translations/index.js';
 import { SrmSeedData } from './data/index.js';
@@ -18,14 +19,15 @@ export default defineStack({
     engines: { protocol: '^18.0.0' },
   },
 
-  // auth + ui：本地 `pnpm dev` 有登录页和控制台。flow 与审批在用到时再加 automation、triggers、approvals。
-  requires: ['auth', 'ui'],
+  // auth + ui：登录页和控制台；automation + triggers：运行记录触发的 flow；approvals：flow 里的审批节点。
+  requires: ['auth', 'ui', 'automation', 'triggers', 'approvals'],
 
   data: SrmSeedData,
 
   objects: Object.values(objects),
   picklists: Object.values(picklists),
   views: Object.values(views),
+  flows: Object.values(flows),
   apps: Object.values(apps),
 
   i18n: {

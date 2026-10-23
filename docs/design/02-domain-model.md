@@ -276,6 +276,11 @@ erDiagram
 | `reject_reason` | textarea | |
 | `cycle_days` | number | 从提交到批准的天数，批准时由 flow 写入（准入周期指标） |
 
+> v0.1（内部代录，见 [07 §1.1](./07-delivery-plan.md#11-第一期的拆分)）先实现一个子集：申请由内部人员为已登记的
+> 潜在或淘汰供应商发起，直接关联 `supplier`；申请品类用多值 lookup `applied_categories`（不经匿名表单，
+> 可以读品类对象）；不含现场审核分支和公司资料等表单字段；`approval_status` 记录审批节点的结论。
+> 公开表单与门户随 v0.2 加入时再补齐本表其余字段。
+
 **`srm_supplier_audit` 供应商审核**（OWD `private`）：`audit_no`、`supplier`
 （lookup）、`application`（lookup，可空）、`audit_type`（`admission` 准入 / `annual`
 年度 / `special` 专项）、`audit_date`、`auditors`（user，多选）、`checklist_score`
