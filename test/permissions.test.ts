@@ -63,6 +63,7 @@ describe('internal permissions', () => {
     expect(visibility('srm_ap_accountant')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
         "srm_supplier_bank_account": "R",
@@ -77,6 +78,7 @@ describe('internal permissions', () => {
     expect(visibility('srm_buyer_lead')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_material": "RE",
         "srm_plant": "R",
         "srm_supplier": "RCE",
         "srm_supplier_application": "RCE",

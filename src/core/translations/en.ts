@@ -35,6 +35,24 @@ export const en: TranslationData = {
       },
       _views: { default: { label: 'All Plants' } },
     },
+    srm_material: {
+      label: 'Material',
+      pluralLabel: 'Materials',
+      _sections: { basic: { label: 'Basic Information' }, external: { label: 'External Systems' } },
+      fields: {
+        material_code: { label: 'Material Code' },
+        name: { label: 'Material Name' },
+        specification: { label: 'Specification' },
+        uom: { label: 'Unit of Measure' },
+        category: { label: 'Purchasing Category' },
+        active: { label: 'Active' },
+        erp_material_no: { label: 'ERP Material No.' },
+      },
+      _views: {
+        default: { label: 'All Materials' },
+        uncategorized: { label: 'Without Category' },
+      },
+    },
     srm_supplier: {
       label: 'Supplier',
       pluralLabel: 'Suppliers',
@@ -46,6 +64,9 @@ export const en: TranslationData = {
       _validations: {
         supplier_status_flow: { message: 'This supplier status change is not allowed' },
         credit_code_format: { message: 'The Unified Social Credit Code must be 18 digits or uppercase letters' },
+        initial_status_by_source: {
+          message: 'A new supplier must start admission as Potential; only a legacy-imported supplier is created as Qualified',
+        },
       },
       fields: {
         supplier_no: { label: 'Supplier No.' },
@@ -81,20 +102,36 @@ export const en: TranslationData = {
         address: { label: 'Registered Address' },
         website: { label: 'Website' },
         is_related_party: { label: 'Related Party' },
+        legacy_imported: { label: 'Legacy Import' },
+        legacy_reviewed: { label: 'Legacy Import Reviewed' },
         erp_vendor_code: { label: 'ERP Vendor Code' },
         contact_count: { label: 'Contacts' },
+        primary_contact_count: { label: 'Primary Contacts' },
         expired_certificate_count: { label: 'Expired Certificates' },
         default_bank_account_count: { label: 'Default Bank Accounts' },
       },
       _views: {
         default: { label: 'All Suppliers' },
         qualification_alert: { label: 'Qualification Alerts' },
+        legacy_review: { label: 'Legacy Imports to Review' },
+        primary_contact_conflict: { label: 'Duplicate Primary Contacts' },
+      },
+      _actions: {
+        srm_confirm_legacy_review: {
+          label: 'Confirm Review',
+          confirmText: "Confirm that this supplier's record, contacts and certificates have been checked?",
+          successMessage: 'Review confirmed',
+        },
       },
     },
     srm_supplier_contact: {
       label: 'Supplier Contact',
       pluralLabel: 'Supplier Contacts',
       _sections: { contact: { label: 'Contact Information' } },
+      _validations: {
+        single_primary_on_insert: { message: 'This supplier already has a primary contact; a supplier has at most one' },
+        single_primary_on_update: { message: 'This supplier already has a primary contact; a supplier has at most one' },
+      },
       fields: {
         supplier: { label: 'Supplier' },
         name: { label: 'Name' },
@@ -124,10 +161,12 @@ export const en: TranslationData = {
         attachment: { label: 'Scan' },
         status: { label: 'Status', options: { valid: 'Valid', expiring: 'Expiring', expired: 'Expired' } },
         verified: { label: 'Verified' },
+        legacy_imported: { label: 'Legacy Import' },
       },
       _views: {
         default: { label: 'All Certificates' },
         expiring: { label: 'Expiring and Expired' },
+        legacy_missing_attachment: { label: 'Legacy Imports Missing a Scan' },
       },
     },
     srm_supplier_bank_account: {
@@ -273,6 +312,7 @@ export const en: TranslationData = {
         nav_bank_account: { label: 'Bank Accounts' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },
+        nav_material: { label: 'Materials' },
         nav_plant: { label: 'Plants' },
       },
     },

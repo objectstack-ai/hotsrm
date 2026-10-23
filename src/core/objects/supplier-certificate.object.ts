@@ -19,11 +19,22 @@ export const SupplierCertificate = ObjectSchema.create({
     supplier: Field.masterDetail('srm_supplier', { label: '供应商', required: true, deleteBehavior: 'cascade' }),
     cert_type: Field.select({ label: '资质类型', group: 'certificate', required: true, picklist: 'srm_cert_type' }),
     is_mandatory: Field.boolean({ label: '必备资质', group: 'review', defaultValue: false }),
-    cert_no: Field.text({ label: '证书编号', group: 'certificate', maxLength: 100 }),
+    // 存量导入按「供应商 + 资质类型 + 证书编号」匹配，所以导入的证书必须有编号
+    cert_no: Field.text({
+      label: '证书编号',
+      group: 'certificate',
+      maxLength: 100,
+      requiredWhen: P`record.legacy_imported == true`,
+    }),
     issuer: Field.text({ label: '发证机构', group: 'certificate', maxLength: 200 }),
     valid_from: Field.date({ label: '生效日期', group: 'certificate' }),
     valid_to: Field.date({ label: '有效期至', group: 'certificate' }),
-    attachment: Field.file({ label: '扫描件', group: 'certificate', required: true }),
+    // 表格导入带不了文件：存量导入的证书先不要求扫描件，复核时补传
+    attachment: Field.file({
+      label: '扫描件',
+      group: 'certificate',
+      requiredWhen: P`record.legacy_imported != true`,
+    }),
     status: Field.select({
       label: '状态',
       group: 'review',
@@ -35,6 +46,12 @@ export const SupplierCertificate = ObjectSchema.create({
       ],
     }),
     verified: Field.boolean({ label: '已核验', group: 'review', defaultValue: false }),
+    legacy_imported: Field.boolean({
+      label: '存量导入',
+      group: 'review',
+      defaultValue: false,
+      readonlyWhen: P`previous.legacy_imported != true`,
+    }),
   },
 
   validations: [

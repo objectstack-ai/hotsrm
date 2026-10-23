@@ -28,5 +28,17 @@ export const SupplierCertificateViews = defineView({
       filter: [{ field: 'status', operator: 'in', value: ['expiring', 'expired'] }],
       sort: [{ field: 'valid_to', order: 'asc' }],
     },
+    // 存量导入的证书没有扫描件，复核时补传
+    legacy_missing_attachment: {
+      label: '存量导入缺扫描件',
+      type: 'grid',
+      data,
+      columns,
+      filter: [
+        { field: 'legacy_imported', operator: 'equals', value: true },
+        { field: 'attachment', operator: 'is_empty' },
+      ],
+      sort: [{ field: 'supplier', order: 'asc' }],
+    },
   },
 });
