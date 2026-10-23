@@ -4,10 +4,12 @@ import * as picklists from './picklists/index.js';
 import * as views from './views/index.js';
 import * as flows from './flows/index.js';
 import * as apps from './apps/index.js';
+import * as actions from './actions/index.js';
 import * as translations from './translations/index.js';
 import { SrmSeedData } from './data/index.js';
 import { SrmPermissionSets } from './security/permission-sets.js';
 import { SrmPositions } from './security/positions.js';
+import { SrmCapabilities } from './security/capabilities.js';
 
 // 通用核心（type: app，命名空间 srm）。扩展包在 objectstack.config.ts 里与它合成一个应用。
 export default defineStack({
@@ -31,7 +33,9 @@ export default defineStack({
   picklists: Object.values(picklists),
   views: Object.values(views),
   flows: Object.values(flows),
+  actions: Object.values(actions),
   apps: Object.values(apps),
+  capabilities: SrmCapabilities,
   permissions: SrmPermissionSets,
   positions: SrmPositions,
 

@@ -103,6 +103,17 @@ export const Supplier = ObjectSchema.create({
         filter: { status: 'expired' },
       },
     }),
+    // 银行账户「每家至多一个默认账户」的校验读这个计数（v0.2）
+    default_bank_account_count: Field.summary({
+      label: '默认银行账户数',
+      group: 'qualification',
+      summaryOperations: {
+        object: 'srm_supplier_bank_account',
+        field: 'id',
+        function: 'count',
+        filter: { is_default: true },
+      },
+    }),
   },
 
   indexes: [

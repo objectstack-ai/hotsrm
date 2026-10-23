@@ -16,6 +16,7 @@ export const InternalBasePermissionSet = {
     srm_supplier_contact: read,
     srm_supplier_certificate: read,
     srm_supplier_category: read,
+    srm_supplier_bank_account: read,
   },
 };
 
@@ -29,7 +30,11 @@ export const SupplierAdminPermissionSet = {
     srm_supplier_certificate: write,
     srm_supplier_category: write,
     srm_supplier_application: write,
+    // 新建账户后为「待核验」并锁定；核验只经 srm_bank_verify，已有账户的修改走信息变更单（v0.2 M4）
+    srm_supplier_bank_account: write,
   },
+  // 银行账号完整可读（BR-20，04 §4.2）
+  systemPermissions: ['srm_view_bank_account_no'],
   fields: {
     'srm_supplier.status': flowOwned,
     'srm_supplier.qualification_alert': flowOwned,
@@ -70,7 +75,8 @@ export const ExecutivePermissionSet = {
   },
 };
 
-// 财务（应付会计）：供应商档案只读。银行账户（v0.2 M2）合入后在此加账号可读，核验只经 screen flow
+// 财务（应付会计）：供应商档案与银行账户只读，银行账号完整可读（BR-20）；
+// 核验只经「核验银行账户」screen flow（srm_bank_verify），不直接改记录
 export const FinancePermissionSet = {
   name: 'srm_finance',
   label: 'SRM 财务',
@@ -78,7 +84,9 @@ export const FinancePermissionSet = {
     srm_supplier: read,
     srm_supplier_contact: read,
     srm_supplier_certificate: read,
+    srm_supplier_bank_account: read,
   },
+  systemPermissions: ['srm_view_bank_account_no'],
 };
 
 // 系统管理员：维护品类与工厂等配置

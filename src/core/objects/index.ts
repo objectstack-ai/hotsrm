@@ -5,3 +5,4 @@ export { SupplierContact } from './supplier-contact.object.js';
 export { SupplierCertificate } from './supplier-certificate.object.js';
 export { SupplierCategory } from './supplier-category.object.js';
 export { SupplierApplication } from './supplier-application.object.js';
+export { SupplierBankAccount } from './supplier-bank-account.object.js';

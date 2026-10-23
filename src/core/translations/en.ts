@@ -84,6 +84,7 @@ export const en: TranslationData = {
         erp_vendor_code: { label: 'ERP Vendor Code' },
         contact_count: { label: 'Contacts' },
         expired_certificate_count: { label: 'Expired Certificates' },
+        default_bank_account_count: { label: 'Default Bank Accounts' },
       },
       _views: {
         default: { label: 'All Suppliers' },
@@ -127,6 +128,41 @@ export const en: TranslationData = {
       _views: {
         default: { label: 'All Certificates' },
         expiring: { label: 'Expiring and Expired' },
+      },
+    },
+    srm_supplier_bank_account: {
+      label: 'Bank Account',
+      pluralLabel: 'Bank Accounts',
+      _sections: { account: { label: 'Account' }, review: { label: 'Status and Verification' } },
+      _validations: {
+        bank_account_status_flow: { message: 'This bank account status change is not allowed' },
+        account_name_matches_supplier: { message: 'The account name must match the supplier legal name' },
+        default_account_active: { message: 'Only an active bank account can be the default account' },
+        single_default_account: { message: 'This supplier already has a default account; clear it first' },
+      },
+      _actions: { srm_bank_verify: { label: 'Verify' } },
+      fields: {
+        supplier: { label: 'Supplier' },
+        bank_name: { label: 'Bank' },
+        branch_name: { label: 'Branch' },
+        account_name: { label: 'Account Name' },
+        account_no: { label: 'Account No.' },
+        swift_code: { label: 'SWIFT Code' },
+        currency: {
+          label: 'Currency',
+          options: { cny: 'CNY', usd: 'USD', eur: 'EUR', jpy: 'JPY', hkd: 'HKD' },
+        },
+        status: {
+          label: 'Status',
+          options: { pending_verify: 'Pending Verification', active: 'Active', inactive: 'Inactive' },
+        },
+        verified_by: { label: 'Verified By' },
+        is_default: { label: 'Default Account' },
+        erp_bank_id: { label: 'ERP Bank Account ID' },
+      },
+      _views: {
+        default: { label: 'All Bank Accounts' },
+        pending_verify: { label: 'Pending Verification' },
       },
     },
     srm_supplier_category: {
@@ -207,6 +243,25 @@ export const en: TranslationData = {
       },
     },
   },
+  flows: {
+    srm_bank_verify: {
+      label: 'Verify Bank Account',
+      successMessage: 'Bank account verified and now active',
+      screens: {
+        confirm: {
+          title: 'Verify bank account: {{ account.account_name }}',
+          description:
+            'Bank: {{ account.bank_name }} {{ account.branch_name }}\nAccount No.: {{ account.account_no }}\n'
+            + 'Confirm the account first, for example by a corporate-account check or a call to the supplier\'s legal representative, then verify.',
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only AP accountants can verify bank accounts' },
+        refuse_status: { message: 'Only bank accounts pending verification need verifying' },
+        refuse_self: { message: 'You cannot verify a bank account you created; ask another AP accountant' },
+      },
+    },
+  },
   apps: {
     srm_workbench: {
       label: 'SRM Workbench',
@@ -215,6 +270,7 @@ export const en: TranslationData = {
         nav_supplier: { label: 'Suppliers' },
         nav_application: { label: 'Admission Applications' },
         nav_certificate: { label: 'Certificates' },
+        nav_bank_account: { label: 'Bank Accounts' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },
         nav_plant: { label: 'Plants' },
