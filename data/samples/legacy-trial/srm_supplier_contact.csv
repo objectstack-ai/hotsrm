@@ -1,0 +1,13 @@
+供应商,姓名,职能,手机,邮箱,主联系人
+示例华东紧固件有限公司,示例张经理,商务,138-0000-0011,zhang@huadong.example.com,是
+示例华东紧固件有限公司,示例李工,质量,13800000012,li@huadong.example.com,是
+示例苏州塑胶制品有限公司,示例王经理,商务,13800000021,wang@suliao.example.com,是
+示例（苏州）塑胶制品有限公司,示例王经理,商务,13800000021,wang@suliao.example.com,是
+示例精工模具有限公司,示例赵经理,销售,13800000031,zhao@jinggong.example.com,是
+示例检测技术服务有限公司,示例钱经理,商务,13800000051,,是
+示例运输有限公司,示例孙调度,物流,0512-00000071,sun@yunshu.example.com;ops@yunshu.example.com,是
+示例新材料科技有限公司,示例周总,商务、主账号,+86 138 0000 0081,ZHOU@XINCAILIAO.EXAMPLE.COM,是
+示例新材料科技有限公司,示例周总,商务、主账号,+86 138 0000 0081,zhou@xincailiao.example.com,是
+Example Precision GmbH,Example Contact,商务,+49 000 0000001,sales@precision.example.com,是
+Example Electronics Co. Ltd.,Example Sales,商务,+886 0000 0001,sales@electronics.example.com,是
+示例不存在的供应商有限公司,示例某人,商务,13800000099,x@none.example.com,否
