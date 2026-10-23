@@ -299,6 +299,11 @@ stateDiagram-v2
 | 资质恢复 | 证书写入后的记录触发 | 重新计算：每一种必备资质类型都有 `status == 'valid'` 且 `verified == true` 的证书时，`qualification_alert = false`（四期起关闭对应风险事件）。只上传新证书而未经 SQE 核验，不会解除异常 |
 | 外部风险 | `schedule`：每周一 04:00（四期） | flow 按批 `loop` 合格供应商，`http` 节点调用企业信息服务；新出现的经营异常、失信、重大诉讼、股权变更按 `external_ref` 去重后建风险事件，`high` 级通知品类经理（FR-903） |
 
+> v0.1 先实现其中的一部分：`srm_certificate_expire_sweep` 每日一次，把证书状态对齐到已过期 / 即将到期（30 天内）/
+> 有效（有效期被延长时恢复）；`srm_supplier_qualification_recalc` 在证书状态或「必备」标志变化后重算
+> `qualification_alert`。到期提醒通知、`is_mandatory` 按品类必备资质自动写入、「经 SQE 核验才解除」随门户版本
+> （v0.2）加入；v0.1 由内部人员维护证书与「必备」标志。
+
 ## 12. 审批矩阵
 
 审批人一律按**岗位**或**记录上的人员字段**解析，不写死具体的人；换人只改岗位任命，
