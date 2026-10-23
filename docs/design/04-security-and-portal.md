@@ -54,14 +54,14 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 | `srm_internal_base` | 内部员工的基础：读品类、物料、工厂、供应商主数据（不含银行账号）、价格库；**不是** `isDefault` |
 | `srm_sourcing` | 寻源单、寻源明细的增改（状态只经 screen flow 推进）；邀请、技术评分、定标只经 screen flow；读报价（受封标 RLS 约束）；新建合同 |
 | `srm_supplier_admin` | 供应商档案、联系人、证书、准入申请、审核、供货品类资格、处置单、合同的增改；开通门户 |
-| `srm_buyer` | 供应商档案、合同、交付记录读；代供应商发起变更单（v0.6 前）；ERP 集成后加订单、送货单的内部字段 |
+| `srm_buyer` | 供应商档案、合同、交付记录读；物料只改 `category` 关联（其余字段 FLS 只读，不新建、不删除）；代供应商发起变更单（v0.6 前）；ERP 集成后加订单、送货单的内部字段 |
 | `srm_quality` | 审核、交付记录（录入）、整改单的增改；证书只读，核验经 screen flow |
 | `srm_iqc` | 交付记录的录入（没有质量系统的客户） |
 | `srm_finance` | 银行账号可读，核验经 screen flow；银行账户变更的第 2 级审批；整改单索赔结论标记 |
 | `srm_legal` | 合同读改（审批由 flow 授予） |
 | `srm_executive` | 全部 SRM 对象只读 + 仪表盘；审批由 flow 授予，不需要额外写权限 |
 | `srm_auditor` | 全部 SRM 对象只读（报价同样受封标约束），可读审批历史与字段历史，不可导出银行账号 |
-| `srm_admin` | 品类、指标库、编码、通知模板的配置；存量供应商、联系人、证书的导入（v0.2，唯一能写「存量导入」标记的权限集，[导入说明](../implementation/legacy-supplier-import.md)）；不授予报价读权限 |
+| `srm_admin` | 品类、指标库、编码、通知模板的配置；物料导入与维护；存量供应商、联系人、证书的导入（v0.2，唯一能写「存量导入」标记的权限集，[导入说明](../implementation/legacy-supplier-import.md)）；不授予报价读权限 |
 | `srm_portal_supplier` | 供应商门户用户：见 §3.2 |
 | `srm_portal_supplier_admin` | 在 `srm_portal_supplier` 之上：维护本公司联系人、银行账户，提交变更申请与绩效申诉；直接授予具体用户 |
 | `srm_integration` | 预留（ERP 集成后）：集成服务账号，物料、交付记录、订单镜像的写入；供应商仅可写 `erp_vendor_code`，价格记录只读；**不**授予报价单与银行账号 |

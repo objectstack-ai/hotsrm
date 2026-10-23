@@ -2,7 +2,7 @@
 
 > 状态：v0.2（2026-10-23）。对应 [07 §4 R6](../design/07-delivery-plan.md#4-风险与应对)、
 > FR-107。导入用平台对象列表自带的「导入」功能，不写代码；样例表格在
-> [`src/core/data/import/`](../../src/core/data/import/)，CI 用它们跑两遍验证幂等
+> [`data/samples/`](../../data/samples/README.md)（`srm_supplier*.csv`），CI 用它们跑两遍验证幂等
 > （[test/import-idempotency.test.ts](../../test/import-idempotency.test.ts)）。
 
 ## 1. 谁来导、按什么顺序

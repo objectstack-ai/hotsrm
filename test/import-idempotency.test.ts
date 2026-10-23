@@ -13,7 +13,7 @@ describe('legacy supplier import', () => {
 
   type ImportResult = { total: number; ok: number; errors: number; created: number; updated: number; skipped: number; results: Array<{ row: number; ok: boolean; action: string; field?: string; code?: string; error?: string }> };
 
-  const sample = (file: string) => readFileSync(new URL(`../src/core/data/import/${file}`, import.meta.url), 'utf8');
+  const sample = (file: string) => readFileSync(new URL(`../data/samples/${file}`, import.meta.url), 'utf8');
   // 表头用字段的中文标签，与导入向导按标签对列一致
   const mappingFor = (object: { fields: Record<string, { label?: unknown }> }) =>
     Object.fromEntries(Object.entries(object.fields).map(([name, field]) => [String(field.label), name]));
@@ -33,12 +33,12 @@ describe('legacy supplier import', () => {
   };
 
   // 供应商分两遍：境内按信用代码，境外按国家 / 地区 + 注册号；每遍跳过另一类的行
-  const importSuppliers = async (csv = sample('suppliers.csv')) => [
+  const importSuppliers = async (csv = sample('srm_supplier.csv')) => [
     await run(Supplier, csv, ['credit_code'], true),
     await run(Supplier, csv, ['country', 'registration_no'], true),
   ];
-  const importContacts = (csv = sample('contacts.csv')) => run(SupplierContact, csv, ['supplier', 'email']);
-  const importCertificates = (csv = sample('certificates.csv')) => run(SupplierCertificate, csv, ['supplier', 'cert_type', 'cert_no']);
+  const importContacts = (csv = sample('srm_supplier_contact.csv')) => run(SupplierContact, csv, ['supplier', 'email']);
+  const importCertificates = (csv = sample('srm_supplier_certificate.csv')) => run(SupplierCertificate, csv, ['supplier', 'cert_type', 'cert_no']);
   const importAll = async () => ({
     suppliers: await importSuppliers(),
     contacts: await importContacts(),

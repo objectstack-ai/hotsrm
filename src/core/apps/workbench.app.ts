@@ -25,6 +25,7 @@ export const Workbench = App.create({
       icon: 'database',
       children: [
         { id: 'nav_category', type: 'object', objectName: 'srm_category', label: '采购品类', icon: 'folder-tree' },
+        { id: 'nav_material', type: 'object', objectName: 'srm_material', label: '物料', icon: 'package' },
         { id: 'nav_plant', type: 'object', objectName: 'srm_plant', label: '工厂', icon: 'warehouse' },
       ],
     },
