@@ -21,8 +21,9 @@ export default defineStack({
     engines: { protocol: '^18.0.0' },
   },
 
-  // auth + ui：登录页和控制台；automation + triggers：运行记录触发的 flow；approvals：flow 里的审批节点。
-  requires: ['auth', 'ui', 'automation', 'triggers', 'approvals'],
+  // auth + ui：登录页和控制台；automation + triggers + job：记录触发与定时 flow；approvals：审批节点；
+  // messaging：站内通知；audit：字段历史（trackHistory）。
+  requires: ['auth', 'ui', 'automation', 'triggers', 'job', 'approvals', 'messaging', 'audit'],
 
   data: SrmSeedData,
 

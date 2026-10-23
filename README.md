@@ -81,6 +81,9 @@ pnpm dev          # 本地启动（内存库）
 pnpm validate     # 每次改元数据后跑；其余检查见 AGENTS.md §6
 ```
 
+定时 flow（证书到期扫描）受部署开关 `OS_AUTOMATION_SCHEDULED_WORK_ENABLED` 控制，平台默认关闭，本地和
+托管云都要显式打开才会运行；托管云上如何为本应用打开，待与平台确认。
+
 ## 当前状态
 
 v0.1 开发中：工程骨架、CI 和核心应用外壳（`srm_workbench` 工作台、采购品类）已就位。
