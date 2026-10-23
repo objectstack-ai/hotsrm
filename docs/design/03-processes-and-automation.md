@@ -184,6 +184,12 @@ flowchart TD
 
 ## 5. P2 信息变更与供应商处置
 
+**新增银行账户**（v0.2，BR-20）：采购侧（`srm_supplier_admin`）在供应商档案下新建银行账户，
+记录为 `pending_verify` 并锁定 → 应付会计在账户上点「核验」，经 screen flow `srm_bank_verify`
+按 `params/core.yaml` 的 `bank_change_verification` 核实后确认 → 账户置为 `active`，写入
+`verified_by`。flow 拒绝三种情况：启动人不是应付会计、账户不是待核验、启动人就是新建人
+（双人原则）。已有账户的修改不直接编辑，走下面的信息变更单。
+
 **信息变更**（v0.2，FR-207）：供应商在门户经「提交变更申请」screen flow 提交变更单（v0.6 前由采购员代供应商发起）→
 `before_value` 自动快照当前档案 → 审批 flow `srm_change_approval`：第 1 级
 `position = srm_buyer_lead`（采购确认）；`change_type == 'bank_account'` 时增加第 2 级

@@ -333,7 +333,7 @@ export const PortalSupplier = definePermissionSet({
 
 | 字段 | 谁可读 | 谁可改 | 原因 |
 |---|---|---|---|
-| `srm_supplier_bank_account.account_no` | 应付会计、`srm_supplier_admin`、本公司门户管理员 | 门户管理员（新建时）、经变更单 flow | 资金安全（BR-20） |
+| `srm_supplier_bank_account.account_no` | 完整值：应付会计（`srm_finance`）、`srm_supplier_admin`、本公司门户管理员（v0.6）；其他内部岗位读到只留后 4 位的脱敏值。实现为字段 `maskingRule: 'bank_account'` + `requiredPermissions: ['srm_view_bank_account_no']`，能力由权限集 `systemPermissions` 授予；没有任何权限集给银行账户 `allowExport` | 新建时（`srm_supplier_admin`；v0.6 起门户管理员）、经变更单 flow；`pending_verify` 期间与有效后都只读 | 资金安全（BR-20） |
 | `srm_supplier_contact.mobile` | 内部员工、本公司门户用户 | 本公司门户管理员 | 个人信息最小化 |
 | `srm_sourcing_event.budget_amount` | 寻源、采购总监、内控 | 寻源 | 门户不可见（门户本就不读寻源单） |
 | `srm_sourcing_item.target_price` / `last_price` | 同上 | 寻源 | 同上 |

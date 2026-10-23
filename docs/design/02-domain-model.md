@@ -207,6 +207,7 @@ erDiagram
 | `contact_count` | summary | `count` 联系人 |
 | `primary_contact_count` | summary | `count` 联系人，条件 `is_primary == true`；联系人的主联系人守卫规则读它（v0.2） |
 | `expired_certificate_count` | summary | `count` 资质证书，条件 `status == 'expired'` |
+| `default_bank_account_count` | summary | `count` 银行账户，条件 `is_default == true`；「每家至多一个默认账户」的校验读它（v0.2） |
 
 **`srm_supplier_contact` 供应商联系人**（master_detail → 供应商；OWD `controlled_by_parent`）
 
@@ -219,19 +220,24 @@ erDiagram
 | `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人。守卫：校验规则在供应商 `primary_contact_count > 0` 时拒绝再设一位（插入，或更新时由否改是），导入同样适用；同一批写入里的两位拦不住（objectstack#25477），由「主联系人重复」视图兜底。更换主联系人由「设为主联系人」screen flow 以系统身份先清掉旧的再设新的 |
 | `active` | boolean | 默认 true |
 
-**`srm_supplier_bank_account` 银行账户**（master_detail → 供应商；v0.2）
+**`srm_supplier_bank_account` 银行账户**（master_detail → 供应商；OWD `controlled_by_parent`；v0.2）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `bank_name` / `branch_name` | text | 开户行 / 支行 |
-| `account_name` | text | 必须与供应商名称一致（校验规则，境外供应商除外） |
-| `account_no` | text | 字段级权限：仅应付会计、采购管理员可读（BR-20） |
+| `bank_name` / `branch_name` | text | 开户行（必填）/ 支行 |
+| `account_name` | text | 必填；中国供应商（`country == 'cn'`）必须与供应商全称一致（校验规则），境外供应商不校验 |
+| `account_no` | text | 必填；脱敏规则 `bank_account`（只留后 4 位）+ `requiredPermissions: ['srm_view_bank_account_no']`：只有持该能力的权限集（`srm_finance`、`srm_supplier_admin`）读到完整值，其他人读到脱敏值且不能按它筛选排序（BR-20，04 §4.2） |
 | `swift_code` | text | 境外账户 |
-| `currency` | select | `cny` / `usd` / `eur` / … |
-| `status` | select | `pending_verify` 待核验 / `active` 有效 / `inactive` 停用 |
-| `verified_by` | user | 核验人（应付会计） |
-| `is_default` | boolean | 默认 false |
-| `erp_bank_id` | text | 预留，ERP 集成前空着 |
+| `currency` | select | `cny` / `usd` / `eur` / `jpy` / `hkd`，默认 `cny` |
+| `status` | select（stageField，只读） | `pending_verify` 待核验（新建默认）/ `active` 有效 / `inactive` 停用；只由 flow 写入，状态机 `pending_verify → active ⇄ inactive` |
+| `verified_by` | user（只读） | 核验人（应付会计），由「核验银行账户」screen flow 写入 |
+| `is_default` | boolean | 默认 false；只有 `active` 的账户可设为默认（校验规则）；每家至多一个默认账户（校验规则读供应商的 `default_bank_account_count`） |
+| `erp_bank_id` | text（只读） | 预留，ERP 集成前空着 |
+
+锁定：开户行、支行、户名、账号、SWIFT、币种在任何状态下都 `readonlyWhen` 只读（新建时可填）——
+`pending_verify` 期间整条记录不可改，`active` / `inactive` 账户的修改走信息变更单（v0.2 M4）。
+新建与核验是两个人：采购侧（`srm_supplier_admin`）新建，应付会计经 `srm_bank_verify` 核验，
+flow 拒绝新建人核验自己建的账户（03 §13）。
 
 **`srm_supplier_certificate` 资质证书**（master_detail → 供应商）
 
