@@ -4,9 +4,10 @@ import { Plant } from '../objects/plant.object.js';
 import { Supplier } from '../objects/supplier.object.js';
 
 // 演示数据。全部是标明「示例」的虚构值，不对应任何真实企业（AGENTS.md 红线 5）。
+// 用 ignore 只补缺不覆盖：每次启动都会重放种子，upsert 会把用户改过的记录（如准入后的供应商状态）改回初值。
 
 const categories = defineSeed(Category, {
-  mode: 'upsert',
+  mode: 'ignore',
   externalId: 'code',
   records: [
     { code: 'ELEC', name: '电子元器件', risk_class: 'high', is_direct: true, mandatory_cert_types: ['business_license', 'iso9001'] },
@@ -16,7 +17,7 @@ const categories = defineSeed(Category, {
 });
 
 const plants = defineSeed(Plant, {
-  mode: 'upsert',
+  mode: 'ignore',
   externalId: 'code',
   records: [
     { code: 'P100', name: '示例一厂', legal_entity: '示例制造有限公司' },
@@ -25,7 +26,7 @@ const plants = defineSeed(Plant, {
 });
 
 const suppliers = defineSeed(Supplier, {
-  mode: 'upsert',
+  mode: 'ignore',
   externalId: 'name',
   records: [
     { name: '示例电子科技有限公司', short_name: '示例电子', country: 'cn', credit_code: '91000000MA0EXAMP01', supplier_type: 'manufacturer', status: 'qualified', risk_level: 'low' },
