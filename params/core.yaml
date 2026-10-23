@@ -17,14 +17,14 @@ registration_accept_days:
   label: 注册申请受理时限
   unit: 工作日
   example: 3
-  used_in: [QP-01 6.2.3]
+  used_in: [QP-01 6.2.3, GL-01 6.1.2, GL-01 附录 B]
   system: 制度要求；受理时的查重与黑名单比对由 flow srm_application_intake 自动完成（核心 03 §3）
 
 trial_period:
   label: 试供期
   example: { months: 3, batches: 3 }
   display: "{months} 个月或 {batches} 个批次"
-  used_in: [QP-01 6.3.5]
+  used_in: [QP-01 6.3.5, GL-01 6.7.1]
   system: 制度要求；品类资格 trial → qualified 由品类经理评价后变更（核心 02 srm_supplier_category）
 
 emergency_backfill_days:
@@ -39,7 +39,7 @@ cert_reminder_days:
   unit: 日历日（到期前）
   example: [30, 15, 7]
   format: "{} 日"
-  used_in: [QP-01 6.6.1]
+  used_in: [QP-01 6.6.1, GL-01 6.8.1, ZC-03 2.1]
   system: 证书到期提醒 flow，time_relative 触发（核心 03 §11）
 
 bank_change_verification:
@@ -109,7 +109,7 @@ record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
   example: 3
-  used_in: [QP-01 第 8 章, QP-02 第 8 章, GL-04 6.7.1]
+  used_in: [QP-01 第 8 章, QP-02 第 8 章, GL-01 第 8 章, GL-04 6.7.1, WI-01 第 8 章]
   system: 制度要求
 
 contract_reminder_days:
@@ -133,6 +133,70 @@ po_ack_escalate_hours:
   example: 48
   used_in: [QP-02]
   system: 同上
+
+# ---- 准入与现场审核（GL-01、WI-01） ----
+
+doc_review_days:
+  label: 准入资料审核时限
+  unit: 工作日
+  example: 10
+  used_in: [GL-01 6.2.1, GL-01 附录 B]
+  system: 制度要求
+
+cert_min_remaining_months:
+  label: 准入时资质证书的最短剩余有效期
+  unit: 个月
+  example: 3
+  used_in: [GL-01 6.2.2]
+  system: 制度要求；核验证书时由核验人判断
+
+doc_return_limit:
+  label: 准入资料退回补充的次数上限
+  unit: 次
+  example: 3
+  used_in: [GL-01 6.2.3]
+  system: 制度要求
+
+site_audit_days:
+  label: 准入现场审核时限（资料审核通过后）
+  unit: 日历日
+  example: 30
+  used_in: [GL-01 附录 B, WI-01 6.2.1]
+  system: 制度要求
+
+audit_reapply_months:
+  label: 现场审核不通过后再次申请的间隔
+  unit: 个月
+  example: 12
+  used_in: [GL-01 6.4.3]
+  system: 制度要求；受理时查看该供应商的历史审核记录
+
+audit_reuse_months:
+  label: 现场审核结果可沿用的期限
+  unit: 个月
+  example: 12
+  used_in: [GL-01 6.4.4]
+  system: 制度要求；准入前置校验（核心 03 §3 第 5 步）只认关联本次申请的审核记录，沿用已有审核记录的做法待设计
+
+trial_share_max_pct:
+  label: 试供期采购份额上限
+  example: 20%
+  used_in: [GL-01 6.7.2]
+  system: 制度要求
+
+qualification_alert_freeze_days:
+  label: 资质异常转冻结的期限
+  unit: 日历日
+  example: 60
+  used_in: [GL-01 6.8.4]
+  system: 制度要求；从资质异常列表（核心 05）发起冻结处置（核心 01 FR-208）
+
+audit_score_thresholds:
+  label: 现场审核结论的分数线
+  example: { pass: 85, floor: 70 }
+  display: 通过线 {pass} 分；有条件通过和单个审核块的下限 {floor} 分
+  used_in: [WI-01 6.6.1]
+  system: 审核记录录入总分与结论（核心 02 srm_supplier_audit）；结论由审核组按分数线判定
 
 # ---- 政策层文件（ZC-01 管理目标、ZC-02 授权审批表、ZC-03 风险控制矩阵） ----
 
