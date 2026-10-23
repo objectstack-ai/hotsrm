@@ -35,6 +35,9 @@ export const BuyerPermissionSet = {
   label: 'SRM 采购',
   objects: {
     srm_material: { ...read, allowEdit: true },
+    // 代供应商发起信息变更（v0.6 前）；改只限自己发起、被退回修改的变更单（对象上的 readonlyWhen）。
+    // 采购员没有完整账号的读写能力，银行账户变更由品类经理或采购主管发起
+    srm_supplier_change_request: { ...write },
   },
   fields: {
     'srm_material.erp_material_no': readOnly,
@@ -56,6 +59,8 @@ export const SupplierAdminPermissionSet = {
     srm_supplier_certificate: write,
     srm_supplier_category: write,
     srm_supplier_application: write,
+    // 发起信息变更；银行账户变更要填完整账号，只有持 srm_view_bank_account_no 的岗位能发起（BR-20）
+    srm_supplier_change_request: write,
     // 新建账户后为「待核验」并锁定；核验只经 srm_bank_verify，已有账户的修改走信息变更单（v0.2 M4）
     srm_supplier_bank_account: write,
   },
@@ -102,6 +107,7 @@ export const ExecutivePermissionSet = {
     srm_supplier_certificate: read,
     srm_supplier_category: read,
     srm_supplier_application: read,
+    srm_supplier_change_request: read,
   },
 };
 
@@ -115,6 +121,8 @@ export const FinancePermissionSet = {
     srm_supplier_contact: read,
     srm_supplier_certificate: read,
     srm_supplier_bank_account: read,
+    // 银行账户变更的第 2 级审批（BR-11）；审批权由 flow 授予
+    srm_supplier_change_request: read,
   },
   systemPermissions: ['srm_view_bank_account_no'],
 };

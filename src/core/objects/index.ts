@@ -6,4 +6,5 @@ export { SupplierCertificate } from './supplier-certificate.object.js';
 export { SupplierCategory } from './supplier-category.object.js';
 export { SupplierApplication } from './supplier-application.object.js';
 export { SupplierBankAccount } from './supplier-bank-account.object.js';
+export { SupplierChangeRequest } from './supplier-change-request.object.js';
 export { Material } from './material.object.js';

@@ -201,6 +201,7 @@ erDiagram
 | `is_related_party` | boolean | 默认 false；存在关联关系申报时为 true（FR-904） |
 | `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；协议生效时由合同 flow 置为 true |
 | `erp_vendor_code` | text | ERP 供应商编码，唯一；预留，ERP 集成前空着或由采购员手工填写 |
+| `last_change_request` | lookup → 信息变更单（只读） | 最近一次写回本档案的变更单，由 `srm_change_apply` 写入（v0.2） |
 | `portal_position` | text | 门户岗位标识，如 `srm_vendor_sup0000128`；开通门户时写入，只读。校验规则：非空时必须以 `srm_vendor_` 开头（没开通门户的供应商为空）。v0.6 加 |
 | `legacy_imported` | boolean | 默认 false；存量导入的供应商为 true（v0.2）。只能在新建时置为 true：`readonlyWhen: previous.legacy_imported != true`，已建档的供应商重复导入时该列被忽略；只有 `srm_admin` 可写 |
 | `legacy_reviewed` | boolean | 默认 false；品类经理核对后经「确认复核」按钮置为 true。`legacy_imported && !legacy_reviewed` 的供应商列在「存量待复核」视图（v0.2） |
@@ -208,6 +209,12 @@ erDiagram
 | `primary_contact_count` | summary | `count` 联系人，条件 `is_primary == true`；联系人的主联系人守卫规则读它（v0.2） |
 | `expired_certificate_count` | summary | `count` 资质证书，条件 `status == 'expired'` |
 | `default_bank_account_count` | summary | `count` 银行账户，条件 `is_default == true`；「每家至多一个默认账户」的校验读它（v0.2） |
+
+关键信息锁定（v0.2）：`name`、`country`、`credit_code`、`registration_no`、`legal_representative`、
+`registered_capital`、`address` 在 `potential` / `qualifying` 期间可以直接改；准入通过后（合格、冻结、
+淘汰、黑名单）只能经信息变更单修改。实现为校验规则 `key_info_via_change_request`：这些字段有变化而
+`last_change_request` 没变时拒绝写入；`last_change_request` 只读，只有写回 flow 能带着它一起写。
+不用 `readonlyWhen`，因为它连系统身份的写入也挡，写回 flow 就写不进去。
 
 **`srm_supplier_contact` 供应商联系人**（master_detail → 供应商；OWD `controlled_by_parent`）
 
@@ -231,7 +238,7 @@ erDiagram
 | `currency` | select | `cny` / `usd` / `eur` / `jpy` / `hkd`，默认 `cny` |
 | `status` | select（stageField，只读） | `pending_verify` 待核验（新建默认）/ `active` 有效 / `inactive` 停用；只由 flow 写入，状态机 `pending_verify → active ⇄ inactive` |
 | `verified_by` | user（只读） | 核验人（应付会计），由「核验银行账户」screen flow 写入 |
-| `is_default` | boolean | 默认 false；只有 `active` 的账户可设为默认（校验规则）；每家至多一个默认账户（校验规则读供应商的 `default_bank_account_count`） |
+| `is_default` | boolean | 默认 false；只有 `active` 的账户可设为默认（校验规则，新建与修改都拦；不用 `readonlyWhen`，变更单停用原账户时要同时取消默认）；每家至多一个默认账户（校验规则读供应商的 `default_bank_account_count`） |
 | `erp_bank_id` | text（只读） | 预留，ERP 集成前空着 |
 
 锁定：开户行、支行、户名、账号、SWIFT、币种在任何状态下都 `readonlyWhen` 只读（新建时可填）——
@@ -324,11 +331,30 @@ upsert 写入，结构不变。
 `status`（`planned` / `done` / `cancelled`）。问题项可经「转整改单」screen flow 生成
 `srm_quality_issue`（`source = audit`）。
 
-**`srm_supplier_change_request` 信息变更单**（v0.2）：`supplier`、`change_type`
-（`basic` 基本信息 / `bank_account` 银行账户 / `address` 地址 / `contact` 联系人）、
-`before_value` / `after_value`（json，变更前后快照）、`reason`、`status`、
-`purchase_approver` / `finance_approver`（user）、`applied_at`（审批通过后写回档案
-的时间）。门户上线前由采购员代供应商发起。
+**`srm_supplier_change_request` 信息变更单**（OWD `private`；v0.2）。门户上线前由采购侧代供应商在
+供应商档案下新建，新建即进入审批（03 §5）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `change_no` | autonumber | `CHG{YYYY}{00000}` |
+| `supplier` | lookup → 供应商 | 必填；新建后只读 |
+| `change_type` | select | `basic` 基本信息 / `bank_account` 银行账户 / `address` 地址 / `contact` 联系人；新建后只读 |
+| `reason` | textarea | 必填 |
+| `new_name` / `new_credit_code` / `new_registration_no` / `new_legal_representative` / `new_registered_capital` | text / currency | 基本信息的新值，至少填一项，留空的保持原值 |
+| `new_address` | address | 地址变更必填 |
+| `bank_account` | lookup → 银行账户 | 被替换的原账户：必须属于本供应商、状态为 `active`；新建后只读 |
+| `new_bank_name` / `new_branch_name` / `new_account_name` / `new_account_no` / `new_swift_code` / `new_currency` | text / select | 新账户。户名规则同银行账户；`new_account_no` 同样脱敏并要求 `srm_view_bank_account_no`，所以银行账户变更只能由持该能力的岗位（品类经理、采购主管）发起 |
+| `contact` | lookup → 联系人 | 联系人变更必填，必须属于本供应商；新值 `new_contact_name` / `new_mobile` / `new_email` |
+| `status` | select（stageField，只读） | `in_review` 审批中 / `applied` 已生效 / `rejected` 已驳回；只由 flow 写入 |
+| `approval_status` | select（只读） | 审批节点镜像：`pending` / `approved` / `rejected` / `returned` 退回修改 / `recalled` |
+| `purchase_approver` / `finance_approver` | user（只读） | 两级审批的实际审批人，flow 从审批记录写入 |
+| `reject_reason` | textarea（只读） | 驳回时的审批意见 |
+| `before_value` / `after_value` | json（只读） | 新建时快照的当前档案 / 写回后的档案；银行账号不进快照（BR-20） |
+| `applied_at` | datetime（只读） | 写回时间 |
+| `new_bank_account` | lookup → 银行账户（只读） | 银行账户变更写回时新建的账户 |
+
+新值用分类型字段而不是直接编辑 json：表单能按类型显示、校验，退回后发起人能直接改。变更内容只在新建时和
+`approval_status == 'returned'` 期间可改（`readonlyWhen`），审批中平台锁定记录。
 
 **`srm_supplier_disposition` 供应商处置单**（v0.3）：`supplier`、`action`
 （`freeze` / `unfreeze` / `eliminate` / `blacklist` / `remove_blacklist`）、

@@ -68,7 +68,6 @@ export const SupplierBankAccount = ObjectSchema.create({
       label: '默认账户',
       group: 'account',
       defaultValue: false,
-      readonlyWhen: P`record.status != 'active'`,
     }),
     erp_bank_id: Field.text({ label: 'ERP 银行账户 ID', group: 'review', maxLength: 50, readonly: true }),
   },
@@ -97,7 +96,8 @@ export const SupplierBankAccount = ObjectSchema.create({
       condition: P`has(record.supplier.country) && record.supplier.country == 'cn' && has(record.supplier.name) && record.account_name != record.supplier.name`,
     },
     {
-      // 只有核验通过的账户能设为默认（readonlyWhen 不管新建，新建时由这条拦住）
+      // 只有核验通过的账户能设为默认（新建和修改都由这条拦住）。不用 readonlyWhen：信息变更单 flow 停用原账户时
+      // 要同时取消默认，readonlyWhen 对系统身份的写入同样生效
       name: 'default_account_active',
       type: 'script',
       severity: 'error',

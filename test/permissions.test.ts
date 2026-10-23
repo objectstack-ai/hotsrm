@@ -69,6 +69,7 @@ describe('internal permissions', () => {
         "srm_supplier_bank_account": "R",
         "srm_supplier_category": "R",
         "srm_supplier_certificate": "R",
+        "srm_supplier_change_request": "R",
         "srm_supplier_contact": "R",
       }
     `);
@@ -85,6 +86,7 @@ describe('internal permissions', () => {
         "srm_supplier_bank_account": "RCE",
         "srm_supplier_category": "RCE",
         "srm_supplier_certificate": "RCE",
+        "srm_supplier_change_request": "RCE",
         "srm_supplier_contact": "RCED",
       }
     `);

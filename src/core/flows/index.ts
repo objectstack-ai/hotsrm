@@ -4,3 +4,5 @@ export { AdmissionRejectionFlow } from './admission/rejection.flow.js';
 export { CertificateSweepFlow } from './qualification/certificate-sweep.flow.js';
 export { QualificationRecalcFlow } from './qualification/qualification-recalc.flow.js';
 export { BankVerifyFlow } from './bank-account/bank-verify.flow.js';
+export { ChangeApprovalFlow } from './change-request/change-approval.flow.js';
+export { ChangeApplyFlow } from './change-request/change-apply.flow.js';
