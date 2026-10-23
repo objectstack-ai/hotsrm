@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schemas.objectstack.dev/template-manifest.json",
+  "name": "hotsrm",
+  "specVersion": "^18.0.0",
+  "engines": {
+    "protocol": "^18.0.0"
+  },
+  "manifestId": "app.objectstack.hotsrm",
+  "displayName": "hotsrm",
+  "description": "供应商关系管理（SRM）：供应商全生命周期、寻源定价、订单协同、质量、绩效、对账与供应商门户。",
+  "tagline": "基于 ObjectStack 的供应商关系管理。",
+  "category": "srm",
+  "isStarter": false,
+  "publisher": "objectstack",
+  "homepageUrl": "https://github.com/objectstack-ai/hotsrm",
+  "tags": ["srm", "procurement", "supplier", "sourcing"],
+  "skills": [
+    "objectstack-platform",
+    "objectstack-data",
+    "objectstack-ui",
+    "objectstack-automation"
+  ],
+  "readmePath": "README.md"
+}
