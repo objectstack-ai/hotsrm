@@ -1,0 +1,44 @@
+# 国企采购合规包参数：定义与示例默认值（见 docs/packs/soe-procurement.md §6）。
+# 以下为示例，实施时按企业制度和授权文件赋值。字段含义见 core.yaml 文件头。
+
+so_open_threshold:
+  label: 公开采购的金额下限
+  unit: 万元
+  example: { goods: 50, services: 30 }
+  display: 货物 {goods} 万元，服务 {services} 万元
+  used_in: [SO-01]
+  system: 采购方式规则表 srm_soe_method_rule
+
+so_min_bidders:
+  label: 询比、竞价方式的最少参与供应商数
+  unit: 家
+  example: 3
+  used_in: [SO-01]
+  system: 寻源活动发布前的校验规则
+
+so_panel_min_size:
+  label: 评审小组最少人数（须为单数）
+  unit: 人
+  example: 3
+  used_in: [SO-01, SO-02]
+  system: 专家抽取记录的校验规则
+
+so_publicity_days:
+  label: 结果公示期
+  unit: 日历日
+  example: 3
+  used_in: [SO-03]
+  system: 公示记录的截止时间计算
+
+so_objection_reply_days:
+  label: 异议答复时限
+  unit: 工作日（收到异议后）
+  example: 3
+  used_in: [SO-04]
+  system: 异议记录的答复期限与超时提醒
+
+so_collective_decision_rule:
+  label: 集体决策的金额标准
+  example: 按企业「三重一大」制度规定
+  used_in: [SO-01]
+  system: 采购方案的集体决策触发条件

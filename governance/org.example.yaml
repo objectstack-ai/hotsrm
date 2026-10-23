@@ -1,0 +1,44 @@
+# 组织信息示例。模板用 {{org.<键>}} 引用；客户的取值写在客户私有仓库的
+# governance/org.yaml，没写的键取这里的示例值。
+
+company_name: 示例股份有限公司
+
+# 下属单位的称谓，如「子公司」「分公司」「工厂」
+unit_term: 单位
+# 适用范围中对下属单位的表述
+scope_units: 所属各单位
+# 适用范围中的供应品类
+supply_scope: 原材料、辅助材料、包装材料、燃料与能源、设备及备品备件、工程、服务和物流运输
+
+# 文件编号前缀；客户在 documents.yaml 中逐个登记编号时，以登记的为准
+doc_prefix: ""
+
+dept:
+  procurement: 采购部
+  quality: 质量管理部
+  hse: 安全环保部
+  production: 生产技术部
+  finance: 财务部
+  legal: 法务部门
+  oversight: 法务、审计、纪检监察部门
+
+role:
+  vp_procurement: 分管采购的副总经理
+  gm: 总经理
+
+# 本企业对行业物资的称呼，用在扩展包段落里
+terms:
+  bulk: 大宗原料
+  hazmat: 危险化学品
+
+# 物资分类的典型物资：examples 用于正文列举，brief 用于附录表格
+material_classes:
+  A:
+    examples: 主要原材料、主要燃料与能源，以及对产品质量有直接影响的关键辅料
+    brief: 主要原材料、主要燃料与能源、关键辅料
+  B:
+    examples: 包装材料、关键设备及备品备件、危险货物运输服务、检维修服务、实验室试剂等
+    brief: 包装材料、关键设备及备件、危险货物运输、检维修服务
+  C:
+    examples: 一般备品备件、劳保用品、办公用品及一般服务
+    brief: 一般备件、劳保、办公用品、一般服务
