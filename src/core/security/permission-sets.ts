@@ -70,6 +70,17 @@ export const ExecutivePermissionSet = {
   },
 };
 
+// 财务（应付会计）：供应商档案只读。银行账户（v0.2 M2）合入后在此加账号可读，核验只经 screen flow
+export const FinancePermissionSet = {
+  name: 'srm_finance',
+  label: 'SRM 财务',
+  objects: {
+    srm_supplier: read,
+    srm_supplier_contact: read,
+    srm_supplier_certificate: read,
+  },
+};
+
 // 系统管理员：维护品类与工厂等配置
 export const AdminPermissionSet = {
   name: 'srm_admin',
@@ -85,5 +96,6 @@ export const SrmPermissionSets = [
   SupplierAdminPermissionSet,
   QualityPermissionSet,
   ExecutivePermissionSet,
+  FinancePermissionSet,
   AdminPermissionSet,
 ];
