@@ -1,0 +1,48 @@
+# hotsrm 持续集成：元数据校验、lint、类型检查、翻译覆盖、启动测试，以及体系文件检查。
+# 元数据错误在运行时是静默的，这里把 AGENTS.md §6 的验证项变成合入前必过的门槛。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    name: Metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      # pnpm 要在 setup-node 之前装好，`cache: pnpm` 需要它。
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm validate
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm i18n:check
+      - run: pnpm test
+      - run: pnpm build
+
+  governance:
+    name: Governance templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: pip install pyyaml
+      - run: python3 governance/scripts/build.py --check
+      - run: python3 governance/scripts/build.py --check --packs bulk,hazmat,soe

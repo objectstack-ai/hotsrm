@@ -61,21 +61,29 @@ hotsrm/
 │   └── adr/                       决策记录
 ├── governance/                    体系文件模板与生成脚本
 ├── params/                        参数定义与示例默认值（制度与系统共用）
-├── src/                                                                    〔待建〕
+├── src/
 │   ├── core/                      核心（type: app）
-│   ├── bulk/  hazmat/  soe/       三个扩展包（type: module）
-│   └── bridges/                   扩展包之间的联动（type: module）
-├── test/                          门户隔离、封标、组合构建、flow 测试          〔待建〕
+│   ├── bulk/  hazmat/  soe/       三个扩展包（type: module）                 〔待建〕
+│   └── bridges/                   扩展包之间的联动（type: module）           〔待建〕
+├── test/                          启动测试；门户隔离、封标、组合构建、flow 测试随功能补齐
 ├── objectstack.composition.ts     按开关选出要组合的模块                      〔待建〕
-├── objectstack.config.ts          合成一个发布制品                            〔待建〕
+├── objectstack.config.ts          合成一个发布制品
 └── objectstack.manifest.json      标准版的应用标识                            〔待建〕
+```
+
+## 本地开发
+
+需要 Node 22 和 pnpm 10。
+
+```bash
+pnpm install
+pnpm dev          # 本地启动（内存库）
+pnpm validate     # 每次改元数据后跑；其余检查见 AGENTS.md §6
 ```
 
 ## 当前状态
 
-设计阶段：核心设计、三个扩展包设计、第一批决策记录、参数文件首版、体系文件生成脚本和
-第一份模板（QP-01）已完成。文档目录见
-[docs/README.md](./docs/README.md)；参与开发前先读 [AGENTS.md](./AGENTS.md)。
-
-下一步：补齐第一批体系文件模板，然后按[核心设计第一期](./docs/design/07-delivery-plan.md)
-实现应用包。
+v0.1 开发中：工程骨架、CI 和核心应用外壳（`srm_workbench` 工作台、采购品类）已就位。
+建议的 v0.1 范围是内部工作台上的供应商主数据、准入审批和资质到期预警，门户、寻源和 ERP 集成
+放在后续版本。设计文档目录见 [docs/README.md](./docs/README.md)；参与开发前先读
+[AGENTS.md](./AGENTS.md)。
