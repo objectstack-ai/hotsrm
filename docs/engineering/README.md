@@ -15,7 +15,9 @@
 | 字段名不含 `role` | `role` 是平台保留禁用词；联系人的角色字段叫 `contact_function` | objectstack ADR-0090 D3 |
 | `stageField` 不用共享选项列表 | 状态字段的每个选项必须带 `kind`，只能内联定义；其他可被扩展的枚举才做成 picklist | 迁移 `stage-field-option-kind-required` |
 | 唯一约束按组织作用域、空值安全 | 声明索引用 `unique: 'organization'`；允许多条空值的组合唯一（如境外供应商的 `country` + `registration_no`）用平台的空值安全写法 | objectstack ADR-0120 |
-| 跨记录规则不写校验规则 | 「每家供应商至多一位主联系人」这类规则由 screen flow 以系统身份处理，不写成单条校验 | 审核 F-29 |
+| 跨记录规则不写校验规则 | 「每家供应商至多一位主联系人」这类规则由 screen flow 以系统身份处理，不写成单条校验；校验规则只经父记录的带条件汇总做守卫（拒绝第二位），同一批写入拦不住（objectstack#25477） | 审核 F-29 |
+| 表达式默认值先判 `has()` | 默认值按字段声明顺序计算，读后声明字段时该字段可能还没取默认值，写成 `has(record.x) && record.x == …` | v0.2 存量导入 |
+| 平台限制提需求 | 遇到平台做不到的，先查重再在 objectstack 提 issue，PR 里链接；变通做法写明是临时措施，并登记到 07 §6.3 | 2026-10-23 用户要求 |
 | 外部单号字段预留、空着 | `erp_vendor_code`、`erp_material_no` 等字段保留在对象上，ERP 集成前不写 | [ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md) |
 | 中国特有字段单独分组 | 统一社会信用代码、纳税人类型等放在「工商与税务」分组，便于将来拆中国本地化包 | [ADR-0009](../adr/0009-core-first-pack-criteria-and-customer-layer.md) |
 

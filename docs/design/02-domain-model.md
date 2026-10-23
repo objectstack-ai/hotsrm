@@ -202,8 +202,10 @@ erDiagram
 | `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；协议生效时由合同 flow 置为 true |
 | `erp_vendor_code` | text | ERP 供应商编码，唯一；预留，ERP 集成前空着或由采购员手工填写 |
 | `portal_position` | text | 门户岗位标识，如 `srm_vendor_sup0000128`；开通门户时写入，只读。校验规则：非空时必须以 `srm_vendor_` 开头（没开通门户的供应商为空）。v0.6 加 |
-| `legacy_imported` | boolean | 默认 false；存量导入的供应商为 true 并进入「存量导入、待复核」视图（v0.2） |
+| `legacy_imported` | boolean | 默认 false；存量导入的供应商为 true（v0.2）。只能在新建时置为 true：`readonlyWhen: previous.legacy_imported != true`，已建档的供应商重复导入时该列被忽略；只有 `srm_admin` 可写 |
+| `legacy_reviewed` | boolean | 默认 false；品类经理核对后经「确认复核」按钮置为 true。`legacy_imported && !legacy_reviewed` 的供应商列在「存量待复核」视图（v0.2） |
 | `contact_count` | summary | `count` 联系人 |
+| `primary_contact_count` | summary | `count` 联系人，条件 `is_primary == true`；联系人的主联系人守卫规则读它（v0.2） |
 | `expired_certificate_count` | summary | `count` 资质证书，条件 `status == 'expired'` |
 
 **`srm_supplier_contact` 供应商联系人**（master_detail → 供应商；OWD `controlled_by_parent`）
@@ -214,7 +216,7 @@ erDiagram
 | `contact_function` | multiselect | `admin` 主账号 / `sales` 商务 / `logistics` 物流 / `quality` 质量 / `finance` 财务（字段名不用 `role`，平台保留词） |
 | `mobile` / `email` | phone / email | email 必填（门户邀请与通知用） |
 | `portal_user` | user | 已开通门户账号时关联的平台用户；该用户同时被任命到供应商的门户岗位（见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)） |
-| `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人：跨记录规则，由「设为主联系人」screen flow 以系统身份清掉其他联系人的 `is_primary`，不写成校验规则 |
+| `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人。守卫：校验规则在供应商 `primary_contact_count > 0` 时拒绝再设一位（插入，或更新时由否改是），导入同样适用；同一批写入里的两位拦不住（objectstack#25477），由「主联系人重复」视图兜底。更换主联系人由「设为主联系人」screen flow 以系统身份先清掉旧的再设新的 |
 | `active` | boolean | 默认 true |
 
 **`srm_supplier_bank_account` 银行账户**（master_detail → 供应商；v0.2）
@@ -237,11 +239,12 @@ erDiagram
 |---|---|---|
 | `cert_type` | select | `business_license` 营业执照 / `iso9001` / `iatf16949` / `iso14001` / `iso45001` / `production_license` 生产许可 / `ccc` 3C 认证 / `other` |
 | `is_mandatory` | boolean | 默认 false；由 `srm_supplier_qualification_recalc` 在证书或品类资格写入时按该供应商全部品类的 `mandatory_cert_types` 重算，门户只读 |
-| `cert_no` / `issuer` | text | |
+| `cert_no` / `issuer` | text | 存量导入的证书 `cert_no` 必填（`requiredWhen: record.legacy_imported == true`），导入按「供应商 + 资质类型 + 证书编号」匹配 |
 | `valid_from` / `valid_to` | date | `valid_to >= valid_from`（跨字段校验） |
-| `attachment` | file | 扫描件，必填 |
+| `attachment` | file | 扫描件；`requiredWhen: record.legacy_imported != true`——表格导入带不了文件，存量证书复核时补传 |
 | `status` | select | `valid` 有效 / `expiring` 即将到期 / `expired` 已过期，由 flow 按 `valid_to` 维护，门户只读 |
 | `verified` | boolean | 默认 false；SQE 经「核验证书」screen flow 置为 true；供应商修改编号、有效期或附件后由 flow 重置为 false，门户只读 |
+| `legacy_imported` | boolean | 默认 false；存量导入的证书为 true，同供应商的同名字段（只在新建时可置为 true，只有 `srm_admin` 可写）（v0.2） |
 
 **`srm_category` 采购品类**（OWD `public_read`）：`code`、`name`、`parent`（`tree`，
 上级品类）、`category_manager`（user）、`sqe`（user）、`is_direct`（boolean，直接
@@ -563,10 +566,15 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 |---|---|---|---|
 | `potential` ★ | 潜在 | open | `qualifying`、`eliminated` |
 | `qualifying` | 准入中（准入申请进入资料审核时） | open | `qualified`、`potential`（准入未通过） |
-| `qualified` | 合格 | won | `frozen`、`eliminated`、`blacklisted` |
+| `qualified` ★ | 合格（只有存量导入的供应商可以建档即合格） | won | `frozen`、`eliminated`、`blacklisted` |
 | `frozen` | 冻结 | lost | `qualified`、`eliminated`、`blacklisted` |
 | `eliminated` | 淘汰 | lost | `qualifying`（只能经新的准入申请重新走全流程，不能直接恢复）、`blacklisted` |
 | `blacklisted` | 黑名单 | lost | `eliminated`（解除黑名单，需单独审批） |
+
+**初始状态**：`status` 的默认值是 `legacy_imported ? 'qualified' : 'potential'`，导入表格不带状态列；
+插入时的校验规则 `initial_status_by_source` 要求「合格」与「存量导入」同真同假，所以普通新建只能从
+「潜在」开始准入。这样重复导入不会把冻结、淘汰的供应商改回合格（存量导入见
+[导入说明](../implementation/legacy-supplier-import.md)）。
 
 「资质异常」不是状态，而是 `qualification_alert` 标志：它不改变供应商是否合格，
 只阻止新的寻源邀请（BR-04），资质更新后自动解除。

@@ -4,6 +4,7 @@ import * as picklists from './picklists/index.js';
 import * as views from './views/index.js';
 import * as flows from './flows/index.js';
 import * as apps from './apps/index.js';
+import * as actions from './actions/index.js';
 import * as translations from './translations/index.js';
 import { SrmSeedData } from './data/index.js';
 import { SrmPermissionSets } from './security/permission-sets.js';
@@ -32,6 +33,7 @@ export default defineStack({
   views: Object.values(views),
   flows: Object.values(flows),
   apps: Object.values(apps),
+  actions: Object.values(actions),
   permissions: SrmPermissionSets,
   positions: SrmPositions,
 

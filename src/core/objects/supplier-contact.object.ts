@@ -1,3 +1,4 @@
+import { P } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 供应商联系人（02 §4.1）。portal_user 随门户版本加入。
@@ -32,4 +33,25 @@ export const SupplierContact = ObjectSchema.create({
     is_primary: Field.boolean({ label: '主联系人', group: 'contact', defaultValue: false }),
     active: Field.boolean({ label: '有效', group: 'contact', defaultValue: true }),
   },
+
+  // 每家供应商至多一位主联系人（02 §4.1）：这里只做守卫，拒绝第二位主联系人（含导入）；
+  // 更换主联系人由「设为主联系人」screen flow 先清掉旧的再设新的。
+  validations: [
+    {
+      name: 'single_primary_on_insert',
+      type: 'script',
+      severity: 'error',
+      events: ['insert'],
+      message: '该供应商已有主联系人，每家供应商至多一位',
+      condition: P`record.is_primary == true && record.supplier.primary_contact_count > 0`,
+    },
+    {
+      name: 'single_primary_on_update',
+      type: 'script',
+      severity: 'error',
+      events: ['update'],
+      message: '该供应商已有主联系人，每家供应商至多一位',
+      condition: P`record.is_primary == true && previous.is_primary != true && record.supplier.primary_contact_count > 0`,
+    },
+  ],
 });

@@ -61,7 +61,7 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 | `srm_legal` | 合同读改（审批由 flow 授予） |
 | `srm_executive` | 全部 SRM 对象只读 + 仪表盘；审批由 flow 授予，不需要额外写权限 |
 | `srm_auditor` | 全部 SRM 对象只读（报价同样受封标约束），可读审批历史与字段历史，不可导出银行账号 |
-| `srm_admin` | 品类、指标库、编码、通知模板的配置；不授予报价读权限 |
+| `srm_admin` | 品类、指标库、编码、通知模板的配置；存量供应商、联系人、证书的导入（v0.2，唯一能写「存量导入」标记的权限集，[导入说明](../implementation/legacy-supplier-import.md)）；不授予报价读权限 |
 | `srm_portal_supplier` | 供应商门户用户：见 §3.2 |
 | `srm_portal_supplier_admin` | 在 `srm_portal_supplier` 之上：维护本公司联系人、银行账户，提交变更申请与绩效申诉；直接授予具体用户 |
 | `srm_integration` | 预留（ERP 集成后）：集成服务账号，物料、交付记录、订单镜像的写入；供应商仅可写 `erp_vendor_code`，价格记录只读；**不**授予报价单与银行账号 |
@@ -75,7 +75,8 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 ### 2.3 对象权限矩阵（节选）
 
 R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — 无权限。删除一律只给
-`srm_admin`，业务上用状态（取消、作废）代替删除。
+`srm_admin`，业务上用状态（取消、作废）代替删除。供应商主数据在集团内共享（§5），
+`supplier_admin` 和 `srm_admin` 对供应商的编辑不限于自己建的记录（`modifyAllRecords`）。
 
 | 对象 | base | sourcing | supplier_admin | buyer | quality | finance | portal |
 |---|---|---|---|---|---|---|---|

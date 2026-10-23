@@ -1,4 +1,4 @@
-import { P } from '@objectstack/spec';
+import { P, cel } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 供应商（02 §4.1、§5.1）。门户岗位、绩效等级等字段随对应版本加入。
@@ -48,10 +48,12 @@ export const Supplier = ObjectSchema.create({
         { label: '物流商', value: 'logistics' },
       ],
     }),
+    // 新建供应商从「潜在」开始走准入；存量导入的供应商已在用，直接为「合格」（02 §5.1）。
+    // 用默认值而不是导入表格里的状态列：重复导入时不带状态，不会把冻结、淘汰改回合格。
     status: Field.select({
       label: '状态',
       group: 'qualification',
-      defaultValue: 'potential',
+      defaultValue: cel`has(record.legacy_imported) && record.legacy_imported == true ? 'qualified' : 'potential'`,
       options: [
         { label: '潜在', value: 'potential', kind: 'open' },
         { label: '准入中', value: 'qualifying', kind: 'open' },
@@ -87,11 +89,30 @@ export const Supplier = ObjectSchema.create({
     address: Field.address({ label: '注册地址', group: 'basic' }),
     website: Field.url({ label: '网站', group: 'basic' }),
     is_related_party: Field.boolean({ label: '关联方', group: 'qualification', defaultValue: false }),
+    // 存量导入（07 R6）：只能在新建时置为 true；已建档的供应商重复导入时该列被忽略（readonlyWhen）
+    legacy_imported: Field.boolean({
+      label: '存量导入',
+      group: 'qualification',
+      defaultValue: false,
+      readonlyWhen: P`previous.legacy_imported != true`,
+    }),
+    legacy_reviewed: Field.boolean({ label: '存量已复核', group: 'qualification', defaultValue: false }),
     erp_vendor_code: Field.text({ label: 'ERP 供应商编码', group: 'registration', unique: true, maxLength: 40 }),
     contact_count: Field.summary({
       label: '联系人数',
       group: 'qualification',
       summaryOperations: { object: 'srm_supplier_contact', field: 'id', function: 'count' },
+    }),
+    // 「每家至多一位主联系人」的守卫依据（联系人校验规则读它）
+    primary_contact_count: Field.summary({
+      label: '主联系人数',
+      group: 'qualification',
+      summaryOperations: {
+        object: 'srm_supplier_contact',
+        field: 'id',
+        function: 'count',
+        filter: { is_primary: true },
+      },
     }),
     expired_certificate_count: Field.summary({
       label: '过期证书数',
@@ -115,7 +136,7 @@ export const Supplier = ObjectSchema.create({
       type: 'state_machine',
       field: 'status',
       message: '供应商状态不允许这样变更',
-      initialStates: ['potential'],
+      initialStates: ['potential', 'qualified'],
       transitions: {
         potential: ['qualifying', 'eliminated'],
         qualifying: ['qualified', 'potential'],
@@ -124,6 +145,14 @@ export const Supplier = ObjectSchema.create({
         eliminated: ['qualifying', 'blacklisted'],
         blacklisted: ['eliminated'],
       },
+    },
+    {
+      name: 'initial_status_by_source',
+      type: 'script',
+      severity: 'error',
+      events: ['insert'],
+      message: '新建供应商须从「潜在」开始准入；只有存量导入的供应商建档即为「合格」',
+      condition: P`(record.legacy_imported == true) != (record.status == 'qualified')`,
     },
     {
       name: 'credit_code_format',
