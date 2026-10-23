@@ -66,7 +66,7 @@ export const en: TranslationData = {
         credit_code_format: { message: 'The Unified Social Credit Code must be 18 digits or uppercase letters' },
         key_info_via_change_request: {
           message:
-            'Change the legal name, credit code, registration number, legal representative, registered capital or address of a qualified supplier through a change request',
+            'Change the legal name, country or region, credit code, registration number, legal representative, registered capital or address of a qualified supplier through a change request',
         },
         initial_status_by_source: {
           message: 'A new supplier must start admission as Potential; only a legacy-imported supplier is created as Qualified',

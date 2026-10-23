@@ -178,7 +178,7 @@ export const Supplier = ObjectSchema.create({
       type: 'script',
       severity: 'error',
       events: ['update'],
-      message: '合格供应商的全称、信用代码、注册号、法定代表人、注册资本、注册地址请经信息变更单修改',
+      message: '合格供应商的全称、国家 / 地区、信用代码、注册号、法定代表人、注册资本、注册地址请经信息变更单修改',
       condition: {
         dialect: 'cel',
         source:
