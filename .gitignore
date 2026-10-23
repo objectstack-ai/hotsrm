@@ -1,3 +1,10 @@
 # 生成物
 build/
 __pycache__/
+# ObjectStack
+node_modules/
+dist/
+.objectstack/
+*.log
+.env
+.env.*

@@ -65,12 +65,26 @@ hotsrm/
 ├── governance/                    体系文件模板与生成脚本
 ├── params/                        参数定义与示例默认值（制度与系统共用）
 ├── src/
-│   └── core/                      核心（type: app）；v0.1 骨架与主数据已合入
-│       （扩展包 bulk/ hazmat/ soe/ 与桥接模块等有客户要求时再建）
-├── test/                          flow 测试；门户隔离（v0.6 起）、封标（v0.7 起）
+│   └── core/                      核心（type: app）；v0.1 已合入（PR #5）
+│       （扩展包 bulk/ hazmat/ soe/ 与桥接模块等有客户要求时再建，ADR-0009）
+├── test/                          启动测试与 flow 测试；门户隔离（v0.6 起）、封标（v0.7 起）
+├── objectstack.composition.ts     按开关选出要组合的模块（现只有核心）
 ├── objectstack.config.ts          发布制品
-└── objectstack.manifest.json      标准版的应用标识
+└── objectstack.manifest.json      标准版的应用标识（市场展示信息）
 ```
+
+## 本地开发
+
+需要 Node 22 和 pnpm 10。
+
+```bash
+pnpm install
+pnpm dev          # 本地启动（内存库）
+pnpm validate     # 每次改元数据后跑；其余检查见 AGENTS.md §6
+```
+
+定时 flow（证书到期扫描）受部署开关 `OS_AUTOMATION_SCHEDULED_WORK_ENABLED` 控制，平台默认关闭，本地和
+托管云都要显式打开才会运行；托管云上如何为本应用打开，待与平台确认。
 
 ## 当前状态
 
@@ -78,16 +92,16 @@ hotsrm/
 
 | 版本 | 内容 | 累计对象 |
 |---|---|---|
-| v0.1（进行中） | 内部工作台：主数据、两级准入审批、资质到期扫描 | 7 |
+| v0.1（已合入，PR #5） | 内部工作台：主数据、两级准入审批、资质到期扫描 | 7 |
 | v0.2 | 物料只读副本、银行账户、存量导入、信息变更单 | 10 |
 | v0.3 | 合同与协议、供应商处置 | 13 |
-| v0.4 | 交付记录导入、质量问题 / SCAR、供应商审核 | 17 |
+| v0.4 | 交付记录导入、质量问题 / SCAR、供应商审核 | 16 |
 | v0.5 | 绩效、风险事件、管理报表 = 内部版 MVP，试运行 | 20 |
 | v0.6 | 供应商门户（依赖 objectstack#25233） | 21 |
 | v0.7 | 寻源与封标、价格库；核心对象冻结 | 27 |
 
 已完成：核心设计、三个扩展包设计（保留）、ADR-0001～0009、参数文件首版、体系文件生成脚本
-和 12 份模板、v0.1 的骨架与主数据（PR #5）。文档目录见 [docs/README.md](./docs/README.md)；
+和 12 份模板、v0.1 内部工作台（PR #5）。文档目录见 [docs/README.md](./docs/README.md)；
 参与开发前先读 [AGENTS.md](./AGENTS.md)。
 
-下一步：完成 v0.1 的准入审批、资质扫描、权限与导航（[07 §1](./docs/design/07-delivery-plan.md#1-分期路线图)）。
+下一步：v0.2 主数据补齐——物料只读副本、银行账户、存量导入、信息变更单（[07 §1](./docs/design/07-delivery-plan.md#1-分期路线图)）。

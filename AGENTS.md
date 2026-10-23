@@ -96,4 +96,5 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 - 体系文件：`python3 governance/scripts/build.py --check` 与
   `python3 governance/scripts/build.py --check --packs bulk,hazmat,soe` 都通过；改了模板的，
   生成 Word 打开检查版式。
-- 元数据（有代码之后）：校验、类型检查、lint、构建、测试全部通过；每种扩展包组合都能构建。
+- 元数据：`pnpm validate`、`pnpm lint`、`pnpm typecheck`、`pnpm i18n:check`、`pnpm test`、
+  `pnpm build` 全部通过（CI 同样跑这些）；有扩展包之后，每种扩展包组合都能构建。
