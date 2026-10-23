@@ -18,10 +18,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      # pnpm 要在 setup-node 之前装好，`cache: pnpm` 需要它。
+      # pnpm 要在 setup-node 之前装好，`cache: pnpm` 需要它；版本取 package.json 的 packageManager。
       - uses: pnpm/action-setup@v6
-        with:
-          version: 10
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
