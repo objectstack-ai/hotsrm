@@ -17,6 +17,10 @@ describe('core boots', () => {
     await stack?.stop();
   });
 
+  it('identifies as the hotsrm app', () => {
+    expect(config.manifest).toMatchObject({ id: 'app.objectstack.hotsrm', namespace: 'srm', type: 'app' });
+  });
+
   it('refuses a category without a code', async () => {
     await expect(
       stack.hooks.run(Category.name, 'insert', { name: '电子元器件' }, { as: admin }),

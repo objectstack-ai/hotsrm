@@ -66,9 +66,9 @@ hotsrm/
 │   ├── bulk/  hazmat/  soe/       三个扩展包（type: module）                 〔待建〕
 │   └── bridges/                   扩展包之间的联动（type: module）           〔待建〕
 ├── test/                          启动测试；门户隔离、封标、组合构建、flow 测试随功能补齐
-├── objectstack.composition.ts     按开关选出要组合的模块                      〔待建〕
+├── objectstack.composition.ts     按开关选出要组合的模块
 ├── objectstack.config.ts          合成一个发布制品
-└── objectstack.manifest.json      标准版的应用标识                            〔待建〕
+└── objectstack.manifest.json      标准版的应用标识（市场展示信息）
 ```
 
 ## 本地开发

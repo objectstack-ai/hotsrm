@@ -7,14 +7,17 @@ import * as translations from './translations/index.js';
 // 通用核心（type: app，命名空间 srm）。扩展包在 objectstack.config.ts 里与它合成一个应用。
 export default defineStack({
   manifest: {
-    id: 'ai.objectstack.hotsrm',
+    id: 'app.objectstack.hotsrm',
     namespace: 'srm',
     version: '0.1.0',
     type: 'app',
     name: 'hotsrm',
     description: '供应商关系管理（SRM）',
-    engines: { protocol: '^18' },
+    engines: { protocol: '^18.0.0' },
   },
+
+  // auth + ui：本地 `pnpm dev` 有登录页和控制台。flow 与审批在用到时再加 automation、triggers、approvals。
+  requires: ['auth', 'ui'],
 
   objects: Object.values(objects),
   views: Object.values(views),
