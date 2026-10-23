@@ -1,0 +1,9 @@
+erp_material_no,material_code,name,specification,uom,active
+EX-100001,RES-0603-10K,示例贴片电阻,0603 10kΩ ±1%,个,true
+EX-100002,CAP-0805-100N,示例贴片电容,0805 100nF 50V X7R,个,true
+EX-100003,IC-MCU-32F1,示例微控制器,"32 位, LQFP-48",个,true
+EX-100004,CON-USB-C16,示例 USB-C 连接器,16 针 贴片,个,true
+EX-200001,BOX-300-200,示例瓦楞纸箱,300×200×150 mm 五层,只,true
+EX-200002,FILM-PE-50,示例 PE 缠绕膜,宽 500 mm 厚 50 μm,卷,true
+EX-300001,BRG-6204,示例深沟球轴承,6204-2RS,套,true
+EX-300002,GLV-NIT-L,示例丁腈手套,L 号 100 只/盒,盒,false
