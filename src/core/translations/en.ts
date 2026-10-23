@@ -35,6 +35,24 @@ export const en: TranslationData = {
       },
       _views: { default: { label: 'All Plants' } },
     },
+    srm_material: {
+      label: 'Material',
+      pluralLabel: 'Materials',
+      _sections: { basic: { label: 'Basic Information' }, external: { label: 'External Systems' } },
+      fields: {
+        material_code: { label: 'Material Code' },
+        name: { label: 'Material Name' },
+        specification: { label: 'Specification' },
+        uom: { label: 'Unit of Measure' },
+        category: { label: 'Purchasing Category' },
+        active: { label: 'Active' },
+        erp_material_no: { label: 'ERP Material No.' },
+      },
+      _views: {
+        default: { label: 'All Materials' },
+        uncategorized: { label: 'Without Category' },
+      },
+    },
     srm_supplier: {
       label: 'Supplier',
       pluralLabel: 'Suppliers',
@@ -217,6 +235,7 @@ export const en: TranslationData = {
         nav_certificate: { label: 'Certificates' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },
+        nav_material: { label: 'Materials' },
         nav_plant: { label: 'Plants' },
       },
     },

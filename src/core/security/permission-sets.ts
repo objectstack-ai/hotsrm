@@ -4,6 +4,7 @@
 const read = { allowCreate: false, allowRead: true, allowEdit: false, allowDelete: false, viewAllRecords: true, modifyAllRecords: false };
 const write = { allowCreate: true, allowRead: true, allowEdit: true, allowDelete: false, viewAllRecords: true, modifyAllRecords: false };
 const flowOwned = { readable: true, editable: false };
+const readOnly = { readable: true, editable: false };
 
 // 内部员工的基础：读基础数据与供应商主数据
 export const InternalBasePermissionSet = {
@@ -12,10 +13,28 @@ export const InternalBasePermissionSet = {
   objects: {
     srm_category: read,
     srm_plant: read,
+    srm_material: read,
     srm_supplier: read,
     srm_supplier_contact: read,
     srm_supplier_certificate: read,
     srm_supplier_category: read,
+  },
+};
+
+// 采购员：物料是 ERP 的只读副本（ADR-0008），采购员只维护物料与品类的关联，不新建、不删除
+export const BuyerPermissionSet = {
+  name: 'srm_buyer',
+  label: 'SRM 采购',
+  objects: {
+    srm_material: { ...read, allowEdit: true },
+  },
+  fields: {
+    'srm_material.erp_material_no': readOnly,
+    'srm_material.material_code': readOnly,
+    'srm_material.name': readOnly,
+    'srm_material.specification': readOnly,
+    'srm_material.uom': readOnly,
+    'srm_material.active': readOnly,
   },
 };
 
@@ -62,6 +81,7 @@ export const ExecutivePermissionSet = {
   objects: {
     srm_category: read,
     srm_plant: read,
+    srm_material: read,
     srm_supplier: read,
     srm_supplier_contact: read,
     srm_supplier_certificate: read,
@@ -81,18 +101,20 @@ export const FinancePermissionSet = {
   },
 };
 
-// 系统管理员：维护品类与工厂等配置
+// 系统管理员：维护品类与工厂等配置，执行物料导入
 export const AdminPermissionSet = {
   name: 'srm_admin',
   label: 'SRM 系统管理员',
   objects: {
     srm_category: { ...write, allowDelete: true },
     srm_plant: { ...write, allowDelete: true },
+    srm_material: { ...write, allowDelete: true },
   },
 };
 
 export const SrmPermissionSets = [
   InternalBasePermissionSet,
+  BuyerPermissionSet,
   SupplierAdminPermissionSet,
   QualityPermissionSet,
   ExecutivePermissionSet,
