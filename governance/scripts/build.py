@@ -498,7 +498,11 @@ def collect(ctx: Context, only: set[str]) -> list[tuple[str, Path, Path | None]]
             if d.is_dir() and d.name not in known:
                 raise BuildError(f'覆盖目录 {d} 没有对应的已组合模板')
     if ctx.instance and (ctx.instance / 'documents').exists():
+        written = {c for c, _, _ in items}
         for path in sorted((ctx.instance / 'documents').glob('*.md')):
+            if path.stem in written:
+                raise BuildError(f'客户文件 {path} 与已编写的通用模板 {path.stem} 重名：删除客户文件，'
+                                 f'专属段落改用 overrides/{path.stem}/')
             items.append((path.stem, path, None))
     for code in ctx.notes:
         if code not in {c for c, _, _ in items}:

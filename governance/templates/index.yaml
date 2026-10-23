@@ -5,8 +5,14 @@
 # 用 org.doc_prefix + 代号和这里的名称。
 #
 # status：written 已编写；planned 计划编写（见 ../README.md §6）。
+# level：政策 / 对外 / 二级 / 三级，含义见 ../README.md §2。
 
 documents:
+  ZC-01: { title: 采购与供应商管理政策, level: 政策, pack: core, status: written }
+  ZC-02: { title: 采购授权审批表, level: 政策, pack: core, status: written }
+  ZC-03: { title: 供应商管理风险控制矩阵, level: 政策, pack: core, status: written }
+  SP-01: { title: 供应商行为准则, level: 对外, pack: core, status: written }
+  SP-02: { title: 大宗原料供应商手册, level: 对外, pack: bulk, status: planned }
   QP-01: { title: 供应商管理控制程序, level: 二级, pack: core, status: written }
   QP-02: { title: 采购控制程序, level: 二级, pack: core, status: planned }
   QP-03: { title: 进货检验与不合格品控制程序, level: 二级, pack: core, status: planned }
