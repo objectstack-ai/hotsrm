@@ -175,7 +175,9 @@ erDiagram
 | `supplier_no` | autonumber | 格式 `SUP{0000000}`，全局流水 |
 | `name` | text | 必填，可搜索；公司全称 |
 | `short_name` | text | 简称 |
-| `credit_code` | text | 统一社会信用代码，必填、唯一（BR-01），18 位格式校验 |
+| `country` | select | 注册地国家 / 地区，必填，默认 `cn`；选项为 ISO 3166-1 两位代码（小写），维护成共享选项列表 `srm_country`（[ADR-0007](../adr/0007-china-first-with-overseas-seams.md)） |
+| `credit_code` | text | 统一社会信用代码，唯一（BR-01）；`country == 'cn'` 时必填（`requiredWhen`）并校验 18 位格式，其他国家 / 地区时隐藏（`visibleWhen`） |
+| `registration_no` | text | 境外供应商在注册地的登记号或税号（如增值税号、雇主识别号）；`country != 'cn'` 时必填并显示。对象声明组合唯一索引 `country` + `registration_no`（BR-01） |
 | `supplier_type` | select | `manufacturer` 生产商 / `distributor` 代理分销 / `service` 服务商 / `logistics` 物流商 |
 | `status` | select（stageField） | 见 §5.1 生命周期状态机 |
 | `grade` | select | `a` / `b` / `c` / `d`，最近一期绩效发布时写入 |
@@ -255,7 +257,9 @@ erDiagram
 |---|---|---|
 | `application_no` | autonumber | `APP{YYYY}{00000}`，按年重置 |
 | `source` | select | `self_registered` 自助注册 / `invited` 邀请 |
-| `company_name` / `credit_code` | text | 必填 |
+| `company_name` | text | 必填 |
+| `country` | select | 必填，默认 `cn`，选项同供应商的 `srm_country` |
+| `credit_code` / `registration_no` | text | 规则同供应商：中国供应商填统一社会信用代码，境外供应商填当地注册号或税号 |
 | `contact_name` / `contact_email` / `contact_mobile` | text / email / phone | 必填 |
 | `applied_categories` | multiselect | 申请供货的一级品类。用 multiselect 而不是 lookup：匿名的公开表单读不到品类对象，选项集按一级品类维护在元数据里 |
 | `company_profile` | composite | 规模、员工数、年营业额、主要客户、产能 |
@@ -620,6 +624,7 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 样。完整对象在实现阶段按 §4 补齐。
 
 ```ts
+import { P } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 export const Supplier = ObjectSchema.create({
@@ -634,7 +639,20 @@ export const Supplier = ObjectSchema.create({
   fields: {
     supplier_no: Field.autonumber({ label: '供应商编号', autonumberFormat: 'SUP{0000000}' }),
     name: Field.text({ label: '公司全称', required: true, searchable: true, maxLength: 200 }),
-    credit_code: Field.text({ label: '统一社会信用代码', required: true, unique: true, maxLength: 18 }),
+    country: Field.select({ label: '国家 / 地区', required: true, defaultValue: 'cn', picklist: 'srm_country' }),
+    credit_code: Field.text({
+      label: '统一社会信用代码',
+      unique: true,
+      maxLength: 18,
+      requiredWhen: P`record.country == 'cn'`,
+      visibleWhen: P`record.country == 'cn'`,
+    }),
+    registration_no: Field.text({
+      label: '注册号 / 税号',
+      maxLength: 50,
+      requiredWhen: P`record.country != 'cn'`,
+      visibleWhen: P`record.country != 'cn'`,
+    }),
     status: Field.select({
       label: '状态',
       defaultValue: 'potential',
@@ -659,6 +677,9 @@ export const Supplier = ObjectSchema.create({
     }),
     // …其余字段见 §4.1
   },
+
+  // 境外供应商按「国家 / 地区 + 注册号」查重（BR-01）
+  indexes: [{ name: 'srm_supplier_overseas_identity', fields: ['country', 'registration_no'], unique: 'organization' }],
 
   validations: [
     {

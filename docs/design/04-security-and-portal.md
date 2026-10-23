@@ -216,7 +216,9 @@ export const PortalSupplier = definePermissionSet({
   },
   fields: {
     'srm_supplier.name':                    { readable: true,  editable: false },
+    'srm_supplier.country':                 { readable: true,  editable: false },
     'srm_supplier.credit_code':             { readable: true,  editable: false },
+    'srm_supplier.registration_no':         { readable: true,  editable: false },
     'srm_supplier.status':                  { readable: true,  editable: false },
     'srm_supplier.portal_position':         { readable: true,  editable: false },
     'srm_supplier_certificate.status':      { readable: true,  editable: false },
@@ -335,7 +337,7 @@ export const PortalSupplier = definePermissionSet({
 | `srm_quality_issue.claim_amount` | 内部、本公司门户 | SQE | |
 | `srm_performance_review.*_score` | 内部、本公司门户（已发布） | 算分 flow、评分人 | |
 | `*.portal_position` | 所有可读该记录的人 | 仅 flow | 隔离锚点，门户不可改 |
-| `srm_supplier` 的 `name`、`credit_code`、`address`、`legal_representative`、`registered_capital`、`status`、`grade`、`qualification_alert`、`erp_vendor_code` | 内部、本公司门户 | 内部（关键信息变更走变更单） | 门户只读；门户可直接改的只有 `short_name`、`website`、`supplier_type`、`taxpayer_type`、`established_date` 等资料字段 |
+| `srm_supplier` 的 `name`、`country`、`credit_code`、`registration_no`、`address`、`legal_representative`、`registered_capital`、`status`、`grade`、`qualification_alert`、`erp_vendor_code` | 内部、本公司门户 | 内部（关键信息变更走变更单） | 门户只读；门户可直接改的只有 `short_name`、`website`、`supplier_type`、`taxpayer_type`、`established_date` 等资料字段 |
 | `srm_supplier_certificate.status` / `is_mandatory` / `verified` | 内部、本公司门户 | 仅 flow 与「核验证书」screen flow | 防止供应商自行解除资质异常 |
 | `srm_quotation_line` 的 `amount`、`is_awarded`、`award_quantity`、`award_ratio` 及快照字段 | 所有可读报价的人 | 仅 flow | 防止供应商改金额或自报中标 |
 | `srm_purchase_order` 全部字段 | 内部、本公司门户 | 内部与集成 | 门户对订单头有编辑权只为写订单行，字段全部只读 |

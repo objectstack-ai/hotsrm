@@ -12,6 +12,7 @@
 | [0004](./0004-sealed-bid.md) | 封标：开标前内部读不到报价，截止后供应商改不了报价 | 已采纳 |
 | [0005](./0005-governance-and-system-share-parameters.md) | 体系文件与系统共用一份参数，源文件用 Markdown | 已采纳 |
 | [0006](./0006-single-org-with-business-units.md) | 多法人默认用单组织加业务单元树，不开墙 | 已采纳 |
+| [0007](./0007-china-first-with-overseas-seams.md) | 中国优先，为出海留三个口子（币种、中英双语、供应商标识按国家区分） | 已采纳 |
 
 ## 写法
 

@@ -91,7 +91,7 @@ sequenceDiagram
   actor D as 采购总监
   V->>F: 填写公司信息、资质、品类（匿名）
   F->>S: 新建准入申请（已提交）
-  S->>S: 受理 flow：信用代码查重、黑名单检查
+  S->>S: 受理 flow：按身份标识查重、黑名单检查
   alt 命中黑名单
     S-->>V: 自动驳回通知
   else 通过
@@ -115,7 +115,7 @@ sequenceDiagram
 
 | 步骤 | 触发 | 自动化 / 人工动作 |
 |---|---|---|
-| 1 受理 | 公开表单提交（匿名 `POST /forms/:slug/submit`） | flow `srm_application_intake`（record_change，after-create）：按 `credit_code` 查供应商；命中 `blacklisted` → 申请置 `rejected`、`duplicate_check = blacklisted`，通知申请人；命中其他状态 → `duplicate`，通知品类经理人工判断；未命中 → `pass` |
+| 1 受理 | 公开表单提交（匿名 `POST /forms/:slug/submit`） | flow `srm_application_intake`（record_change，after-create）：按身份标识查供应商（`country == 'cn'` 用 `credit_code`，其他国家 / 地区用 `country` + `registration_no`，BR-01）；命中 `blacklisted` → 申请置 `rejected`、`duplicate_check = blacklisted`，通知申请人；命中其他状态 → `duplicate`，通知品类经理人工判断；未命中 → `pass` |
 | 2 建档 | 受理通过 | 同一 flow：新建 `potential` 供应商与主联系人，`supplier` 回填到申请；按申请品类找到品类经理和 SQE，写入 `reviewer` / `sqe`，并把这些品类中最高的风险等级写入 `risk_class`；申请→`doc_review`，供应商 `potential → qualifying`；通知品类经理 |
 | 3 开通门户 | 品类经理 / 管理员 | 邀请主联系人加入组织并开通门户（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)） |
 | 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，通知联系人）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
