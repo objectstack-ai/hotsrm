@@ -76,7 +76,9 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 
 R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — 无权限。删除一律只给
 `srm_admin`，业务上用状态（取消、作废）代替删除。供应商主数据在集团内共享（§5），
-`supplier_admin` 和 `srm_admin` 对供应商的编辑不限于自己建的记录（`modifyAllRecords`）。
+`supplier_admin` 和 `srm_admin` 对供应商的编辑不限于自己建的记录：目标是 OWD `public_read` + 只放开编辑的「改所有记录」，
+平台的 `modifyAllRecords` 会连删除一起放开（objectstack#25470），所以暂用 OWD `public_read_write`，
+`srm_quality` 为写证书保留对供应商的编辑权、供应商字段经 FLS 全部只读。
 
 | 对象 | base | sourcing | supplier_admin | buyer | quality | finance | portal |
 |---|---|---|---|---|---|---|---|

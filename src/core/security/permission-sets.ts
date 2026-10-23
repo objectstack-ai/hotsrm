@@ -1,10 +1,10 @@
+import { Supplier } from '../objects/supplier.object.js';
+
 // 内部权限集（04 §2.2）的 v0.1 子集。一律不设 isDefault（AGENTS.md 红线 2）。
 // 状态类字段（供应商状态、资质异常、证书状态）只由 flow 写入，权限集里一律只读。
 
 const read = { allowCreate: false, allowRead: true, allowEdit: false, allowDelete: false, viewAllRecords: true, modifyAllRecords: false };
 const write = { allowCreate: true, allowRead: true, allowEdit: true, allowDelete: false, viewAllRecords: true, modifyAllRecords: false };
-// 供应商主数据在集团内共享（04 §5）：维护者能改所有供应商，不只是自己建的
-const writeAll = { ...write, modifyAllRecords: true };
 const flowOwned = { readable: true, editable: false };
 // 存量导入标记只由系统管理员在导入时写入：品类经理和 SQE 写不了，避免绕过准入直接建「合格」供应商
 const importOwned = {
@@ -54,7 +54,7 @@ export const SupplierAdminPermissionSet = {
   name: 'srm_supplier_admin',
   label: 'SRM 供应商管理',
   objects: {
-    srm_supplier: writeAll,
+    srm_supplier: write,
     srm_supplier_contact: { ...write, allowDelete: true },
     srm_supplier_certificate: write,
     srm_supplier_category: write,
@@ -76,6 +76,10 @@ export const SupplierAdminPermissionSet = {
   },
 };
 
+// 供应商 OWD 暂为 public_read_write（objectstack#25470），有 allowEdit 就能改所有供应商：
+// SQE 的编辑权只为写证书（controlled_by_parent 要求父记录可编辑，04 §2.3），供应商字段全部只读
+const supplierFieldsReadOnly = Object.fromEntries(Object.keys(Supplier.fields).map((field) => [`srm_supplier.${field}`, readOnly]));
+
 // SQE：v0.1 由 SQE 维护证书（门户版本改为供应商上传、SQE 经 screen flow 核验）
 export const QualityPermissionSet = {
   name: 'srm_quality',
@@ -86,11 +90,9 @@ export const QualityPermissionSet = {
     srm_supplier_application: read,
   },
   fields: {
-    'srm_supplier.status': flowOwned,
-    'srm_supplier.qualification_alert': flowOwned,
+    ...supplierFieldsReadOnly,
     'srm_supplier_certificate.status': flowOwned,
-    'srm_supplier.legacy_reviewed': flowOwned,
-    ...importOwned,
+    'srm_supplier_certificate.legacy_imported': flowOwned,
   },
 };
 
@@ -135,7 +137,7 @@ export const AdminPermissionSet = {
     srm_category: { ...write, allowDelete: true },
     srm_plant: { ...write, allowDelete: true },
     srm_material: { ...write, allowDelete: true },
-    srm_supplier: writeAll,
+    srm_supplier: write,
     srm_supplier_contact: write,
     srm_supplier_certificate: write,
   },
