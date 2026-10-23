@@ -6,6 +6,8 @@ import * as flows from './flows/index.js';
 import * as apps from './apps/index.js';
 import * as translations from './translations/index.js';
 import { SrmSeedData } from './data/index.js';
+import { SrmPermissionSets } from './security/permission-sets.js';
+import { SrmPositions } from './security/positions.js';
 
 // 通用核心（type: app，命名空间 srm）。扩展包在 objectstack.config.ts 里与它合成一个应用。
 export default defineStack({
@@ -29,6 +31,8 @@ export default defineStack({
   views: Object.values(views),
   flows: Object.values(flows),
   apps: Object.values(apps),
+  permissions: SrmPermissionSets,
+  positions: SrmPositions,
 
   i18n: {
     defaultLocale: 'zh-CN',
