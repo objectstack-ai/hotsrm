@@ -3,7 +3,14 @@
 
 const read = { allowCreate: false, allowRead: true, allowEdit: false, allowDelete: false, viewAllRecords: true, modifyAllRecords: false };
 const write = { allowCreate: true, allowRead: true, allowEdit: true, allowDelete: false, viewAllRecords: true, modifyAllRecords: false };
+// 供应商主数据在集团内共享（04 §5）：维护者能改所有供应商，不只是自己建的
+const writeAll = { ...write, modifyAllRecords: true };
 const flowOwned = { readable: true, editable: false };
+// 存量导入标记只由系统管理员在导入时写入：品类经理和 SQE 写不了，避免绕过准入直接建「合格」供应商
+const importOwned = {
+  'srm_supplier.legacy_imported': flowOwned,
+  'srm_supplier_certificate.legacy_imported': flowOwned,
+};
 const readOnly = { readable: true, editable: false };
 
 // 内部员工的基础：读基础数据与供应商主数据
@@ -43,7 +50,7 @@ export const SupplierAdminPermissionSet = {
   name: 'srm_supplier_admin',
   label: 'SRM 供应商管理',
   objects: {
-    srm_supplier: write,
+    srm_supplier: writeAll,
     srm_supplier_contact: { ...write, allowDelete: true },
     srm_supplier_certificate: write,
     srm_supplier_category: write,
@@ -55,6 +62,7 @@ export const SupplierAdminPermissionSet = {
     'srm_supplier_certificate.status': flowOwned,
     'srm_supplier_category.status': flowOwned,
     'srm_supplier_category.approved_date': flowOwned,
+    ...importOwned,
   },
 };
 
@@ -71,6 +79,8 @@ export const QualityPermissionSet = {
     'srm_supplier.status': flowOwned,
     'srm_supplier.qualification_alert': flowOwned,
     'srm_supplier_certificate.status': flowOwned,
+    'srm_supplier.legacy_reviewed': flowOwned,
+    ...importOwned,
   },
 };
 
@@ -101,7 +111,7 @@ export const FinancePermissionSet = {
   },
 };
 
-// 系统管理员：维护品类与工厂等配置，执行物料导入
+// 系统管理员：维护品类与工厂等配置，执行物料导入和存量供应商、联系人、证书导入（04 §2.2）
 export const AdminPermissionSet = {
   name: 'srm_admin',
   label: 'SRM 系统管理员',
@@ -109,6 +119,14 @@ export const AdminPermissionSet = {
     srm_category: { ...write, allowDelete: true },
     srm_plant: { ...write, allowDelete: true },
     srm_material: { ...write, allowDelete: true },
+    srm_supplier: writeAll,
+    srm_supplier_contact: write,
+    srm_supplier_certificate: write,
+  },
+  fields: {
+    'srm_supplier.status': flowOwned,
+    'srm_supplier.qualification_alert': flowOwned,
+    'srm_supplier_certificate.status': flowOwned,
   },
 };
 

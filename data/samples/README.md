@@ -1,7 +1,7 @@
 # 样例导入表格
 
 这里的表格演示从 ERP 导出数据、用平台导入写入 SRM 的格式。全部是标明「示例」的虚构数据，
-不对应任何真实企业或物料清单（AGENTS.md 红线 5）。CI 用它们验证导入可重复执行（`test/material.test.ts`）。
+不对应任何真实企业或物料清单（AGENTS.md 红线 5）。CI 用它们验证导入可重复执行（`test/material.test.ts`、`test/import-idempotency.test.ts`）。
 
 ## 物料 `srm_material.csv`
 
@@ -37,3 +37,9 @@ POST /api/v1/data/srm_material/import
   首次初始化时如果 ERP 的物料组能对上 SRM 品类，可以带上，值填品类名称。
 - 同一张表格导入两遍，第二遍只更新、不新增，记录数与字段值不变。
 - 未关联品类的物料在「物料 › 未关联品类」视图里，供采购员补齐。
+
+## 存量供应商、联系人、证书
+
+`srm_supplier.csv`、`srm_supplier_contact.csv`、`srm_supplier_certificate.csv` 是客户台账一次性迁移的样例，
+表头用字段的中文标签。匹配规则、导入顺序、字段说明和常见错误见
+[存量供应商导入说明](../../docs/implementation/legacy-supplier-import.md)。
