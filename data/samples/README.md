@@ -43,3 +43,6 @@ POST /api/v1/data/srm_material/import
 `srm_supplier.csv`、`srm_supplier_contact.csv`、`srm_supplier_certificate.csv` 是客户台账一次性迁移的样例，
 表头用字段的中文标签。匹配规则、导入顺序、字段说明和常见错误见
 [存量供应商导入说明](../../docs/implementation/legacy-supplier-import.md)。
+
+`legacy-trial/` 是同样三张表的模拟「脏」台账（重复行、格式错误、选项别名、缺字段等），用来试导、
+验证每类问题都能在报告里看到（`test/import-trial.test.ts`，结论见导入说明 §6）。
