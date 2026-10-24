@@ -74,7 +74,7 @@ perf_d_exit_periods:
   label: 启动淘汰的连续 D 级期数
   unit: 期
   example: 2
-  used_in: [QP-01 6.7.4, QP-01 6.9.1]
+  used_in: [QP-01 6.7.4, QP-01 6.9.1, GL-08 6.1.1]
   system: 考评发布后触发的淘汰评审 flow（核心 01 BR-18）
 
 scar_containment_hours:
@@ -95,15 +95,22 @@ inactivity_exit_months:
   label: 无交易淘汰期限
   unit: 个月
   example: 24
-  used_in: [QP-01 6.9.2]
+  used_in: [QP-01 6.9.2, GL-08 6.1.2]
   system: 制度要求；可由报表列出超期无交易的供应商，人工发起淘汰
 
 blacklist_years:
   label: 黑名单禁入期限
   unit: 年
   example: 5
-  used_in: [QP-01 6.9.3]
+  used_in: [QP-01 6.9.3, GL-08 6.5.3, GL-08 6.6.2]
   system: 制度要求；黑名单状态由处置单设置，解除需单独审批（核心 03 §5）
+
+disposition_appeal_days:
+  label: 处置结果申诉期限
+  unit: 日历日（收到通知后）
+  example: 15
+  used_in: [GL-08 6.7.1]
+  system: 制度要求；供应商门户上线前书面申诉
 
 change_review_days:
   label: 信息变更审核时限
@@ -124,8 +131,8 @@ contract_reminder_days:
   unit: 日历日（到期前）
   example: [60, 30, 7]
   format: "{} 日"
-  used_in: [GL-03]
-  system: 合同到期提醒 flow，time_relative 触发（核心 03 §6）
+  used_in: [GL-03 6.7.1, GL-03 第 7 章, ZC-03 2.2]
+  system: 合同到期提醒 flow srm_contract_expiry_notice，time_relative 触发（核心 03 §6）
 
 po_ack_remind_hours:
   label: 订单未确认提醒供应商
@@ -202,7 +209,7 @@ qualification_alert_freeze_days:
   label: 资质异常转冻结的期限
   unit: 日历日
   example: 60
-  used_in: [GL-01 6.8.4]
+  used_in: [GL-01 6.8.4, GL-08 6.1.1]
   system: 制度要求；从资质异常列表（核心 05）发起冻结处置（核心 01 FR-208）
 
 audit_score_thresholds:
@@ -219,8 +226,8 @@ award_approval_tiers:
   unit: 万元（单次事项含税总金额）
   example: { mid: 10, high: 100 }
   display: 不足 {mid} 万元、{mid} 万元至不足 {high} 万元、{high} 万元及以上三档
-  used_in: [ZC-02 3, GL-02 附录 A]
-  system: 定标审批 flow 按定标金额选择审批层级，单一来源寻源达到 high 档时加总经理一级（核心 03 §12 审批矩阵，v0.7）
+  used_in: [ZC-02 3, GL-02 附录 A, GL-03 附录 A]
+  system: 定标审批 flow 按定标金额选择审批层级，单一来源寻源达到 high 档时加总经理一级（核心 03 §12 审批矩阵，v0.7）；合同审批 flow 法务审查后按合同金额取同一档（v0.3）
 
 min_valid_quotes:
   label: 定标所需的有效报价家数

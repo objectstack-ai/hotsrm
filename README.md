@@ -101,7 +101,7 @@ pnpm validate     # 每次改元数据后跑；其余检查见 AGENTS.md §6
 | v0.7 | 寻源与封标、价格库；核心对象冻结 | 27 |
 
 已完成：核心设计、三个扩展包设计（保留）、ADR-0001～0009、参数文件首版、体系文件生成脚本
-和 12 份模板、v0.1 内部工作台（PR #5）、v0.2 主数据补齐（PR #13–#18）。文档目录见 [docs/README.md](./docs/README.md)；
+和 14 份模板、v0.1 内部工作台（PR #5）、v0.2 主数据补齐（PR #13–#18）。文档目录见 [docs/README.md](./docs/README.md)；
 参与开发前先读 [AGENTS.md](./AGENTS.md)。
 
 下一步：v0.3 合同与处置——合同与合同行、供应商处置单（[07 §1](./docs/design/07-delivery-plan.md#1-分期路线图)）。
