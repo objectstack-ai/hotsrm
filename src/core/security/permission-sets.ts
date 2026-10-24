@@ -34,6 +34,9 @@ export const InternalBasePermissionSet = {
     srm_delivery_record: read,
     // 整改单内部只读（04 §2.3）
     srm_quality_issue: read,
+    // 供应商审核内部只读：品类经理推进准入时看审核结论（v0.4）
+    srm_supplier_audit: read,
+    srm_supplier_audit_finding: read,
   },
 };
 
@@ -103,6 +106,9 @@ export const SupplierAdminPermissionSet = {
     'srm_supplier_category.status_before_freeze': flowOwned,
     'srm_supplier_category.freeze_scope': flowOwned,
     'srm_supplier_category.freeze_disposition': flowOwned,
+    // 现场审核结论由 srm_audit_admission_apply 写回（FR-204）
+    'srm_supplier_application.audit_passed': flowOwned,
+    'srm_supplier_application.audit_result': flowOwned,
     ...importOwned,
   },
 };
@@ -123,9 +129,15 @@ export const QualityPermissionSet = {
     srm_delivery_record: write,
     // 整改单：手工新建（客户投诉、制程等），v0.6 前代供应商填写 8D 回复、推进状态、登记索赔（03 §8）
     srm_quality_issue: write,
+    // 供应商审核：安排准入、专项审核，执行年度计划，录入结论与问题项（FR-607）
+    srm_supplier_audit: write,
+    srm_supplier_audit_finding: write,
   },
   fields: {
     ...supplierFieldsReadOnly,
+    // 计划年度由 srm_audit_plan_generate 写入，问题项的整改单由「转整改单」回填
+    'srm_supplier_audit.plan_year': flowOwned,
+    'srm_supplier_audit_finding.quality_issue': flowOwned,
     'srm_supplier_certificate.status': flowOwned,
     'srm_supplier_certificate.legacy_imported': flowOwned,
     // 逾期标志由 srm_scar_overdue_sweep 维护
@@ -161,6 +173,8 @@ export const ExecutivePermissionSet = {
     srm_supplier_disposition: read,
     srm_delivery_record: read,
     srm_quality_issue: read,
+    srm_supplier_audit: read,
+    srm_supplier_audit_finding: read,
   },
 };
 
@@ -245,6 +259,8 @@ export const AuditorPermissionSet = {
     srm_supplier_disposition: read,
     srm_delivery_record: read,
     srm_quality_issue: read,
+    srm_supplier_audit: read,
+    srm_supplier_audit_finding: read,
   },
 };
 

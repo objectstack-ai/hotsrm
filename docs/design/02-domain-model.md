@@ -69,7 +69,7 @@
 
 ## 2. 对象总览
 
-核心共 **27 个对象**（[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md)），按版本交付（[07 §1](./07-delivery-plan.md#1-分期路线图)）。
+核心共 **28 个对象**（[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md) 定为 27 个，2026-10-24 审核问题项从 repeater 改为子对象后为 28 个），按版本交付（[07 §1](./07-delivery-plan.md#1-分期路线图)）。
 「来源」列：**SRM** 表示在 SRM 内产生；**导入** 表示从 ERP 导出表格按外部编号幂等导入、SRM 内只读；
 **门户** 表示门户上线（v0.6）后主要由供应商在门户里填写，在此之前由内部代录。
 
@@ -91,17 +91,18 @@
 | 14 | `srm_delivery_record` | 交付记录（含检验结论） | 质量 | — | 导入 / 质检员录入 | v0.4 |
 | 15 | `srm_quality_issue` | 质量整改单（SCAR / 8D） | 质量 | — | SRM / 门户 | v0.4 |
 | 16 | `srm_supplier_audit` | 供应商审核 | 质量 | — | SRM | v0.4 |
-| 17 | `srm_kpi` | 绩效指标 | 绩效 | — | SRM | v0.5 |
-| 18 | `srm_performance_review` | 绩效考评单 | 绩效 | — | SRM | v0.5 |
-| 19 | `srm_performance_score` | 评分明细 | 绩效 | 考评单 | SRM | v0.5 |
-| 20 | `srm_risk_event` | 风险事件 | 风险 | — | SRM（手工登记） | v0.5 |
-| 21 | `srm_supplier_invitation` | 门户邀请 | 门户 | — | SRM | v0.6 |
-| 22 | `srm_sourcing_event` | 寻源单（询价 / 招标 / 竞价） | 寻源 | — | SRM | v0.7 |
-| 23 | `srm_sourcing_item` | 寻源明细 | 寻源 | 寻源单 | SRM | v0.7 |
-| 24 | `srm_sourcing_invitation` | 寻源邀请 | 寻源 | —（lookup 寻源单） | SRM | v0.7 |
-| 25 | `srm_quotation` | 报价单 | 寻源 | — | 门户 | v0.7 |
-| 26 | `srm_quotation_line` | 报价明细 | 寻源 | 报价单 | 门户 | v0.7 |
-| 27 | `srm_price_record` | 价格记录（价格库） | 寻源 | — | SRM | v0.7 |
+| 17 | `srm_supplier_audit_finding` | 审核问题项 | 质量 | 供应商审核 | SRM | v0.4 |
+| 18 | `srm_kpi` | 绩效指标 | 绩效 | — | SRM | v0.5 |
+| 19 | `srm_performance_review` | 绩效考评单 | 绩效 | — | SRM | v0.5 |
+| 20 | `srm_performance_score` | 评分明细 | 绩效 | 考评单 | SRM | v0.5 |
+| 21 | `srm_risk_event` | 风险事件 | 风险 | — | SRM（手工登记） | v0.5 |
+| 22 | `srm_supplier_invitation` | 门户邀请 | 门户 | — | SRM | v0.6 |
+| 23 | `srm_sourcing_event` | 寻源单（询价 / 招标 / 竞价） | 寻源 | — | SRM | v0.7 |
+| 24 | `srm_sourcing_item` | 寻源明细 | 寻源 | 寻源单 | SRM | v0.7 |
+| 25 | `srm_sourcing_invitation` | 寻源邀请 | 寻源 | —（lookup 寻源单） | SRM | v0.7 |
+| 26 | `srm_quotation` | 报价单 | 寻源 | — | 门户 | v0.7 |
+| 27 | `srm_quotation_line` | 报价明细 | 寻源 | 报价单 | 门户 | v0.7 |
+| 28 | `srm_price_record` | 价格记录（价格库） | 寻源 | — | SRM | v0.7 |
 
 **从原设计移出核心的对象**（原 35 个中的 11 个，[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md)）：
 
@@ -141,7 +142,8 @@ erDiagram
   srm_material ||--o{ srm_delivery_record : ""
   srm_delivery_record ||--o| srm_quality_issue : "不合格生成"
   srm_supplier ||--o{ srm_supplier_audit : "审核"
-  srm_supplier_audit ||--o{ srm_quality_issue : "问题项转整改"
+  srm_supplier_audit ||--o{ srm_supplier_audit_finding : "问题项"
+  srm_supplier_audit_finding |o--o| srm_quality_issue : "转整改"
 
   srm_supplier ||--o{ srm_performance_review : ""
   srm_performance_review ||--o{ srm_performance_score : "评分"
@@ -313,8 +315,9 @@ upsert 写入，结构不变。
 | `duplicate_check` | select | `pass` / `duplicate` / `blacklisted` / `reapply`（命中已淘汰的供应商：不建新档，申请指向旧档，允许继续），受理 flow 写入 |
 | `risk_class` | select | 受理时从申请品类复制的最高风险等级，只读；决定是否需要现场审核 |
 | `material_class` | select | 受理时从申请品类复制的最高物资类别（`srm_material_class`），只读；决定准入审批是否会签质量经理（03 §12） |
-| `audit_passed` | boolean | 默认 false；现场审核结果为通过或有条件通过时由 flow 置为 true。v0.4 之前没有审核对象，由 SQE 直接勾选并上传 `audit_report` |
-| `audit_report` | file | 审核报告（v0.4 前的过渡字段，之后由 `srm_supplier_audit.report` 替代） |
+| `audit_passed` | boolean | 只读，默认 false；准入审核完成时由 `srm_audit_admission_apply` 写入：结论为通过或有条件通过时为 true，否则为 false |
+| `audit_result` | select（只读） | 准入审核结论 `pass` / `conditional` / `fail`，同一 flow 写入；有条件通过的申请批准后品类资格为 `trial`（WI-01 6.6.2） |
+| `audit_report` | file | 不建：v0.4 前的过渡设计，审核报告在 `srm_supplier_audit.report` 上 |
 | `reviewer` | user | 初审人（品类经理） |
 | `sqe` | user | 负责审核的 SQE |
 | `supplier` | lookup → 供应商 | 品类经理把申请推进到「资料审核」时新建（或 `reapply` 时关联旧档）的供应商；`submitted` 阶段只有申请记录，不建主数据 |
@@ -326,14 +329,34 @@ upsert 写入，结构不变。
 > 可以读品类对象）；不含现场审核分支和公司资料等表单字段；`approval_status` 记录审批节点的结论。
 > 本表其余字段随 v0.4（供应商审核）和 v0.6（门户、邀请注册）补齐。
 
-**`srm_supplier_audit` 供应商审核**（OWD `private`；v0.4）：`audit_no`、`supplier`
-（lookup）、`application`（lookup，可空）、`audit_type`（`admission` 准入 / `annual`
-年度 / `special` 专项）、`planned_date` / `audit_date`、`auditors`（user，多选）、
-`checklist`（repeater：检查项、评分、备注）、`checklist_score`（number）、`result`
-（`pass` / `conditional` 有条件通过 / `fail`）、`findings`（repeater：问题项、严重度、
-整改要求、关联整改单）、`report`（file）、`sample_result`（`not_required` / `pass` / `fail`）、
-`status`（`planned` / `done` / `cancelled`）。问题项可经「转整改单」screen flow 生成
-`srm_quality_issue`（`source = audit`）。
+**`srm_supplier_audit` 供应商审核**（OWD 暂为 `public_read_write`：年度计划由系统生成、SQE 之间要互相接手，
+目标是 `private` + 质量岗位改所有记录，等 objectstack#25470；只有质量岗位有 `allowEdit`，删除不开放；v0.4）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `audit_no` | autonumber | `AUD{YYYY}{00000}` |
+| `supplier` | lookup | 必填 |
+| `audit_type` | select | `admission` 准入 / `annual` 年度 / `special` 专项 |
+| `application` | lookup → 准入申请 | 准入审核必填，必须是本供应商、进行中的申请 |
+| `plan_year` | number（只读） | 年度计划生成时写入，按「供应商 + 计划年度」防重 |
+| `planned_date` / `audit_date` | date | 计划中时计划日期必填；完成时审核日期必填 |
+| `auditors` | user（多选） | 审核员；年度计划默认品类的 SQE |
+| `status` | select（stageField） | `planned` 计划中 / `done` 已完成 / `cancelled` 已取消；`planned → done / cancelled`，`cancelled → planned`，完成后不再变 |
+| `cancel_reason` | textarea | 取消时必填（如不需现场复审的 B 类供应商、经批准以资料审核代替一次复审，WI-01 6.9） |
+| `checklist_score` / `lowest_block_score` | number | 审核总分、最低审核块得分（0–100），完成时必填 |
+| `result` | select | `pass` / `conditional` 有条件通过 / `fail`，完成时必填；按 `audit_score_thresholds` 校验，只拦「高判」：通过要求总分 ≥ pass 线、每块 ≥ floor 线、没有严重不符合项和否决项；有条件通过要求总分 ≥ floor 线、严重不符合项不超过 1 项、没有否决项（WI-01 6.6.1） |
+| `sample_result` | select | `not_required` / `pass` / `fail` |
+| `report` / `scoresheet` | file | 审核报告、审核评分表（QR-03） |
+| `serious_finding_count` / `veto_finding_count` | summary | 严重不符合项数、否决项数，校验结论用 |
+
+检查表原设计为 repeater（检查项、评分、备注）。平台的 repeater 不能声明子字段（列名、类型、选项与翻译都没处写），
+表单只能当无结构表格编辑，所以逐条评分留在评分表附件里，系统记总分和最低审核块得分；问题项改为子对象：
+
+**`srm_supplier_audit_finding` 审核问题项**（master_detail → 供应商审核，`controlled_by_parent`；v0.4）：`title` 问题项（必填）、
+`description` 事实描述、`severity`（`serious` 严重不符合 / `general` 一般不符合 / `observation` 观察项）、`veto` 否决项（boolean）、
+`requirement` 整改要求、`quality_issue`（lookup → 整改单，只读）。不符合项经审核上的「转整改单」screen flow
+`srm_audit_finding_to_scar` 各生成一张 `srm_quality_issue`（`source = audit`，`audit` 指向本审核；严重不符合 → `critical`，
+一般不符合 → `major`）并回填 `quality_issue`，转出后问题项只读；观察项不转。
 
 **`srm_supplier_change_request` 信息变更单**（OWD `private`；v0.2）。门户上线前由采购侧代供应商在
 供应商档案下新建，新建即进入审批（03 §5）。
@@ -596,7 +619,7 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `issue_no` | autonumber | `SCAR{YYYY}{00000}` |
 | `supplier` / `material` | lookup | |
 | `delivery_record` | lookup | 来源交付记录（可空） |
-| `audit` | lookup | 来源审核（可空）；随供应商审核对象在 v0.4 Q3 加 |
+| `audit` | lookup（只读） | 来源审核（可空）；审核问题项「转整改单」时写入 |
 | `source` | select（共享选项列表 `srm_quality_issue_source`） | `iqc` 来料 / `production` 制程 / `customer` 客户投诉 / `audit` 审核发现 / `performance` 绩效改善 |
 | `severity` | select | 同检验 |
 | `problem_description` | richtext | D2 问题描述，必填 |
@@ -764,7 +787,7 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 | 报价单 | `QT{YYYY}{000000}` | QT2026001024 | 按年 |
 | 合同 | `CT{YYYY}{00000}` | CT202600088 | 按年 |
 | 整改单 | `SCAR{YYYY}{00000}` | SCAR202600007 | 按年 |
-| 供应商审核 | `AUD{YYYY}{0000}` | AUD20260012 | 按年 |
+| 供应商审核 | `AUD{YYYY}{00000}` | AUD202600012 | 按年 |
 | 考评单 | `PR{YYYY}{00000}` | PR202600210 | 按年 |
 | 送货单（预留） | `ASN{YYYYMMDD}{0000}` | ASN202610220015 | 按日 |
 

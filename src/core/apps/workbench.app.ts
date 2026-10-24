@@ -38,6 +38,7 @@ export const Workbench = App.create({
       children: [
         { id: 'nav_delivery_record', type: 'object', objectName: 'srm_delivery_record', label: '交付记录', icon: 'truck' },
         { id: 'nav_quality_issue', type: 'object', objectName: 'srm_quality_issue', label: '整改单', icon: 'clipboard-x' },
+        { id: 'nav_supplier_audit', type: 'object', objectName: 'srm_supplier_audit', label: '供应商审核', icon: 'clipboard-list' },
       ],
     },
     {

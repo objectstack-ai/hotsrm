@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
-import { Category, Supplier, SupplierApplication } from '../src/core/objects';
+import { Category, Supplier, SupplierApplication, SupplierAudit } from '../src/core/objects';
 
 // v0.4 Q0：A 类物资或高风险品类的准入，第 2 级由采购总监、质量经理并行会签（03 §3 步骤 6、§12）。
 // 受理时把申请品类中最高的物资类别与风险等级复制到申请。岗位都有人任命，所以单独起一个栈，
@@ -49,8 +49,20 @@ describe('admission countersign by the quality manager', () => {
     const res = await stack.apiAs(as, 'POST', `/approvals/requests/${req!.id}/${verdict}`, { comment: verdict });
     expect(res.status, await res.clone().text()).toBe(200);
   };
-  // 推进到准入评审，品类经理通过第 1 级
+  // 推进到准入评审，品类经理通过第 1 级。高风险品类以现场审核为前置（FR-204，见 supplier-audit.test.ts），
+  // 先由系统录一份通过的准入审核
   const toSecondLevel = async (app: string) => {
+    const { supplier } = await row(SupplierApplication.name, app);
+    await system(SupplierAudit.name, {
+      supplier,
+      application: app,
+      audit_type: 'admission',
+      status: 'done',
+      audit_date: new Date().toISOString().slice(0, 10),
+      checklist_score: 90,
+      lowest_block_score: 80,
+      result: 'pass',
+    });
     await stack.hooks.run(SupplierApplication.name, 'update', { id: app, status: 'admission_review' }, { as: manager.token });
     await decide(manager.token, app, 'approve');
   };

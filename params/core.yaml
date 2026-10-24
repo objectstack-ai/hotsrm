@@ -217,7 +217,15 @@ audit_score_thresholds:
   example: { pass: 85, floor: 70 }
   display: 通过线 {pass} 分；有条件通过和单个审核块的下限 {floor} 分
   used_in: [WI-01 6.6.1]
-  system: 审核记录录入总分与结论（核心 02 srm_supplier_audit）；结论由审核组按分数线判定
+  system: 审核记录录入总分与结论（核心 02 srm_supplier_audit）；结论由审核组按分数线判定，系统拦截高于分数线的结论
+
+annual_audit_frequency:
+  label: 在册供应商现场复审频次（按物资类别）
+  unit: 个月
+  example: { A: 12, B: 24 }
+  display: A 类每 {A} 个月 1 次，B 类每 {B} 个月 1 次，C 类不定期
+  used_in: [WI-01 6.9.1]
+  system: 年度审核计划 flow srm_audit_plan_generate 按供应商所供最高物资类别（srm_category.material_class）生成到期的年度审核；C 类不生成（核心 03 §8）
 
 # ---- 政策层文件（ZC-01 管理目标、ZC-02 授权审批表、ZC-03 风险控制矩阵） ----
 

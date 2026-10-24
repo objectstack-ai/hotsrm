@@ -42,6 +42,13 @@ export const QualityIssue = ObjectSchema.create({
     }),
     material: Field.lookup('srm_material', { label: '物料', group: 'problem', displayField: 'erp_material_no', readonlyWhen: ended }),
     delivery_record: Field.lookup('srm_delivery_record', { label: '来源交付记录', group: 'problem', readonly: true }),
+    // 审核问题项经「转整改单」生成时写入（srm_audit_finding_to_scar，v0.4 Q3）
+    audit: Field.lookup('srm_supplier_audit', {
+      label: '来源审核',
+      group: 'problem',
+      readonly: true,
+      relatedListColumns: ['issue_no', 'severity', 'status', 'final_due', 'sqe'],
+    }),
     source: Field.select({ label: '来源', group: 'problem', required: true, defaultValue: 'iqc', picklist: 'srm_quality_issue_source', readonlyWhen: ended }),
     severity: Field.select({
       label: '严重度',
