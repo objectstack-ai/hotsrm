@@ -17,3 +17,5 @@ export { Kpi } from './kpi.object.js';
 export { SupplierAudit } from './supplier-audit.object.js';
 export { SupplierAuditFinding } from './supplier-audit-finding.object.js';
 export { RiskEvent } from './risk-event.object.js';
+export { PerformanceReview } from './performance-review.object.js';
+export { PerformanceScore } from './performance-score.object.js';

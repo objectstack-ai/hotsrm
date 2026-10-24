@@ -190,7 +190,7 @@ erDiagram
 | `registration_no` | text | 境外供应商在注册地的登记号或税号（如增值税号、雇主识别号）；`country != 'cn'` 时必填并显示。对象声明组合唯一索引 `country` + `registration_no`（BR-01） |
 | `supplier_type` | select | `manufacturer` 生产商 / `distributor` 代理分销 / `service` 服务商 / `logistics` 物流商 |
 | `status` | select（stageField） | 见 §5.1 生命周期状态机 |
-| `grade` | select | `a` / `b` / `c` / `d`，最近一期绩效发布时写入 |
+| `grade` | select | `grade_a` / `grade_b` / `grade_c` / `grade_d`（同考评单），最近一期绩效发布时写入 |
 | `latest_score` | number | 最近一期绩效总分（存储字段，供看板使用） |
 | `qualification_alert` | boolean | 默认 false；任一必备资质类型没有「有效且已核验」的证书时由 flow 置为 true（BR-04），补齐并经 SQE 核验后才恢复为 false |
 | `risk_level` | select | `low` / `medium` / `high` |
@@ -667,19 +667,21 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 集成前不启用。按物资类别分方案的接口预留为可选多选字段 `material_classes`（选项列表 `srm_material_class`，空 = 全部
 类别），有客户需要时再加，v0.5 不做（2026-10-24 裁定）。
 
-**`srm_performance_review` 绩效考评单**：`review_no`、`supplier`、`cycle`（`monthly` /
-`quarterly` / `yearly`，按供应商所供最高物资类别取参数 `perf_cycle`）、`period`（text，
-如 `2026Q3`、`2026-10`）、`period_start` / `period_end`（date）、`quality_score` /
-`cost_score` / `delivery_score` / `service_score` / `hse_score` / `total_score`（number，存储字段，
-由算分 flow 写入，供看板使用）、`grade`（`a` / `b` / `c` / `d`）、`status`（见 §5.7）、
-`otd_rate` / `lot_pass_rate`（percent）、`ppm`（number）、`ack_on_time_rate`（percent，
-ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result`。自动指标由
-交付记录按 `period` 汇总。
+**`srm_performance_review` 绩效考评单**（OWD `public_read`，内部只读：由 flow 生成和推进，评分只经「提交评分」
+screen flow；删除只给 `srm_admin`，删掉后可补跑生成；开启字段历史；`supplier` + `period` 唯一）：`review_no`
+（`PR{YYYY}{00000}`）、`supplier`、`cycle`（`monthly` / `quarterly` / `yearly`，按供应商所供最高物资类别取参数
+`perf_cycle`）、`period`（text，月度 `2026-10`、季度 `2026Q3`、年度 `2026`）、`period_start` / `period_end`（date）、
+`quality_score` / `cost_score` / `delivery_score` / `service_score` / `hse_score` / `total_score`（number，存储字段，
+由汇总分级写入，供看板使用）、`grade`（`grade_a` / `grade_b` / `grade_c` / `grade_d`；平台的选项值至少两个字符）、
+`status`（见 §5.7）、`otd_rate` / `lot_pass_rate`（percent）、`ppm`（number）、`ack_on_time_rate`（percent，
+ERP 集成前为空）、`delivery_count`（number，本期交付行数）、`data_incomplete`（boolean，默认 false：本期没有交付记录或
+某项启用的自动指标没有数据时为 true，该项不给零分，07 R7）、`reviewer`（user）、`appeal_reason`、`appeal_result`。
+自动指标由交付记录按 `period` 汇总，比率字段存小数（0.985 即 98.5%）；flow 写的字段一律只读。
 
-**`srm_performance_score` 评分明细**（master_detail → 考评单）：`kpi`（lookup）、
-`raw_value`（number，自动指标的原始值）、`score`（number，0–100）、`weight`
-（percent，快照）、`scorer`（user，人工指标的评分人）、`comment`、`scored`
-（boolean，默认 false）。
+**`srm_performance_score` 评分明细**（master_detail → 考评单，`controlled_by_parent`）：`kpi`（lookup）、
+`raw_value`（number，自动指标的原始值，与指标的满分值、零分值同一单位：比率按百分点，PPM 按 PPM）、`score`（number，0–100）、
+`weight`（percent，生成时从指标快照）、`scorer`（user，人工指标的评分人）、`comment`、`scored`（boolean，默认 false；
+自动指标算出得分时为 true，没有数据时为 false 并在 `comment` 写明）。
 
 ### 4.8 结算（不做，留在 ERP）
 
@@ -809,9 +811,17 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 
 ### 5.7 绩效考评单 `srm_performance_review.status`
 
-`calculating` ★ 自动算分（open）→ `scoring` 人工评分（open）→ `reviewing` 审定中
-（open）→ `published` 已发布（won）→ `appealed` 申诉中（open）→ `published`；
-作废为 `void`（lost）。
+| 值 | 标签 | kind | 允许跳转到 |
+|---|---|---|---|
+| `calculating` ★ | 自动算分 | open | `scoring`、`void` |
+| `scoring` | 人工评分 | open | `reviewing`、`void` |
+| `reviewing` | 审定中 | open | `published`、`void` |
+| `appealed` | 申诉中 | open | `published` |
+| `published` | 已发布 | won | `appealed` |
+| `void` | 已作废 | lost | — |
+
+`calculating` 只存在于一次生成运行之内：生成 flow 建单、建评分明细、算完自动指标后在同一次运行里转 `scoring`；
+中途失败留下的 `calculating` 考评单在下次运行时删掉重建（03 §10 第 1 步）。
 
 ### 5.8 对账单
 

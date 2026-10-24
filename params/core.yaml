@@ -53,7 +53,7 @@ perf_cycle:
   example: { A: 每月, B: 每季度, C: 每年 }
   display: A 类{A}，B 类{B}，C 类{C}
   used_in: [QP-01 6.7.1, QP-01 附录 A]
-  system: 考评生成 flow 按供应商所供最高物资类别（srm_category.material_class）取周期（核心 03 §10，v0.5）
+  system: 考评生成 flow srm_performance_generate 按供应商所供最高物资类别（srm_category.material_class）取周期，flow 的 CYCLE 与本参数由测试核对一致（核心 03 §10，v0.5）
 
 perf_kpi_weights:
   label: 绩效指标权重（按指标编码）

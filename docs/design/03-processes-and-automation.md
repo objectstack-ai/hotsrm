@@ -381,8 +381,8 @@ stateDiagram-v2
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 生成 | `schedule`：每月 1 日 03:00（追赶式） | 按供应商所供最高物资类别取周期参数 `perf_cycle`（示例 A 类每月、B 类每季、C 类每年）；本次运行到期的供应商各建一张上期考评单（`calculating`，`cycle` / `period` 写明），按指标库中启用的指标建评分明细（FR-702）；启用指标的权重合计不是 100% 时本次不生成并通知采购总监；已有同期考评单的跳过 |
-| 2 自动算分 | 同一次运行 | 按 [05 §4](./05-experience-and-analytics.md#4-仪表盘与指标口径) 的口径从交付记录计算 OTD、批次合格率、PPM，写入原始值与得分；订单响应及时率在 ERP 集成前在指标库中不启用（不建评分明细），启用时由采购总监调整其余权重。得分按指标的满分值、零分值线性计算（02 §4.7）。由 flow 的查询节点按供应商和 `period` 汇总交付记录上的 `on_time`、`inspection_result`、`defect_quantity` |
+| 1 生成 | `schedule`：每月 1–7 日每天 03:00（追赶式） | 活跃供应商（合格或冻结：冻结期间仍在交付在途订单，连续 D 级要能累计）按所供品类（不论品类资格状态）中最高的物资类别取周期参数 `perf_cycle`（示例 A 类每月、B 类每季、C 类每年），没有品类资格的不生成；每期的第一个月「到期」，建上一期的考评单（`calculating`，`cycle` / `period` / 起止日期写明），按指标库中启用的指标建评分明细并快照权重（FR-702）。启用指标的权重合计不是 100% 时本次不生成并通知采购总监。同一供应商同一期间已有考评单的跳过（`supplier` + `period` 唯一），1 日漏跑的后几天补上，跑两遍不重复建；上次中途失败留下的 `calculating` 考评单删掉重建。补跑更早的月份时传入运行日 `asOf` |
+| 2 自动算分 | 同一次运行 | 按 [05 §4](./05-experience-and-analytics.md#4-仪表盘与指标口径) 的口径（同数据集 `srm_delivery_metrics`）从交付记录计算 OTD、批次合格率、PPM：flow 的查询节点按供应商和本期包含的月份（交付记录的 `period`）取交付记录，汇总 `on_time`、`inspection_result`、`defect_quantity`、`received_quantity`，写入考评单的比率字段与交付行数；每条自动指标的评分明细写入原始值与得分，得分按指标的满分值、零分值线性计算（02 §4.7），数字全在指标库里，flow 不写死。本期没有交付记录、某项指标没有数据（如没有已检批次）时该项不给分（`scored = false`，`comment` 写明），考评单标记「数据不全」，不给零分（07 R7），由人工评分环节处理。订单响应及时率在 ERP 集成前在指标库中不启用（不建评分明细），启用时由采购总监调整其余权重。算完转 `scoring`。不良数与实收数逐行累加：CEL 没有对列表求和、flow 没有汇总节点（07 §6.3 PF15）。性能（07 R9，2026-10-24 进程内 sqlite 实测）：200 家供应商、每家 6 行交付记录一次生成约 7.4 秒，每家 30 行约 8.6 秒，重跑（全部跳过）约 0.6 秒 |
 | 3 人工评分 | 状态→`scoring` | 按评分明细的 `scorer`（品类经理、SQE、需求部门评分人）通知，评分人经「提交评分」screen flow 只看到并填写分配给自己的评分项；截止 10 天，扫描任务提醒未评项；截止后未评项按「取 60 分并标记未评」处理（可配置） |
 | 4 汇总分级 | 全部评分完成或截止 | `total_score = Σ(score × weight)`；等级线取参数 `perf_grade_min`（示例 A ≥ 90、B ≥ 80、C ≥ 70，其余 D）；状态→`reviewing` |
 | 5 审定发布 | 审批：采购总监（`position = srm_procurement_director`） | 通过后→`published`；回写供应商 `grade`、`latest_score`；供应商可在门户查看结果与扣分项（FR-704） |
@@ -474,7 +474,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_scar_overdue_sweep` | schedule：每小时（api 心跳等 objectstack#25675） | 整改单 | v0.4 |
 | `srm_audit_admission_apply` | record_change：准入审核完成或改结论 | 供应商审核 → 准入申请 | v0.4 |
 | `srm_audit_plan_generate` | schedule：每月 1 日 02:30（追赶式；年初那次生成全年计划） | 供应商审核 | v0.4 |
-| `srm_performance_generate` | schedule：每月 1 日（按类别周期） | 考评单 | v0.5 |
+| `srm_performance_generate` | schedule：每月 1–7 日 03:00（追赶式，按类别周期） | 考评单、评分明细 | v0.5 |
 | `srm_performance_publish` | record_change：状态→`reviewing` | 考评单 → 供应商 | v0.5 |
 | `srm_performance_apply` | record_change：状态→`published` | 考评单 → 整改单、处置单 | v0.5 |
 | `srm_risk_event_apply` | record_change：风险事件新建或改为高风险 | 风险事件 → 处置单（草稿） | v0.5 |
