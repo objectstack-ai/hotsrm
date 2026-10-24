@@ -82,6 +82,19 @@ export const Supplier = ObjectSchema.create({
         { label: '高', value: 'high' },
       ],
     }),
+    // 最近一期已发布的绩效结果（03 §10 第 5 步），由 srm_performance_publish / srm_appeal_resolve 写入；选项同考评单
+    grade: Field.select({
+      label: '绩效等级',
+      group: 'qualification',
+      readonly: true,
+      options: [
+        { label: 'A', value: 'grade_a' },
+        { label: 'B', value: 'grade_b' },
+        { label: 'C', value: 'grade_c' },
+        { label: 'D', value: 'grade_d' },
+      ],
+    }),
+    latest_score: Field.number({ label: '最近绩效总分', group: 'qualification', readonly: true, scale: 2 }),
     registered_capital: Field.currency({ label: '注册资本', group: 'registration' }),
     established_date: Field.date({ label: '成立日期', group: 'registration' }),
     legal_representative: Field.text({ label: '法定代表人', group: 'registration', maxLength: 50 }),

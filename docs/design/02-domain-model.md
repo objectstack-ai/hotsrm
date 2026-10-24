@@ -266,7 +266,8 @@ flow 拒绝新建人核验自己建的账户（03 §13）。
 | `legacy_imported` | boolean | 默认 false；存量导入的证书为 true，同供应商的同名字段（只在新建时可置为 true，只有 `srm_admin` 可写）（v0.2） |
 
 **`srm_category` 采购品类**（OWD `public_read`）：`code`、`name`、`parent`（`tree`，
-上级品类）、`category_manager`（user）、`sqe`（user）、`is_direct`（boolean，直接
+上级品类）、`category_manager`（user）、`sqe`（user）、`buyer`（user，采购员）、`evaluator`（user，需求部门
+评分人，持 `srm_evaluator` 岗位；`buyer` 与 `evaluator` 随 v0.5 绩效评分加入，见 §4.7 `scorer_type`）、`is_direct`（boolean，直接
 物料）、`material_class`（共享选项列表 `srm_material_class`：`class_a` 战略类 / `class_b` 重要类 /
 `class_c` 一般类（选项值至少 2 个字符，所以不用单字母），与体系文件的物资 A / B / C 分类同源，决定准入审批是否会签质量经理、
 审核频次和绩效周期）、`risk_class`（`high` / `medium` / `low`，决定准入是否需要现场
@@ -659,7 +660,9 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 `weight`（percent）、`active`（默认 true）、`scoring_rule`（textarea，评分规则说明，例如「OTD ≥ 98% 得满分，
 每低 1% 扣 5 分」）、`full_score_value` / `zero_score_value`（number，自动指标必填：原始值达到满分值得 100 分、
 达到零分值得 0 分，之间线性计分、越界取 0 或 100；满分值大于零分值时越高越好，反之越低越好〔PPM〕；比率按百分点填，
-两者不能相同）。启用的指标权重必须大于 0。
+两者不能相同）、`scorer_type`（评分人：`category_manager` 品类经理〔默认〕/ `buyer` 采购员 / `sqe` SQE /
+`evaluator` 需求部门评分人；人工指标和没有数据的自动指标按它从供应商的品类上取评分人，03 §10 第 3 步）。
+启用的指标权重必须大于 0。
 
 现阶段一套全局方案：**启用指标的权重合计应为 100%**。跨记录合计写不成单条校验规则（改权重往往要连改几条），
 所以由视图「启用指标」检查——按维度分组，权重列的合计即总权重、分组表头是各维度小计；考评生成 flow 再守一次
@@ -675,13 +678,20 @@ screen flow；删除只给 `srm_admin`，删掉后可补跑生成；开启字段
 由汇总分级写入，供看板使用）、`grade`（`grade_a` / `grade_b` / `grade_c` / `grade_d`；平台的选项值至少两个字符）、
 `status`（见 §5.7）、`otd_rate` / `lot_pass_rate`（percent）、`ppm`（number）、`ack_on_time_rate`（percent，
 ERP 集成前为空）、`delivery_count`（number，本期交付行数）、`data_incomplete`（boolean，默认 false：本期没有交付记录或
-某项启用的自动指标没有数据时为 true，该项不给零分，07 R7）、`reviewer`（user）、`appeal_reason`、`appeal_result`。
+某项启用的自动指标没有数据时为 true，该项不给零分，07 R7）、`score_due`（date，评分截止日，转人工评分时为当天 +
+`perf_score_days`）、`approval_status`（审批结论，审定发布的审批节点写入）、`reviewer`（user，审定人）、`review_comment`
+（审定意见：通过或退回重评时采购总监的意见）、`published_date`（date）、`appeal_reason`、`appeal_date`（date，申诉登记日）、
+`appeal_recorded_by`（user，代录人）、`appeal_result`、`appeal_outcome`（`maintained` 维持原结果 / `adjusted` 调整总分）、
+`appeal_handled_by`（user，处理申诉的采购总监）、`void_reason`（v0.5 P3 加入后面这些字段）。
 自动指标由交付记录按 `period` 汇总，比率字段存小数（0.985 即 98.5%）；flow 写的字段一律只读。
+维度得分是该维度各评分明细按权重的加权平均（0–100，没有该维度的指标时为空），总分是全部明细的 `Σ(score × weight)`
+（启用指标权重合计 100%），都保留两位小数，等级按两位小数的总分判断。
 
 **`srm_performance_score` 评分明细**（master_detail → 考评单，`controlled_by_parent`）：`kpi`（lookup）、
 `raw_value`（number，自动指标的原始值，与指标的满分值、零分值同一单位：比率按百分点，PPM 按 PPM）、`score`（number，0–100）、
 `weight`（percent，生成时从指标快照）、`scorer`（user，人工指标的评分人）、`comment`、`scored`（boolean，默认 false；
-自动指标算出得分时为 true，没有数据时为 false 并在 `comment` 写明）。
+自动指标算出得分时为 true，没有数据时为 false 并在 `comment` 写明）、`defaulted`（boolean，默认 false，「未评」：评分截止时
+还没有评分，由扫描任务按参数 `perf_missing_score` 取默认分，v0.5 P3）。
 
 ### 4.8 结算（不做，留在 ERP）
 
@@ -815,13 +825,15 @@ ERP 集成前为空）、`delivery_count`（number，本期交付行数）、`da
 |---|---|---|---|
 | `calculating` ★ | 自动算分 | open | `scoring`、`void` |
 | `scoring` | 人工评分 | open | `reviewing`、`void` |
-| `reviewing` | 审定中 | open | `published`、`void` |
+| `reviewing` | 审定中 | open | `published`、`scoring`（采购总监退回重评）、`void` |
 | `appealed` | 申诉中 | open | `published` |
 | `published` | 已发布 | won | `appealed` |
 | `void` | 已作废 | lost | — |
 
 `calculating` 只存在于一次生成运行之内：生成 flow 建单、建评分明细、算完自动指标后在同一次运行里转 `scoring`；
-中途失败留下的 `calculating` 考评单在下次运行时删掉重建（03 §10 第 1 步）。
+中途失败留下的 `calculating` 考评单在下次运行时删掉重建（03 §10 第 1 步）。作废只在人工评分阶段，由采购总监经「作废」
+screen flow 写明理由（例如供应商本期实际没有供货）；作废的考评单仍占着 `supplier` + `period`，同期要重新考评时由系统管理员
+删除后补跑生成。
 
 ### 5.8 对账单
 

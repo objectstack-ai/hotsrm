@@ -1,4 +1,5 @@
 import type * as Automation from '@objectstack/spec/automation';
+import { SCORE_DAYS } from './params.js';
 
 // P9 步骤 1–2（03 §10，FR-702）：生成考评单并自动算分。
 //
@@ -11,6 +12,10 @@ import type * as Automation from '@objectstack/spec/automation';
 // 批次合格率 = 合格行 ÷ 已检行（让步接收计不合格）；PPM = Σ不良数 ÷ Σ实收数 × 1,000,000。写入考评单的比率字段，
 // 再按每条自动指标的满分值、零分值线性算分（02 §4.7），得分规则全在指标库里，这里不写死数字。本期没有交付记录、
 // 某项指标没有数据（如没有已检批次）时该项不给分、考评单标记「数据不全」（07 R7）。算完转人工评分（scoring）。
+//
+// 指派评分人（03 §10 第 3 步，v0.5 P3）：人工指标和没有数据的自动指标按指标的 scorer_type 从供应商的品类上取评分人——
+// 物资类别最高、设了这个人的品类优先，都没设时退回品类经理，仍没有则不指派（截止后按缺评处理）。转人工评分时写评分截止日
+// （当天 + perf_score_days）并通知各评分人。
 //
 // 追赶式（03 §2.3 R2）：每月 1–7 日每天 03:00 运行，同一供应商同一期间已有考评单的跳过，1 日漏跑后几天补上，跑两遍不
 // 重复建（考评单上 supplier + period 唯一索引兜底）。补跑更早的月份时传入运行日 asOf（如 2026-10-01）。
@@ -38,6 +43,17 @@ const cycleOf = (Object.entries(CYCLE) as Array<[string, string]>).reduceRight(
 const due = `(cycle == 'monthly' || (cycle == 'quarterly' && runMonth % 3 == 0) || (cycle == 'yearly' && runMonth == 0))`;
 const isDue = `(cycle != '' && ${due})`;
 const stale = `(existing != null && existing.status == 'calculating')`;
+// 供应商品类上的某个人：物资类别最高、设了这个人的品类优先
+const personOf = (field: string) =>
+  (['class_a', 'class_b', 'class_c'] as const).reduceRight(
+    (rest, cls) => `cats.exists(x, x.material_class == '${cls}' && ${val(`x.${field}`)}) ? cats.filter(x, x.material_class == '${cls}' && ${val(`x.${field}`)})[0].${field} : ${rest}`,
+    `cats.exists(x, ${val(`x.${field}`)}) ? cats.filter(x, ${val(`x.${field}`)})[0].${field} : null`,
+  );
+// 某条指标的评分人：按 scorer_type 取，没设时是品类经理
+const scorerOf = (k: string) =>
+  `(${val(`${k}.scorer_type`)} && ${k}.scorer_type == 'buyer' ? buyerUser`
+  + ` : ${val(`${k}.scorer_type`)} && ${k}.scorer_type == 'sqe' ? sqeUser`
+  + ` : ${val(`${k}.scorer_type`)} && ${k}.scorer_type == 'evaluator' ? evaluatorUser : cmUser)`;
 const span = (n: number) => `[${Array.from({ length: n }, (_, i) => i).join(', ')}]`;
 
 // 某条指标在本期的原始值（与满分值、零分值同一单位）；人工指标与没有数据源的自动指标为 null
@@ -65,7 +81,7 @@ const supplierBody: Automation.FlowNode[] = [
     config: {
       objectName: 'srm_category',
       filter: { id: { $in: c('grants.map(g, g.category)') } },
-      fields: ['material_class'],
+      fields: ['material_class', 'category_manager', 'buyer', 'sqe', 'evaluator'],
       limit: 500,
       outputVariable: 'cats',
     },
@@ -84,6 +100,14 @@ const supplierBody: Automation.FlowNode[] = [
           + ` : cycle == 'quarterly' ? string(periodStart.getFullYear()) + 'Q' + string(periodStart.getMonth() / 3 + 1)`
           + ` : string(periodStart.getFullYear())`,
         ),
+        // 评分人：采购员、SQE、需求部门评分人没设时退回品类经理
+        cmUser: c(personOf('category_manager')),
+        buyerFound: c(personOf('buyer')),
+        sqeFound: c(personOf('sqe')),
+        evaluatorFound: c(personOf('evaluator')),
+        buyerUser: c('buyerFound != null ? buyerFound : cmUser'),
+        sqeUser: c('sqeFound != null ? sqeFound : cmUser'),
+        evaluatorUser: c('evaluatorFound != null ? evaluatorFound : cmUser'),
         // 本期包含的月份，交付记录的 period 是实到日期的年月
         months: c(
           `(cycle == 'monthly' ? ${span(1)} : cycle == 'quarterly' ? ${span(3)} : ${span(12)}).map(i, isoDate(addMonths(periodStart, i)).substring(0, 7))`,
@@ -138,7 +162,7 @@ const supplierBody: Automation.FlowNode[] = [
     id: 'reset_sums',
     type: 'assignment',
     label: '累计清零',
-    config: { assignments: { defectSum: c('0.0'), receivedSum: c('0.0'), lineFailed: c('false') } },
+    config: { assignments: { defectSum: c('0.0'), receivedSum: c('0.0'), lineFailed: c('false'), scorers: c('[]') } },
   },
   {
     id: 'sum_deliveries',
@@ -202,7 +226,13 @@ const supplierBody: Automation.FlowNode[] = [
                     id: 'line_raw',
                     type: 'assignment',
                     label: '本项原始值',
-                    config: { assignments: { raw: c(rawOf('kpi')) } },
+                    config: {
+                      assignments: {
+                        raw: c(rawOf('kpi')),
+                        // 算出得分的自动指标不需要评分人
+                        lineScorer: c(`kpi.method == 'auto' && raw != null ? null : ${scorerOf('kpi')}`),
+                      },
+                    },
                   },
                   {
                     id: 'create_score',
@@ -218,11 +248,21 @@ const supplierBody: Automation.FlowNode[] = [
                         score: c(scoreOf('kpi', 'raw')),
                         scored: c(`kpi.method == 'auto' && raw != null`),
                         comment: c(`kpi.method == 'auto' && raw == null ? '本期没有可用的交付数据，自动指标未算分' : null`),
+                        scorer: c('lineScorer'),
                       },
                     },
                   },
+                  {
+                    id: 'collect_scorer',
+                    type: 'assignment',
+                    label: '记下评分人（去重）',
+                    config: { assignments: { scorers: c('lineScorer != null && !(lineScorer in scorers) ? scorers + [lineScorer] : scorers') } },
+                  },
                 ],
-                edges: [{ id: 'e_score', source: 'line_raw', target: 'create_score', type: 'default' }],
+                edges: [
+                  { id: 'e_score', source: 'line_raw', target: 'create_score', type: 'default' },
+                  { id: 'e_collect', source: 'create_score', target: 'collect_scorer', type: 'default' },
+                ],
               },
               // 缺一行的考评单不能往下走：留在「自动算分」，下次运行删掉重建
               catch: { nodes: [{ id: 'score_failed', type: 'assignment', label: '记下失败', config: { assignments: { lineFailed: c('true') } } }] },
@@ -247,8 +287,22 @@ const supplierBody: Automation.FlowNode[] = [
         ppm: c('ppmRaw == null ? null : double(round(ppmRaw))'),
         delivery_count: c('lineCount'),
         data_incomplete: c('incomplete'),
+        score_due: c(`isoDate(addDays(today(), ${SCORE_DAYS}))`),
         status: 'scoring',
       },
+    },
+  },
+  { id: 'has_scorers', type: 'decision', label: '有评分人？' },
+  {
+    id: 'notify_scorers',
+    type: 'notify',
+    label: '通知评分人',
+    config: {
+      recipients: c('scorers'),
+      title: '待你评分：{{ review.review_no }}',
+      message: '考评单 {{ review.review_no }}（期间 {{ period }}）有指派给你的评分项，请在考评单上点「提交评分」，评分截止日见考评单。',
+      sourceObject: 'srm_performance_review',
+      sourceId: c('review.id'),
     },
   },
   { id: 'leave_calculating', type: 'assignment', label: '留在自动算分，下次重建' },
@@ -282,7 +336,10 @@ const supplierEdges: Automation.FlowEdge[] = [
   { id: 'v10', source: 'create_scores', target: 'lines_ok', type: 'default' },
   { id: 'v_lines', source: 'lines_ok', target: 'to_scoring', type: 'conditional', condition: c('!lineFailed'), label: '齐全' },
   { id: 'v_partial', source: 'lines_ok', target: 'leave_calculating', type: 'conditional', condition: c('lineFailed'), label: '有失败' },
-  { id: 'v11', source: 'to_scoring', target: 'next_vendor', type: 'default' },
+  { id: 'v11', source: 'to_scoring', target: 'has_scorers', type: 'default' },
+  { id: 'v_notify', source: 'has_scorers', target: 'notify_scorers', type: 'conditional', condition: c('scorers.size() > 0'), label: '有' },
+  { id: 'v_no_scorers', source: 'has_scorers', target: 'next_vendor', type: 'conditional', condition: c('scorers.size() == 0'), label: '没有' },
+  { id: 'v_notified', source: 'notify_scorers', target: 'next_vendor', type: 'default' },
   { id: 'v12', source: 'skip_vendor', target: 'next_vendor', type: 'default' },
   { id: 'v13', source: 'leave_calculating', target: 'next_vendor', type: 'default' },
 ];

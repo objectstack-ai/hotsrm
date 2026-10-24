@@ -59,6 +59,18 @@ export const Kpi = ObjectSchema.create({
       ],
     }),
     weight: Field.percent({ label: '权重', group: 'basic', required: true, min: 0, max: 1 }),
+    // 人工指标和没有数据的自动指标由谁评分（03 §10 第 3 步）：考评生成时按它从供应商的品类上取评分人
+    scorer_type: Field.select({
+      label: '评分人',
+      group: 'basic',
+      defaultValue: 'category_manager',
+      options: [
+        { label: '品类经理', value: 'category_manager' },
+        { label: '采购员', value: 'buyer' },
+        { label: 'SQE', value: 'sqe' },
+        { label: '需求部门评分人', value: 'evaluator' },
+      ],
+    }),
     active: Field.boolean({ label: '启用', group: 'basic', defaultValue: true }),
     scoring_rule: Field.textarea({ label: '评分规则说明', group: 'scoring', maxLength: 2000 }),
     // 自动指标线性算分：原始值达到满分值得 100 分，达到零分值得 0 分，之间按比例，越界取 0 或 100。

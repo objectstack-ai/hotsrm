@@ -383,11 +383,15 @@ stateDiagram-v2
 |---|---|---|
 | 1 生成 | `schedule`：每月 1–7 日每天 03:00（追赶式） | 活跃供应商（合格或冻结：冻结期间仍在交付在途订单，连续 D 级要能累计）按所供品类（不论品类资格状态）中最高的物资类别取周期参数 `perf_cycle`（示例 A 类每月、B 类每季、C 类每年），没有品类资格的不生成；每期的第一个月「到期」，建上一期的考评单（`calculating`，`cycle` / `period` / 起止日期写明），按指标库中启用的指标建评分明细并快照权重（FR-702）。启用指标的权重合计不是 100% 时本次不生成并通知采购总监。同一供应商同一期间已有考评单的跳过（`supplier` + `period` 唯一），1 日漏跑的后几天补上，跑两遍不重复建；上次中途失败留下的 `calculating` 考评单删掉重建。补跑更早的月份时传入运行日 `asOf` |
 | 2 自动算分 | 同一次运行 | 按 [05 §4](./05-experience-and-analytics.md#4-仪表盘与指标口径) 的口径（同数据集 `srm_delivery_metrics`）从交付记录计算 OTD、批次合格率、PPM：flow 的查询节点按供应商和本期包含的月份（交付记录的 `period`）取交付记录，汇总 `on_time`、`inspection_result`、`defect_quantity`、`received_quantity`，写入考评单的比率字段与交付行数；每条自动指标的评分明细写入原始值与得分，得分按指标的满分值、零分值线性计算（02 §4.7），数字全在指标库里，flow 不写死。本期没有交付记录、某项指标没有数据（如没有已检批次）时该项不给分（`scored = false`，`comment` 写明），考评单标记「数据不全」，不给零分（07 R7），由人工评分环节处理。订单响应及时率在 ERP 集成前在指标库中不启用（不建评分明细），启用时由采购总监调整其余权重。算完转 `scoring`。不良数与实收数逐行累加：CEL 没有对列表求和、flow 没有汇总节点（07 §6.3 PF15）。性能（07 R9，2026-10-24 进程内 sqlite 实测）：200 家供应商、每家 6 行交付记录一次生成约 7.4 秒，每家 30 行约 8.6 秒，重跑（全部跳过）约 0.6 秒 |
-| 3 人工评分 | 状态→`scoring` | 按评分明细的 `scorer`（品类经理、SQE、需求部门评分人）通知，评分人经「提交评分」screen flow 只看到并填写分配给自己的评分项；截止 10 天，扫描任务提醒未评项；截止后未评项按「取 60 分并标记未评」处理（可配置） |
-| 4 汇总分级 | 全部评分完成或截止 | `total_score = Σ(score × weight)`；等级线取参数 `perf_grade_min`（示例 A ≥ 90、B ≥ 80、C ≥ 70，其余 D）；状态→`reviewing` |
-| 5 审定发布 | 审批：采购总监（`position = srm_procurement_director`） | 通过后→`published`；回写供应商 `grade`、`latest_score`；供应商可在门户查看结果与扣分项（FR-704） |
+| 3 人工评分 | 生成 flow 转 `scoring` 时 | 评分人在生成评分明细时写入：人工指标和没有数据的自动指标按指标的 `scorer_type` 从供应商的品类上取（品类经理 `category_manager`、采购员 `buyer`、SQE `sqe`、需求部门评分人 `evaluator`）；供应商有多个品类时取物资类别最高的、设了这个人的品类，都没设时退回品类经理，仍没有则不指派（截止后按缺评处理）。转 `scoring` 时写评分截止日 `score_due`（当天 + `perf_score_days`，示例 10 天）并通知各评分人（「待你评分」）。评分人在考评单上点「提交评分」（screen flow `srm_score_submit`）：flow 只列出指派给本人的评分项，逐项显示指标、评分规则和原始值，填 0–100 分和说明，已评的可以在截止前改；全部评分项都已评分时考评单转 `reviewing`。`srm_score_due_notice` 在截止前 3 天提醒还有未评项的评分人；扫描任务 `srm_score_overdue_sweep`（每日，追赶式）把已过截止日的考评单上未评项取参数 `perf_missing_score`（示例 60 分，客户可改）、标记「未评」（`defaulted`），转 `reviewing` |
+| 4 汇总分级 | 状态→`reviewing`（`srm_performance_publish`） | `total_score = Σ(score × weight)`，各维度得分为维度内按权重的加权平均；等级线取参数 `perf_grade_min`（示例 A ≥ 90、B ≥ 80、C ≥ 70，其余 D），写入考评单 |
+| 5 审定发布 | 同一 flow 的审批：采购总监（`position = srm_procurement_director`） | 通过后→`published`，写审定人、发布日期；回写供应商 `grade`、`latest_score`（同一供应商已有更晚期间的已发布考评单时不回写），通知评分人；供应商可在门户查看结果与扣分项（FR-704，v0.6）。采购总监驳回即「退回重评」：考评单回到 `scoring`，审定意见写入 `review_comment`，截止日重新起算，通知评分人改分。职责分离（同 BR-11）：审定人不能是本考评单的评分人，撞人时这次通过不算数，通知后重新开一轮审定 |
 | 6 结果应用 | 发布后的记录触发 | C 级：生成改善要求（整改单，`source = performance`）；D 级：生成处置单草稿（冻结）；连续 `perf_d_exit_periods` 期 D 级：生成淘汰处置单草稿交品类经理评审（BR-18）；A 级：在名录中标记优选，供寻源邀请参考 |
-| 7 申诉 | 供应商发布后 7 天内 | 状态→`appealed`，采购总监处理后回到 `published`，结果留痕（FR-706） |
+| 7 申诉 | 供应商发布后 `perf_appeal_days`（示例 7）天内 | v0.6 前由采购员、采购主管或品类经理在考评单上代录（screen flow `srm_appeal_submit`，门户上线后供应商自己提交）：只能申诉一次，写申诉理由 → `appealed`，通知采购总监。采购总监经「处理申诉」（`srm_appeal_resolve`）写处理结果，选择维持原结果或调整总分（等级按新总分重算并回写供应商）→ 回到 `published`，处理人和结果留在考评单上（FR-706）。处理人同样不能是本考评单的评分人。结果应用（第 6 步）只在审定发布时触发；申诉改变等级时，按原等级生成的草稿由品类经理作废或另行处理 |
+
+> 评分人的回避（评分人、复核人与被评价供应商有关联关系的）系统判断不了，是制度要求（GL-05）；系统能做到的是评分只能填
+> 指派给本人的评分项、评分人不能审定或处理本考评单的申诉。人工评分环节的界面过滤之外，评分写入只经 screen flow（考评单与
+> 评分明细对所有内部岗位只读），所以绕过界面也改不了别人的评分项。
 
 ## 11. P10 资质与风险监控（资质 v0.1，风险事件 v0.5）
 
@@ -475,7 +479,9 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_audit_admission_apply` | record_change：准入审核完成或改结论 | 供应商审核 → 准入申请 | v0.4 |
 | `srm_audit_plan_generate` | schedule：每月 1 日 02:30（追赶式；年初那次生成全年计划） | 供应商审核 | v0.4 |
 | `srm_performance_generate` | schedule：每月 1–7 日 03:00（追赶式，按类别周期） | 考评单、评分明细 | v0.5 |
-| `srm_performance_publish` | record_change：状态→`reviewing` | 考评单 → 供应商 | v0.5 |
+| `srm_performance_publish` | record_change：状态→`reviewing`（汇总分级 + 采购总监审定） | 考评单 → 供应商 | v0.5 |
+| `srm_score_due_notice` | time_relative：考评单 `score_due` −3 天 | 考评单 → 评分人 | v0.5 |
+| `srm_score_overdue_sweep` | schedule：每日 04:00（追赶式） | 考评单、评分明细 | v0.5 |
 | `srm_performance_apply` | record_change：状态→`published` | 考评单 → 整改单、处置单 | v0.5 |
 | `srm_risk_event_apply` | record_change：风险事件新建或改为高风险 | 风险事件 → 处置单（草稿） | v0.5 |
 | `srm_blacklist_expiry_notice` | time_relative：供应商 `blacklist_until` −30 / 0 天 | 供应商（黑名单） | v0.5 |
@@ -503,8 +509,10 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_change_submit` 提交变更申请 | 门户：公司资料（v0.6 前内部在供应商档案下直接新建变更单） | 门户管理员 | v0.6 |
 | `srm_audit_finding_to_scar` 转整改单 | 供应商审核（已完成） | SQE、质量经理 | v0.4 |
 | `srm_disposition_submit` 提交审批 / `srm_disposition_cancel` 作废 | 处置单（草稿） | 品类经理、采购主管 | v0.5 |
-| `srm_score_submit` 提交评分 | 考评单 | 评分人 | v0.5 |
-| `srm_appeal_submit` 申诉 | 门户：绩效 | 门户管理员 | v0.6 |
+| `srm_score_submit` 提交评分 | 考评单（人工评分） | 评分人 | v0.5 |
+| `srm_performance_void` 作废 | 考评单（人工评分） | 采购总监 | v0.5 |
+| `srm_appeal_submit` 申诉 | 考评单（已发布）；v0.6 起门户：绩效 | 采购员、采购主管、品类经理代录（v0.5）；门户管理员（v0.6） | v0.5 |
+| `srm_appeal_resolve` 处理申诉 | 考评单（申诉中） | 采购总监 | v0.5 |
 | `srm_portal_enable` 开通门户 | 供应商联系人 | `srm_supplier_admin` | v0.6 |
 | `srm_invite_supplier` 邀请供应商 | 寻源单 | 寻源工程师 | v0.7 |
 | `srm_event_submit` 发布 | 寻源单 | 寻源工程师 | v0.7 |

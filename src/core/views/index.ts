@@ -14,3 +14,4 @@ export { SupplierAuditViews } from './supplier-audit.view.js';
 export { RiskEventViews } from './risk-event.view.js';
 export { KpiViews } from './kpi.view.js';
 export { PerformanceReviewViews } from './performance-review.view.js';
+export { PerformanceScoreViews } from './performance-score.view.js';
