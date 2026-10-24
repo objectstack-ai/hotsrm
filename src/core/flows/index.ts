@@ -6,3 +6,5 @@ export { QualificationRecalcFlow } from './qualification/qualification-recalc.fl
 export { BankVerifyFlow } from './bank-account/bank-verify.flow.js';
 export { ChangeApprovalFlow } from './change-request/change-approval.flow.js';
 export { ChangeApplyFlow } from './change-request/change-apply.flow.js';
+export { DispositionApprovalFlow } from './disposition/disposition-approval.flow.js';
+export { DispositionApplyFlow } from './disposition/disposition-apply.flow.js';

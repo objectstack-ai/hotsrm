@@ -134,6 +134,17 @@ export const Supplier = ObjectSchema.create({
         filter: { status: 'expired' },
       },
     }),
+    // 「同一家供应商同时只能有一张审批中的处置单」的守卫依据（处置单校验规则读它，v0.3）
+    open_disposition_count: Field.summary({
+      label: '审批中处置单数',
+      group: 'qualification',
+      summaryOperations: {
+        object: 'srm_supplier_disposition',
+        field: 'id',
+        function: 'count',
+        filter: { status: 'in_review' },
+      },
+    }),
     // 银行账户「每家至多一个默认账户」的校验读这个计数（v0.2）
     default_bank_account_count: Field.summary({
       label: '默认银行账户数',
