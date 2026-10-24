@@ -1,6 +1,7 @@
 import { Supplier } from '../objects/supplier.object.js';
 import { Contract } from '../objects/contract.object.js';
 import { QualityIssue } from '../objects/quality-issue.object.js';
+import { PerformanceReview } from '../objects/performance-review.object.js';
 
 // 内部权限集（04 §2.2）的 v0.1 子集。一律不设 isDefault（AGENTS.md 红线 2）。
 // 状态类字段（供应商状态、资质异常、证书状态）只由 flow 写入，权限集里一律只读。
@@ -41,6 +42,9 @@ export const InternalBasePermissionSet = {
     srm_risk_event: read,
     // 绩效指标库内部只读（v0.5）：评分人按评分规则说明打分
     srm_kpi: read,
+    // 考评单与评分明细内部只读（04 §2.3）：由 flow 生成和推进，评分只经「提交评分」screen flow（v0.5 P3）
+    srm_performance_review: read,
+    srm_performance_score: read,
   },
 };
 
@@ -185,6 +189,8 @@ export const ExecutivePermissionSet = {
     srm_supplier_audit_finding: read,
     srm_risk_event: read,
     srm_kpi: read,
+    srm_performance_review: read,
+    srm_performance_score: read,
   },
 };
 
@@ -225,6 +231,9 @@ export const FinancePermissionSet = {
   },
 };
 
+// 管理员能删考评单要 modifyAllRecords，它连修改一起放开（objectstack#25470）：考评单字段对管理员一律只读
+const reviewFieldsReadOnly = Object.fromEntries(Object.keys(PerformanceReview.fields).map((field) => [`srm_performance_review.${field}`, readOnly]));
+
 // 系统管理员：维护品类与工厂等配置，执行物料导入和存量供应商、联系人、证书导入（04 §2.2）
 export const AdminPermissionSet = {
   name: 'srm_admin',
@@ -241,12 +250,16 @@ export const AdminPermissionSet = {
     srm_delivery_record: { ...read, allowDelete: true, modifyAllRecords: true },
     // 指标库的配置与清理（04 §2.2）；删除自己没建的指标要 modifyAllRecords，同上
     srm_kpi: { ...write, allowDelete: true, modifyAllRecords: true },
+    // 删除错误生成的考评单（评分明细随之删除）后可补跑生成；删系统生成的记录要 modifyAllRecords，同交付记录
+    srm_performance_review: { ...read, allowDelete: true, modifyAllRecords: true },
+    srm_performance_score: { ...read, allowDelete: true },
   },
   fields: {
     'srm_supplier.status': flowOwned,
     'srm_supplier.qualification_alert': flowOwned,
     ...agreementFlags,
     'srm_supplier_certificate.status': flowOwned,
+    ...reviewFieldsReadOnly,
   },
 };
 
@@ -285,6 +298,8 @@ export const AuditorPermissionSet = {
     srm_supplier_audit_finding: read,
     srm_risk_event: read,
     srm_kpi: read,
+    srm_performance_review: read,
+    srm_performance_score: read,
   },
 };
 

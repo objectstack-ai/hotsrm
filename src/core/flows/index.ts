@@ -27,3 +27,4 @@ export { DispositionSubmitFlow } from './disposition/disposition-submit.flow.js'
 export { DispositionCancelFlow } from './disposition/disposition-cancel.flow.js';
 export { RiskEventApplyFlow } from './risk/risk-event-apply.flow.js';
 export { BlacklistExpiryNoticeFlow } from './risk/blacklist-expiry-notice.flow.js';
+export { PerformanceGenerateFlow } from './performance/generate.flow.js';
