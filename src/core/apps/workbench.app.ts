@@ -37,6 +37,7 @@ export const Workbench = App.create({
       icon: 'shield-check',
       children: [
         { id: 'nav_delivery_record', type: 'object', objectName: 'srm_delivery_record', label: '交付记录', icon: 'truck' },
+        { id: 'nav_quality_issue', type: 'object', objectName: 'srm_quality_issue', label: '整改单', icon: 'clipboard-x' },
       ],
     },
     {

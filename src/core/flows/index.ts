@@ -16,3 +16,7 @@ export { ContractExpireSweepFlow } from './contract/expire-sweep.flow.js';
 export { ContractExpiryNoticeFlow } from './contract/expiry-notice.flow.js';
 export { DispositionApprovalFlow } from './disposition/disposition-approval.flow.js';
 export { DispositionApplyFlow } from './disposition/disposition-apply.flow.js';
+export { ScarCreateFlow } from './quality/scar-create.flow.js';
+export { ScarReviewFlow } from './quality/scar-review.flow.js';
+export { ScarReopenFlow } from './quality/scar-reopen.flow.js';
+export { ScarOverdueSweepFlow } from './quality/scar-overdue-sweep.flow.js';

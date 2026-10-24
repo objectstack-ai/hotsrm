@@ -1,7 +1,6 @@
 import type { Dashboard } from '@objectstack/spec/ui';
 
-// 05 §4.2 交付、质量两块看板里只依赖交付记录的卡片（v0.4）。按供应商的 OTD 趋势、逾期整改单等随考评单、
-// 整改单上线再加。数据按月导入上月的收货，所以默认看上月；平台的数据集图表不能指定堆叠，
+// 05 §4.2 交付、质量两块看板（v0.4）。按供应商的 OTD 趋势随考评单上线再加。数据按月导入上月的收货，所以默认看上月；平台的数据集图表不能指定堆叠，
 // 「准时 / 不准时」画成按月并列的两组柱。
 const lastMonth = { field: 'receipt_date', defaultRange: 'last_month' as const, allowCustomRange: true };
 
@@ -38,7 +37,7 @@ export const DeliveryDashboard: Dashboard = {
 export const QualityDashboard: Dashboard = {
   name: 'srm_quality_dashboard',
   label: '质量',
-  description: '不合格交付行、批次合格率与按供应商的 PPM 排名',
+  description: '不合格交付行、批次合格率、按供应商的 PPM 排名与未关闭、逾期整改单',
   columns: 12,
   dateRange: lastMonth,
   widgets: [
@@ -86,6 +85,28 @@ export const QualityDashboard: Dashboard = {
       values: ['nonconforming_count', 'defect_sum'],
       filter: { inspection_result: { $in: ['fail', 'concession'] } },
       layout: { x: 6, y: 2, w: 6, h: 5 },
+    },
+    // 整改单看的是当前积压，不按看板的「上月」日期区间过滤
+    {
+      id: 'open_issues_by_status',
+      type: 'column',
+      title: '未关闭整改单（按状态）',
+      dataset: 'srm_quality_issue_metrics',
+      dimensions: ['status'],
+      values: ['open_count'],
+      filter: { status: { $in: ['open', 'containment_submitted', 'action_submitted', 'verifying'] } },
+      filterBindings: { dateRange: false },
+      layout: { x: 0, y: 7, w: 8, h: 4 },
+    },
+    {
+      id: 'overdue_issues',
+      type: 'metric',
+      title: '逾期整改单',
+      dataset: 'srm_quality_issue_metrics',
+      values: ['overdue_count'],
+      filterBindings: { dateRange: false },
+      layout: { x: 8, y: 7, w: 4, h: 2 },
+      colorVariant: 'danger',
     },
   ],
 };
