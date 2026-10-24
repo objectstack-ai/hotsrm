@@ -65,6 +65,7 @@ describe('internal permissions', () => {
         "srm_category": "R",
         "srm_contract": "R",
         "srm_contract_line": "R",
+        "srm_delivery_record": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -84,6 +85,7 @@ describe('internal permissions', () => {
         "srm_category": "R",
         "srm_contract": "RCE",
         "srm_contract_line": "RCE",
+        "srm_delivery_record": "R",
         "srm_material": "RE",
         "srm_plant": "R",
         "srm_supplier": "RCE",
@@ -105,6 +107,7 @@ describe('internal permissions', () => {
         "srm_category": "R",
         "srm_contract": "RE",
         "srm_contract_line": "RE",
+        "srm_delivery_record": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -123,6 +126,7 @@ describe('internal permissions', () => {
         "srm_category": "R",
         "srm_contract": "R",
         "srm_contract_line": "R",
+        "srm_delivery_record": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -143,6 +147,7 @@ describe('internal permissions', () => {
         "srm_category": "R",
         "srm_contract": "R",
         "srm_contract_line": "R",
+        "srm_delivery_record": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -157,7 +162,7 @@ describe('internal permissions', () => {
     `);
   });
 
-  // v0.4 Q0：质量经理权限同 SQE（会签由 flow 授予）；srm_iqc 的交付记录权限随 v0.4 Q1 补齐
+  // v0.4 Q0：质量经理权限同 SQE（会签由 flow 授予）；IQC 检验员录入交付记录（v0.4 Q1）
   it('gives the quality manager the same access as an SQE', () => {
     expect(visibility('srm_quality_manager')).toEqual(visibility('srm_sqe'));
   });
@@ -166,6 +171,7 @@ describe('internal permissions', () => {
     expect(visibility('srm_iqc_inspector')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_delivery_record": "RCE",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",

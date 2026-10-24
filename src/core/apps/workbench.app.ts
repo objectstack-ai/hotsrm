@@ -31,6 +31,26 @@ export const Workbench = App.create({
       ],
     },
     {
+      id: 'group_quality',
+      type: 'group',
+      label: '质量',
+      icon: 'shield-check',
+      children: [
+        { id: 'nav_delivery_record', type: 'object', objectName: 'srm_delivery_record', label: '交付记录', icon: 'truck' },
+      ],
+    },
+    {
+      id: 'group_analytics',
+      type: 'group',
+      label: '分析',
+      icon: 'chart-column',
+      children: [
+        { id: 'nav_delivery_dashboard', type: 'dashboard', dashboardName: 'srm_delivery_dashboard', label: '交付看板', icon: 'truck' },
+        { id: 'nav_quality_dashboard', type: 'dashboard', dashboardName: 'srm_quality_dashboard', label: '质量看板', icon: 'shield-check' },
+        { id: 'nav_delivery_scorecard', type: 'report', reportName: 'srm_delivery_scorecard', label: '供应商交付与质量', icon: 'table' },
+      ],
+    },
+    {
       id: 'group_master_data',
       type: 'group',
       label: '基础数据',

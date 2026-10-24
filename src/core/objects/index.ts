@@ -11,3 +11,4 @@ export { SupplierDisposition } from './supplier-disposition.object.js';
 export { Material } from './material.object.js';
 export { Contract } from './contract.object.js';
 export { ContractLine } from './contract-line.object.js';
+export { DeliveryRecord } from './delivery-record.object.js';

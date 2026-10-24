@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | 物料（编码、名称、规格、单位、品类） | ERP 导出 → SRM | 平台导入，按 `erp_material_no` 匹配，可重复执行 | 初始化 + 按需 | v0.2 |
 | 存量供应商、联系人、证书 | 客户台账 → SRM | 平台导入，按身份标识查重；导入的供应商标记「存量导入、待复核」 | 一次 + 补充 | v0.2 |
-| 交付记录（收货与检验结果） | ERP / 质量系统导出 → SRM | 平台导入，按 `erp_order_no` + `erp_line_no` 匹配；没有质量系统时质检员逐条录入 | 每月 | v0.4 |
+| 交付记录（收货与检验结果） | ERP / 质量系统导出 → SRM | 平台导入，按 `erp_receipt_no` + `erp_order_no` + `erp_line_no` 匹配（[导入说明](../implementation/delivery-import.md)）；没有质量系统时质检员逐条录入 | 每月 | v0.4 |
 | 供应商编码、冻结标志、价格 | SRM → ERP | 采购员按 SRM 的审批结果在 ERP 手工维护；`erp_vendor_code` 可手工回填 | 事件 | v0.1 起 |
 
 导入在 CI 用样例表格跑两遍验证幂等（[docs/engineering](../engineering/README.md)）。

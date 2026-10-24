@@ -29,7 +29,7 @@
 7. **复选框不设必填**：`boolean` 字段一律给 `defaultValue: false`，「必须勾选」
    用校验规则表达。
 8. **外部单号字段预留、空着**：从 ERP 导入的对象（物料、交付记录）有唯一的外部编号
-   字段（`erp_material_no`、`erp_order_no` + 行号），表格导入按它幂等匹配。SRM 将来要推给
+   字段（`erp_material_no`、`erp_receipt_no` + `erp_order_no` + 行号），表格导入按它幂等匹配。SRM 将来要推给
    ERP 的对象（供应商、银行账户、价格记录、合同）保留 `erp_*` 编号字段，现阶段不写；
    同步状态三字段（`erp_sync_status` / `erp_sync_error` / `erp_synced_at`）在 ERP 集成立项时
    再加（[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md)，[06 §1](./06-integration-and-ai.md#1-预留的-erp-集成点)）。
@@ -553,27 +553,35 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 
 ### 4.6 质量（v0.4）
 
-**`srm_delivery_record` 交付记录**（OWD `public_read`，内部只读；导入或质检员录入）
+**`srm_delivery_record` 交付记录**（OWD `public_read`，内部只读；SQE 导入，IQC 检验员录入；删除只给 `srm_admin`）
 
 只为算绩效和开整改单，不做业务：不改库存、不对账。每月从 ERP 导出表格导入，按
-`erp_order_no` + `erp_line_no` 幂等匹配；没有质量系统的客户由质检员逐条录入。ERP 集成后
-改为 upsert 写入，结构不变。
+`erp_receipt_no` + `erp_order_no` + `erp_line_no` 幂等匹配：一条订单行可以分几次到货，每次到货
+（收货单的一行）是一条记录，只按订单号 + 行号匹配会让第二次到货覆盖第一次。没有质量系统的客户由
+质检员逐条录入。ERP 集成后改为 upsert 写入，结构不变。导入说明与试导结论见
+[交付记录导入说明](../implementation/delivery-import.md)。
+
+指标要的值（`on_time`、`period`、`received_quantity_mn`）是带 `expression` 的存储字段：引擎在每次
+新建和修改时按表达式算好写入，导入、手工录入和以后的 upsert 走同一条写入路径，表格里带了这几列
+也会被重算覆盖。不用 record_change flow（原设计的 `srm_delivery_apply`）：表达式在同一次写入里完成，
+不需要写入后再更新一次记录。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `erp_order_no` / `erp_line_no` | text | ERP 订单号与行号，组合唯一（导入匹配键） |
-| `supplier` / `material` / `plant` | lookup | 必填（工厂可空） |
-| `required_date` / `promised_date` | date | 需求日期 / 供应商承诺日期（可空） |
-| `receipt_date` | date | 实到日 |
-| `ordered_quantity` / `received_quantity` / `accepted_quantity` | number | 订单数量 / 实收数量 / 合格数量 |
+| `erp_receipt_no` / `erp_order_no` / `erp_line_no` | text | ERP 收货单号、订单号与订单行号，必填，三者组合唯一（导入匹配键） |
+| `supplier` / `material` / `plant` | lookup | 必填（工厂可空）。导入时物料按 ERP 物料号找（找不到再按名称），工厂按工厂编码找（找不到再按名称），供应商按全称找 |
+| `required_date` / `promised_date` | date | 需求日期（必填）/ 供应商承诺日期（可空） |
+| `receipt_date` | date | 实到日，必填 |
+| `ordered_quantity` / `received_quantity` / `accepted_quantity` | number | 订单数量 / 实收数量（必填）/ 合格数量；不小于 0，合格数量与不良数不大于实收数量 |
 | `uom` | text | |
-| `on_time` | boolean | 默认 false；写入时由 flow 按 `receipt_date <= promised_date`（无承诺日期时按 `required_date`）判定 |
-| `inspection_result` | select | `pass` 合格 / `fail` 不合格 / `concession` 让步接收 / `not_inspected` 未检 |
-| `severity` | select | `critical` 严重 / `major` 主要 / `minor` 次要（不合格时填写） |
-| `defect_quantity` | number | 不良数（PPM 口径） |
+| `on_time` | boolean | 存储表达式：`receipt_date <= promised_date`，没有承诺日期时按 `required_date` |
+| `inspection_result` | select | `pass` 合格 / `fail` 不合格 / `concession` 让步接收 / `not_inspected` 未检；必填，默认未检 |
+| `severity` | select | `critical` 严重 / `major` 主要 / `minor` 次要；不合格时必填 |
+| `defect_quantity` | number | 不良数（PPM 口径）；不合格、让步接收时必填；判批合格的也可以有少量不良，照样计入 PPM |
 | `defect_description` | textarea | |
-| `amount` | currency | 实收数量 × 单价（表格里带单价时写入，用于供应商维度的支出分析） |
-| `period` | text | 所属期间，如 `2026-10`，导入时写入，供考评 flow 按期汇总 |
+| `amount` | currency | 交付金额（ERP 导出带金额时写入，用于供应商维度的支出分析） |
+| `period` | text | 存储表达式：实到日期的年月，如 `2026-10`，供考评 flow 按期汇总 |
+| `received_quantity_mn` | number | 存储表达式：实收数量 ÷ 1,000,000。PPM = Σ不良数 ÷ Σ`received_quantity_mn`，看板用两个合计之比得出（[05 §4.1](./05-experience-and-analytics.md#41-指标口径)） |
 | `portal_position` | text | v0.6 加；供应商在门户只能看本公司的交付记录 |
 
 **`srm_quality_issue` 质量整改单 SCAR**

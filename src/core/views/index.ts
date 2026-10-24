@@ -8,3 +8,4 @@ export { SupplierChangeRequestViews } from './supplier-change-request.view.js';
 export { MaterialViews } from './material.view.js';
 export { ContractViews } from './contract.view.js';
 export { SupplierDispositionViews } from './supplier-disposition.view.js';
+export { DeliveryRecordViews } from './delivery-record.view.js';

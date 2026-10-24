@@ -285,9 +285,11 @@ sequenceDiagram
 
 ## 8. P7 交付记录导入与质量整改（SCAR / 8D）（v0.4）
 
-**交付记录导入**：每月从 ERP 导出上月的收货与检验结果表格，用平台导入按 `erp_order_no` +
-`erp_line_no` 匹配写入 `srm_delivery_record`（可重复执行）；没有质量系统的客户由质检员
-逐条录入。写入后 flow `srm_delivery_apply` 判定 `on_time`，并按下表生成整改单。
+**交付记录导入**：每月从 ERP 导出上月的收货与检验结果表格，SQE 用平台导入按 `erp_receipt_no` +
+`erp_order_no` + `erp_line_no` 匹配写入 `srm_delivery_record`（可重复执行，见
+[交付记录导入说明](../implementation/delivery-import.md)）；没有质量系统的客户由 IQC 检验员
+逐条录入。写入时引擎按字段表达式算出 `on_time`、`period` 和 PPM 用的 `received_quantity_mn`
+（[02 §4.6](./02-domain-model.md#46-质量v04)），再按下表生成整改单。
 
 ```mermaid
 stateDiagram-v2
@@ -414,7 +416,6 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_contract_renew` | 子 flow：到期扫描调用 | 合同 → 续签草稿、明细 | v0.3 |
 | `srm_contract_agreement_recalc` | record_change：质量协议 / 廉洁协议进入或离开 `active` | 合同 → 供应商 | v0.3 |
 | `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单 | v0.3 |
-| `srm_delivery_apply` | record_change：交付记录写入 | 交付记录 | v0.4 |
 | `srm_scar_create` | record_change：交付记录不合格 | 交付记录 → 整改单 | v0.4 |
 | `srm_scar_review` | record_change：状态→`action_submitted` | 整改单 | v0.4 |
 | `srm_scar_overdue_sweep` | schedule：每小时 + api 心跳 | 整改单 | v0.4 |

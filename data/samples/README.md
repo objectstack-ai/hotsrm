@@ -1,7 +1,7 @@
 # 样例导入表格
 
 这里的表格演示从 ERP 导出数据、用平台导入写入 SRM 的格式。全部是标明「示例」的虚构数据，
-不对应任何真实企业或物料清单（AGENTS.md 红线 5）。CI 用它们验证导入可重复执行（`test/material.test.ts`、`test/import-idempotency.test.ts`）。
+不对应任何真实企业或物料清单（AGENTS.md 红线 5）。CI 用它们验证导入可重复执行（`test/material.test.ts`、`test/import-idempotency.test.ts`、`test/delivery-record.test.ts`）。
 
 ## 物料 `srm_material.csv`
 
@@ -53,3 +53,14 @@ POST /api/v1/data/srm_material/import
 表头用字段的中文标签，供应商取上面存量供应商样例里的公司。先导入存量供应商（合同只能与「合格」的供应商签订），
 再以品类经理岗位导入合同（按「合同名称」匹配），最后导入明细（按「合同 + 行号」匹配）。导入的合同都是草稿，
 照常提交审批、签署生效；明细金额 = 数量 × 单价，由系统计算，表格里不带；税率填小数（0.13 即 13%），带百分号的「13%」会被读成 13 而拒收。`test/contract.test.ts` 导入这两张表格并核对金额。
+
+## 交付记录（v0.4）
+
+`srm_delivery_record.csv` 是一个月（2026-09）的 ERP 收货与检验结果导出样例（[02 §4.6](../../docs/design/02-domain-model.md#46-质量v04)）：
+7 家供应商、15 行，含按期 / 迟到、只有需求日期没有承诺日期、同一订单行分两次到货、不合格（严重 / 主要 / 次要）、
+让步接收、判批合格但有少量不良、未检。表头用字段的中文标签，供应商、物料取上面的样例和演示种子。以 SQE 岗位导入，
+按「ERP 收货单号 + ERP 订单号 + ERP 订单行号」匹配；准时与期间由系统计算，表格里不带。导入步骤、字段说明和常见错误见
+[交付记录导入说明](../../docs/implementation/delivery-import.md)。
+
+`delivery-trial/` 是一份模拟的「脏」月度表格（日期格式、简称、选项别名、缺必填、重复行、退货行、千分位等），
+用来试导、验证每类问题都能在报告里看到（`test/delivery-record.test.ts`，结论见导入说明 §5）。
