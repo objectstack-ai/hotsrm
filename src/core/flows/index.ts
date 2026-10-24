@@ -12,3 +12,5 @@ export { ContractAgreementRecalcFlow } from './contract/agreement-recalc.flow.js
 export { ContractRenewFlow } from './contract/renew.flow.js';
 export { ContractExpireSweepFlow } from './contract/expire-sweep.flow.js';
 export { ContractExpiryNoticeFlow } from './contract/expiry-notice.flow.js';
+export { DispositionApprovalFlow } from './disposition/disposition-approval.flow.js';
+export { DispositionApplyFlow } from './disposition/disposition-apply.flow.js';

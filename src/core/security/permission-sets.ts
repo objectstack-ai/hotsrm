@@ -27,6 +27,8 @@ export const InternalBasePermissionSet = {
     srm_supplier_certificate: read,
     srm_supplier_category: read,
     srm_supplier_bank_account: read,
+    // 采购员按已执行的处置单在 ERP 同步冻结标志（v0.3）
+    srm_supplier_disposition: read,
   },
 };
 
@@ -81,6 +83,8 @@ export const SupplierAdminPermissionSet = {
     // 起草合同与明细；状态只经 flow 推进（提交审批、确认生效、到期扫描）
     srm_contract: write,
     srm_contract_line: write,
+    // 发起冻结 / 解冻 / 淘汰 / 黑名单；新建即进入审批，改只限被退回修改期间（对象上的 readonlyWhen，v0.3）
+    srm_supplier_disposition: write,
   },
   // 银行账号完整可读（BR-20，04 §4.2）
   systemPermissions: ['srm_view_bank_account_no'],
@@ -91,6 +95,9 @@ export const SupplierAdminPermissionSet = {
     'srm_supplier_category.status': flowOwned,
     'srm_supplier_category.approved_date': flowOwned,
     ...agreementFlags,
+    'srm_supplier_category.status_before_freeze': flowOwned,
+    'srm_supplier_category.freeze_scope': flowOwned,
+    'srm_supplier_category.freeze_disposition': flowOwned,
     ...importOwned,
   },
 };
@@ -131,6 +138,7 @@ export const ExecutivePermissionSet = {
     srm_supplier_change_request: read,
     srm_contract: read,
     srm_contract_line: read,
+    srm_supplier_disposition: read,
   },
 };
 
@@ -200,6 +208,7 @@ export const AuditorPermissionSet = {
     srm_supplier_change_request: read,
     srm_contract: read,
     srm_contract_line: read,
+    srm_supplier_disposition: read,
   },
 };
 

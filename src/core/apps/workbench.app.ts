@@ -18,6 +18,7 @@ export const Workbench = App.create({
         { id: 'nav_certificate', type: 'object', objectName: 'srm_supplier_certificate', label: '资质证书', icon: 'badge-check' },
         { id: 'nav_bank_account', type: 'object', objectName: 'srm_supplier_bank_account', label: '银行账户', icon: 'landmark' },
         { id: 'nav_change_request', type: 'object', objectName: 'srm_supplier_change_request', label: '变更单', icon: 'file-pen' },
+        { id: 'nav_disposition', type: 'object', objectName: 'srm_supplier_disposition', label: '处置单', icon: 'ban' },
       ],
     },
     {
