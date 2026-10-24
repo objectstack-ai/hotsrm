@@ -11,3 +11,4 @@ export { SupplierDispositionViews } from './supplier-disposition.view.js';
 export { DeliveryRecordViews } from './delivery-record.view.js';
 export { QualityIssueViews } from './quality-issue.view.js';
 export { SupplierAuditViews } from './supplier-audit.view.js';
+export { KpiViews } from './kpi.view.js';

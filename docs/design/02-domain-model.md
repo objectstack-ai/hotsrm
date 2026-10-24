@@ -641,15 +641,27 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 
 ### 4.7 绩效（v0.5）
 
-**`srm_kpi` 绩效指标**：`code`、`name`、`dimension`（`quality` / `cost` / `delivery` /
-`service`）、`method`（`auto` 自动 / `manual` 人工）、`weight`（percent）、
-`scoring_rule`（textarea，评分规则说明，例如「OTD ≥ 98% 得满分，每低 1% 扣 5 分」）、
-`active`。
+**`srm_kpi` 绩效指标**（OWD `public_read`；采购总监经共享规则 `srm_kpi_director_edit` 改全部指标，包括
+种子建的示例指标，不用 `modifyAllRecords`，所以不能删除；删除只给 `srm_admin`，不再使用的指标停用；开启字段历史；
+表单分组：基本信息、评分规则）：`code`（唯一）、`name`、`dimension`（共享选项列表 `srm_kpi_dimension`：
+`quality` 质量 / `cost` 成本 / `delivery` 交付 / `service` 服务 / `hse` 安全环保，扩展包可追加；
+安全环保按 QP-01 6.7.2 单列一维）、`method`（`auto` 自动 / `manual` 人工，默认人工）、`auto_metric`（自动指标对应
+考评单上的比率字段：`otd_rate` / `lot_pass_rate` / `ppm` / `ack_on_time_rate`；自动指标必填，人工指标不填）、
+`weight`（percent）、`active`（默认 true）、`scoring_rule`（textarea，评分规则说明，例如「OTD ≥ 98% 得满分，
+每低 1% 扣 5 分」）、`full_score_value` / `zero_score_value`（number，自动指标必填：原始值达到满分值得 100 分、
+达到零分值得 0 分，之间线性计分、越界取 0 或 100；满分值大于零分值时越高越好，反之越低越好〔PPM〕；比率按百分点填，
+两者不能相同）。启用的指标权重必须大于 0。
+
+现阶段一套全局方案：**启用指标的权重合计应为 100%**。跨记录合计写不成单条校验规则（改权重往往要连改几条），
+所以由视图「启用指标」检查——按维度分组，权重列的合计即总权重、分组表头是各维度小计；考评生成 flow 再守一次
+（03 §10 第 1 步）。示例指标库按 QP-01 附录 D，权重取参数 `perf_kpi_weights`；订单响应及时率要 ERP 订单确认数据，
+集成前不启用。按物资类别分方案的接口预留为可选多选字段 `material_classes`（选项列表 `srm_material_class`，空 = 全部
+类别），有客户需要时再加，v0.5 不做（2026-10-24 裁定）。
 
 **`srm_performance_review` 绩效考评单**：`review_no`、`supplier`、`cycle`（`monthly` /
 `quarterly` / `yearly`，按供应商所供最高物资类别取参数 `perf_cycle`）、`period`（text，
 如 `2026Q3`、`2026-10`）、`period_start` / `period_end`（date）、`quality_score` /
-`cost_score` / `delivery_score` / `service_score` / `total_score`（number，存储字段，
+`cost_score` / `delivery_score` / `service_score` / `hse_score` / `total_score`（number，存储字段，
 由算分 flow 写入，供看板使用）、`grade`（`a` / `b` / `c` / `d`）、`status`（见 §5.7）、
 `otd_rate` / `lot_pass_rate`（percent）、`ppm`（number）、`ack_on_time_rate`（percent，
 ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result`。自动指标由

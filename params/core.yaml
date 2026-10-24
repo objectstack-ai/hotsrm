@@ -55,6 +55,15 @@ perf_cycle:
   used_in: [QP-01 6.7.1, QP-01 附录 A]
   system: 考评生成 flow 按供应商所供最高物资类别（srm_category.material_class）取周期（核心 03 §10，v0.5）
 
+perf_kpi_weights:
+  label: 绩效指标权重（按指标编码）
+  unit: "%"
+  example: { LOT_PASS: 20, PPM: 10, OTD: 15, PLAN_FULFIL: 10, PRICE: 20, SERVICE: 10, SAFETY_ENV: 15 }
+  format: "{}%"
+  display: 批次合格率 {LOT_PASS}%，来料不良 PPM {PPM}%，交付准时率 {OTD}%，计划完成率 {PLAN_FULFIL}%，价格竞争力 {PRICE}%，响应与配合 {SERVICE}%，安全环保 {SAFETY_ENV}%
+  used_in: [QP-01 附录 D]
+  system: 绩效指标库 srm_kpi 的示例数据（src/core/data）；客户环境由采购总监在指标库维护，启用指标权重合计 100%（核心 02 §4.7）
+
 perf_grade_min:
   label: 绩效等级下限分
   unit: 分
