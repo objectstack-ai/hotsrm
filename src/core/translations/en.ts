@@ -365,6 +365,10 @@ export const en: TranslationData = {
             rejected: 'Rejected',
           },
         },
+        duplicate_check: {
+          label: 'Duplicate Check',
+          options: { pass: 'Passed', duplicate: 'Duplicate', blacklisted: 'Blacklisted', reapply: 'Re-admission' },
+        },
         reviewer: { label: 'Reviewer' },
         approval_status: { label: 'Approval Result', options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' } },
         approved_date: { label: 'Approved Date' },

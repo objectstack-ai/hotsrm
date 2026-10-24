@@ -105,6 +105,8 @@ export const AdmissionApprovalFlow: Automation.Flow = {
                       config: {
                         objectName: 'srm_supplier_category',
                         filter: { supplier: cel`record.supplier`, category: cel`categoryId` },
+                        // 按条件更新要声明 multi；供应商 + 品类唯一，实际只有一条
+                        multi: true,
                         fields: { status: 'qualified', approved_date: cel`today()` },
                       },
                     },

@@ -650,7 +650,7 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 | 值 | 标签 | kind | 允许跳转到 |
 |---|---|---|---|
 | `potential` ★ | 潜在 | open | `qualifying`、`eliminated` |
-| `qualifying` | 准入中（准入申请进入资料审核时） | open | `qualified`、`potential`（准入未通过） |
+| `qualifying` | 准入中（准入申请进入资料审核时） | open | `qualified`、`potential`（准入未通过）、`eliminated`（淘汰后重新准入未通过，回到淘汰） |
 | `qualified` ★ | 合格（只有存量导入的供应商可以建档即合格） | won | `frozen`、`eliminated`、`blacklisted` |
 | `frozen` | 冻结 | lost | `qualified`、`eliminated`、`blacklisted` |
 | `eliminated` | 淘汰 | lost | `qualifying`（只能经新的准入申请重新走全流程，不能直接恢复）、`blacklisted` |

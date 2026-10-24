@@ -88,6 +88,13 @@ v0.1 只有内部登记：品类经理在工作台新建准入申请（`source =
 受邀供应商在门户填申请（`source = invited`）；公开表单（`self_registered`）待平台
 （01 FR-201），只收文字信息，附件在供应商注册账户、登录门户后上传。现场审核对象在 v0.4 才有，之前由 SQE 在申请上勾选 `audit_passed` 并上传报告。
 
+内部登记时申请直接关联已登记的供应商（身份标识已由供应商上的唯一约束查重），所以 v0.3 的受理
+flow 按所关联供应商的状态写 `duplicate_check`：`potential` → `pass`；`eliminated` → `reapply`；
+`blacklisted` → 申请直接 `rejected` 并通知申请人，供应商状态不动；其他状态在新建申请时就被校验规则
+`supplier_admissible` 拦下，不会出现 `duplicate`。步骤 2「建档」与 `srm_application_accept` 随门户申请
+（v0.6）加入，之前受理时供应商直接进入 `qualifying`、申请进入 `doc_review`。重新准入批准后按本次申请
+品类恢复或新建品类资格，没再申请的品类保持淘汰时的 `suspended`。
+
 ```mermaid
 sequenceDiagram
   autonumber

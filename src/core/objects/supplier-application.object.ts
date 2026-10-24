@@ -3,6 +3,7 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 准入申请（02 §4.2、§5.2）。v0.1 由内部人员为已登记的潜在供应商发起：没有公开表单和门户，
 // 所以申请直接关联供应商，申请品类用多值 lookup；现场审核分支随供应商审核对象加入（v0.2）。
+// v0.3 起淘汰供应商可以重新申请（沿用旧档），黑名单供应商的申请由受理 flow 自动驳回（FR-208、BR-02）。
 export const SupplierApplication = ObjectSchema.create({
   name: 'srm_supplier_application',
   label: '准入申请',
@@ -42,6 +43,19 @@ export const SupplierApplication = ObjectSchema.create({
         { label: '未通过', value: 'rejected', kind: 'lost' },
       ],
     }),
+    // 受理 flow 写入的查重结论，只读。内部登记时供应商已由唯一约束查重，所以不会出现 duplicate；
+    // 公开表单 / 门户申请（v0.6）不预先关联供应商，才会按身份标识命中在册供应商
+    duplicate_check: Field.select({
+      label: '查重结论',
+      group: 'review',
+      readonly: true,
+      options: [
+        { label: '通过', value: 'pass' },
+        { label: '重复', value: 'duplicate' },
+        { label: '黑名单', value: 'blacklisted' },
+        { label: '淘汰后重新准入', value: 'reapply' },
+      ],
+    }),
     reviewer: Field.user({ label: '初审人', group: 'review' }),
     // 审批节点写入的审批结论，只读
     approval_status: Field.select({
@@ -73,13 +87,14 @@ export const SupplierApplication = ObjectSchema.create({
       },
     },
     {
-      // 只有潜在或已淘汰的供应商能发起准入（02 §5.1：淘汰后只能经新的准入申请重新走全流程）
+      // 只有潜在或已淘汰的供应商能发起准入（02 §5.1：淘汰后只能经新的准入申请重新走全流程）。
+      // 黑名单供应商的申请放行建档，由受理 flow 自动驳回并留下记录（BR-02）
       name: 'supplier_admissible',
       type: 'script',
       severity: 'error',
       events: ['insert'],
       message: '只有「潜在」或「淘汰」状态的供应商可以发起准入申请',
-      condition: P`has(record.supplier.status) && record.supplier.status != 'potential' && record.supplier.status != 'eliminated'`,
+      condition: P`has(record.supplier.status) && record.supplier.status != 'potential' && record.supplier.status != 'eliminated' && record.supplier.status != 'blacklisted'`,
     },
     {
       // 评审要有初审人：第 1 级审批人取自该字段
