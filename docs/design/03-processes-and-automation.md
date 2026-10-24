@@ -86,7 +86,7 @@
 v0.1 只有内部登记：品类经理在工作台新建准入申请（`source = internal`），下图中的公开
 表单、开通门户、门户补资料三步跳过，`reviewer` 默认取创建人所在品类的品类经理。v0.6 起
 受邀供应商在门户填申请（`source = invited`）；公开表单（`self_registered`）待平台
-（01 FR-201），只收文字信息，附件在供应商注册账户、登录门户后上传。现场审核对象在 v0.4 才有，之前由 SQE 在申请上勾选 `audit_passed` 并上传报告。
+（01 FR-201），只收文字信息，附件在供应商注册账户、登录门户后上传。现场审核对象随 v0.4 加入，审核结论由 flow 写回申请。
 
 内部登记时申请直接关联已登记的供应商（身份标识已由供应商上的唯一约束查重），所以 v0.3 的受理
 flow 按所关联供应商的状态写 `duplicate_check`：`potential` → `pass`；`eliminated` → `reapply`；
@@ -134,9 +134,9 @@ sequenceDiagram
 | 2 建档 | 品类经理把申请推进到 `doc_review`（人工确认后，防止灌水污染主数据） | flow `srm_application_accept`：`duplicate_check == 'pass'` 时新建 `potential` 供应商与主联系人并回填 `supplier`；`reapply` 时沿用旧档；供应商 `potential / eliminated → qualifying`；`submitted` 阶段只有申请记录，不建主数据 |
 | 3 开通门户 | 品类经理 / 管理员（v0.6） | 邀请主联系人加入组织并开通门户（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）；v0.1–v0.5 跳过 |
 | 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，通知联系人）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
-| 5 现场审核 | `risk_class == 'high'` | v0.4 起：SQE 建供应商审核记录（`audit_type = admission`），结果为通过或有条件通过时，flow 把申请的 `audit_passed` 置为 true；v0.4 前由 SQE 直接勾选并上传 `audit_report`。条件校验：`risk_class == 'high' && audit_passed == false` 时申请不得进入 `admission_review`（FR-204） |
+| 5 现场审核 | `risk_class == 'high'` | SQE 建供应商审核记录（`audit_type = admission`，关联本次申请），审核后录入总分、最低审核块得分、结论与问题项（结论按 `audit_score_thresholds` 校验，02 §4.2）。审核完成或改了结论时，flow `srm_audit_admission_apply` 把结论写回申请：`audit_result` 记结论，通过或有条件通过时 `audit_passed = true`，否则为 false，并通知初审人；已批准或已驳回的申请不再写。校验规则 `audit_before_review`：`risk_class == 'high' && audit_passed != true` 时申请不得进入 `admission_review`（FR-204）。申请上的勾选框只由 flow 写，品类经理改不了 |
 | 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'class_a'` 或 `risk_class == 'high'` 时第 2 级改为采购总监、`srm_quality_manager` 并行会签（`per_group`：两个岗位各一人通过，同岗位多人时任一人即可；任一人驳回即驳回）。校验规则拦截提交人 = 审批人（平台没有「不可自审」选项，objectstack#25446）。驳回 → 申请回 `doc_review` 并通知 |
-| 7 批准后 | 审批通过 | 申请→`approved`，写入 `cycle_days`；供应商 `qualifying → qualified`；按申请品类建 `srm_supplier_category`（审核结论为有条件通过时为 `trial`，否则 `qualified`）；通知供应商。ERP 建档与 `erp_vendor_code` 回写为预留集成点（06 §1） |
+| 7 批准后 | 审批通过 | 申请→`approved`，写入 `cycle_days`；供应商 `qualifying → qualified`；按申请品类建 `srm_supplier_category`（申请的 `audit_result` 为有条件通过时为 `trial`，否则 `qualified`，WI-01 6.6.2）；通知供应商。ERP 建档与 `erp_vendor_code` 回写为预留集成点（06 §1） |
 | 8 未通过 | 终止 | 申请→`rejected`；供应商 `qualifying → potential`（`reapply` 的旧档回 `eliminated`）；v0.6 起回收门户账号 |
 
 ## 4. P3 寻源：询价 → 比价 → 定标（v0.7）
@@ -325,13 +325,28 @@ stateDiagram-v2
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 生成 | 交付记录写入（新建或修改，月度导入是 upsert），**变成** `inspection_result == 'fail'` 且 `severity in ['critical','major']`；或审核问题项经「转整改单」screen flow；客户投诉、制程等来源由 SQE 手工新建 | flow `srm_scar_create`：同一条交付记录已有整改单时不再开（重复导入不重复开单）；新建整改单，`sqe` 取物料品类的 SQE，`containment_due = 创建时间 + scar_containment_hours`、`final_due = 创建日期 + scar_final_days`（参数见 `params/core.yaml`，由字段默认值算好）；通知 SQE，品类没有 SQE 时通知质量经理指派（BR-15）；供应商 `quality` 联系人的通知等 objectstack#25444 或 v0.6 门户。`minor` 不合格只计入绩效，不自动开单。v0.6 前供应商的回复由 SQE 代填 |
+| 1 生成 | 交付记录写入（新建或修改，月度导入是 upsert），**变成** `inspection_result == 'fail'` 且 `severity in ['critical','major']`；或审核问题项经「转整改单」screen flow；客户投诉、制程等来源由 SQE 手工新建 | flow `srm_scar_create`：同一条交付记录已有整改单时不再开（重复导入不重复开单）；新建整改单，`sqe` 取物料品类的 SQE，`containment_due = 创建时间 + scar_containment_hours`、`final_due = 创建日期 + scar_final_days`（参数见 `params/core.yaml`，由字段默认值算好）；通知 SQE，品类没有 SQE 时通知质量经理指派（BR-15）；供应商 `quality` 联系人的通知等 objectstack#25444 或 v0.6 门户。`minor` 不合格只计入绩效，不自动开单。审核问题项由 SQE 或质量经理在已完成的审核上点「转整改单」（`srm_audit_finding_to_scar`）：还没转出的严重、一般不符合项各开一张（`source = audit`，严重 → `critical`、一般 → `major`，负责 SQE 为操作人），整改单回填到问题项，重复点击不重复开单；观察项不转。v0.6 前供应商的回复由 SQE 代填 |
 | 2 临时措施 | 供应商提交 D3（v0.6 前 SQE 代填 D3 后把状态改为「已提交临时措施」） | 状态→`containment_submitted`；D3 必填。SQE 认为临时措施不够时退回到 `open`，退回意见写入 `sqe_comment`（必填） |
 | 3 根因与措施 | 供应商提交 D4–D7（v0.6 前 SQE 代填后改状态） | 状态→`action_submitted`；flow `srm_scar_review` 发起 `approval` 节点：`field` 审批人 = `sqe`（没填时交给质量经理），审批期间锁定记录。SQE 用审批的「驳回」退回：状态回到 `containment_submitted`，审批意见写入 `sqe_comment`（FR-604），改好后再次提交重新审核。平台的「退回修改」窗口只能原样回到审批节点、中间改不了状态，所以退回用驳回表达；驳回时没写意见的不算数，提醒 SQE 后重新审核 |
 | 4 效果验证 | SQE 审核通过 | 状态→`verifying`；SQE 跟踪后续批次，确认有效后关闭（D8），或验证不通过退回 `action_submitted` 重新审核 |
 | 5 逾期升级 | 追赶式扫描 `srm_scar_overdue_sweep`（每小时；外部心跳见 §2.3 R3） | 超过 `containment_due` 仍为 `open`、或超过 `final_due` 仍未到 `verifying`：`is_overdue = true`，通知负责 SQE 与质量经理（SQE 主管，FR-605）；标志保留到关闭，供「SCAR 按期关闭率」统计；提醒供应商等 objectstack#25444 或 v0.6 |
 | 5a 复发重开 | SQE 把已关闭的整改单改回 `open` | flow `srm_scar_reopen`：期限按重开时间重算，逾期标志清掉，通知负责 SQE |
 | 6 索赔 | SQE 填写 `claim_amount`，`claim_status → proposed` | 供应商在门户接受或提出异议（v0.6 前线下确认后由 SQE 记录）；接受后（`supplier_accepted`）由财务在 ERP 扣款，应付会计回来标记 `settled`。SRM 不生成扣款 |
+
+**供应商审核与年度审核计划**（v0.4，FR-607；体系文件 WI-01）：准入审核见 §3 第 5 步；年度审核与专项审核由 SQE
+建审核记录，审核后录入结论与问题项，不符合项经「转整改单」进入上面的整改流程。年度计划由
+`srm_audit_plan_generate` 按供应商所供品类中最高的物资类别（`material_class`，P-D2）定复审频次，
+频次取 `annual_audit_frequency`（示例：A 类 12 个月、B 类 24 个月、C 类不定期、不生成）：
+
+| 步骤 | 动作 |
+|---|---|
+| 1 选供应商 | 先 A 类品类、再 B 类品类，逐个找状态为合格或试供的品类资格；供应商本身不是 `qualified`（冻结、淘汰等）的不排计划。同时供 A、B 两类的按 A 类频次 |
+| 2 判到期 | 上次完成的审核（任何类型）日期 + 频次 ≤ 本年 12 月 31 日即本年到期；从没审核过的视为已到期 |
+| 3 防重 | 供应商已有「计划中」的审核，或已有本年度（`plan_year`）生成的年度审核（不论完成还是取消）时跳过，重复运行不重复建（§2.3 R2） |
+| 4 生成 | 新建 `audit_type = annual`、`status = planned` 的审核，计划日期 = 到期日（已过的取今天），审核员默认品类的 SQE；SQE 按日历视图（05 §2）排程 |
+| 5 取消 | 不需要现场复审的（WI-01 6.9 的其他 B 类供应商、经批准以资料审核代替一次复审）由质量部门取消并写明原因，本年度不再生成 |
+
+每月 1 日跑一次，年初那次生成全年计划，之后各次补上漏掉的与年中新到期的。
 
 ## 9. P8 对账与结算（不做，留在 ERP）
 
@@ -379,7 +394,8 @@ stateDiagram-v2
 > v0.1 先实现其中的一部分：`srm_certificate_expire_sweep` 每日一次，把证书状态对齐到已过期 / 即将到期（30 天内）/
 > 有效（有效期被延长时恢复）；`srm_supplier_qualification_recalc` 在证书状态或「必备」标志变化后重算
 > `qualification_alert`。到期提醒通知随 v0.1 收尾加入；`is_mandatory` 按品类必备资质自动写入随 v0.2；「经 SQE 核验才解除」
-> 随 v0.4 供应商审核加入；在此之前由内部人员维护证书与「必备」标志。
+> 随门户（v0.6）加入：门户上线前证书由 SQE 自己录入，录入即核验，要求再勾一次「已核验」没有意义；门户上线后证书由供应商上传，
+> 改证书时 `verified` 复位，经 `srm_certificate_verify` 核验后才解除（2026-10-24 随 v0.4 Q3 核对后改期）。
 
 ## 12. 审批矩阵
 
@@ -440,6 +456,8 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_scar_review` | record_change：状态→`action_submitted` | 整改单 | v0.4 |
 | `srm_scar_reopen` | record_change：状态 `closed`→`open` | 整改单 | v0.4 |
 | `srm_scar_overdue_sweep` | schedule：每小时（api 心跳等 objectstack#25675） | 整改单 | v0.4 |
+| `srm_audit_admission_apply` | record_change：准入审核完成或改结论 | 供应商审核 → 准入申请 | v0.4 |
+| `srm_audit_plan_generate` | schedule：每月 1 日 02:30（追赶式；年初那次生成全年计划） | 供应商审核 | v0.4 |
 | `srm_performance_generate` | schedule：每月 1 日（按类别周期） | 考评单 | v0.5 |
 | `srm_performance_publish` | record_change：状态→`reviewing` | 考评单 → 供应商 | v0.5 |
 | `srm_performance_apply` | record_change：状态→`published` | 考评单 → 整改单、处置单 | v0.5 |
@@ -466,7 +484,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_contract_submit` 提交审批 | 合同（草稿） | 品类经理、采购主管 | v0.3 |
 | `srm_contract_activate` 确认生效 | 合同（签署中） | 采购员、采购主管、品类经理 | v0.3 |
 | `srm_change_submit` 提交变更申请 | 门户：公司资料（v0.6 前内部在供应商档案下直接新建变更单） | 门户管理员 | v0.6 |
-| `srm_audit_finding_to_scar` 转整改单 | 供应商审核 | SQE | v0.4 |
+| `srm_audit_finding_to_scar` 转整改单 | 供应商审核（已完成） | SQE、质量经理 | v0.4 |
 | `srm_score_submit` 提交评分 | 考评单 | 评分人 | v0.5 |
 | `srm_appeal_submit` 申诉 | 门户：绩效 | 门户管理员 | v0.6 |
 | `srm_portal_enable` 开通门户 | 供应商联系人 | `srm_supplier_admin` | v0.6 |
