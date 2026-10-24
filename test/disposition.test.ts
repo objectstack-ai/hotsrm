@@ -3,8 +3,8 @@ import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
 import { Category, Supplier, SupplierCategory, SupplierDisposition } from '../src/core/objects';
 
-// v0.3 C3 供应商处置单（02 §4.2、§5.1，03 §5、§12，FR-208，BR-11）：品类经理发起 → 采购总监 →
-// 淘汰 / 黑名单 / 解除黑名单再经总经理 → 拉入黑名单最后由内控会签 → 执行。
+// v0.3 C3 供应商处置单（02 §4.2、§5.1，03 §5、§12，FR-208，BR-11）：品类经理发起（发起即品类经理一级；
+// 采购主管发起时先经品类经理）→ 采购总监 → 淘汰 / 黑名单 / 解除黑名单再经总经理 → 拉入黑名单最后由内控会签 → 执行。
 // 测试数据全部在这里生成（示例公司名、示例品类），不依赖外部样本。
 describe('supplier disposition', () => {
   let stack: VerifyStack;
@@ -60,6 +60,8 @@ describe('supplier disposition', () => {
 
   const pending = async (recordId: string) =>
     (await stack.rows('sys_approval_request', { record_id: recordId })).find((r) => r.status === 'pending');
+  // 当前这一级的待审批人（按岗位解析出的人）
+  const pendingApprovers = async (recordId: string) => String((await pending(recordId))?.pending_approvers ?? '');
   const decide = async (as: string, recordId: string, verdict: 'approve' | 'reject' | 'revise', comment: string = verdict) => {
     const req = await pending(recordId);
     expect(req, 'no pending approval request').toBeTruthy();
@@ -73,6 +75,7 @@ describe('supplier disposition', () => {
   let gm: { token: string; id: string };
   let compliance: { token: string; id: string };
   let buyer: { token: string; id: string };
+  let buyerLead: { token: string; id: string };
   let otherDirector: { token: string; id: string };
 
   beforeAll(async () => {
@@ -82,6 +85,7 @@ describe('supplier disposition', () => {
     gm = await person('srm_general_manager');
     compliance = await person('srm_procurement_compliance');
     buyer = await person('srm_buyer');
+    buyerLead = await person('srm_buyer_lead');
     // 审批节点开启时按岗位解析审批人，第二位采购总监要提前任命
     otherDirector = await person('srm_procurement_director');
   });
@@ -95,11 +99,15 @@ describe('supplier disposition', () => {
     const freeze = await submit(manager.token, { supplier: supplier.id, action: 'freeze' });
     expect(await disposition(freeze.id)).toMatchObject({ status: 'in_review', approval_status: 'pending', scope: 'all' });
     expect(await supplierStatus(supplier.id)).toBe('qualified');
+    // 品类经理发起即是品类经理一级，直接到采购总监
+    expect(await pendingApprovers(freeze.id)).toContain(director.id);
+    expect(await pendingApprovers(freeze.id)).not.toContain(manager.id);
 
     await decide(director.token, freeze.id, 'approve');
     const frozen = await disposition(freeze.id);
     expect(frozen).toMatchObject({ status: 'applied', director_approver: director.id });
     expect(frozen.applied_at).toBeTruthy();
+    expect(frozen.category_approver ?? null).toBeNull();
     expect(await supplierStatus(supplier.id)).toBe('frozen');
     expect(await qualificationStatus(supplier)).toEqual({ qualified: 'suspended', trial: 'suspended', suspended: 'suspended' });
     expect(await row(SupplierCategory.name, supplier.qualifications.trial)).toMatchObject({
@@ -229,6 +237,59 @@ describe('supplier disposition', () => {
     expect(await supplierStatus(supplier.id)).toBe('qualified');
     await decide(gm.token, eliminate.id, 'approve');
     expect(await disposition(eliminate.id)).toMatchObject({ status: 'applied', gm_approver: gm.id });
+  });
+
+  it('adds the category manager level when a buyer lead raises the disposition (03 §12)', async () => {
+    const supplier = await qualifiedSupplier();
+    const freeze = await submit(buyerLead.token, { supplier: supplier.id, action: 'freeze' });
+    expect(await pendingApprovers(freeze.id)).toContain(manager.id);
+    expect(await pendingApprovers(freeze.id)).not.toContain(director.id);
+
+    await decide(manager.token, freeze.id, 'approve');
+    expect(await disposition(freeze.id)).toMatchObject({ status: 'in_review', approval_status: 'pending', category_approver: manager.id });
+    expect(await supplierStatus(supplier.id)).toBe('qualified');
+    expect(await pendingApprovers(freeze.id)).toContain(director.id);
+
+    await decide(director.token, freeze.id, 'approve');
+    expect(await disposition(freeze.id)).toMatchObject({ status: 'applied', category_approver: manager.id, director_approver: director.id });
+    expect(await supplierStatus(supplier.id)).toBe('frozen');
+  });
+
+  it('lets the category manager send a buyer lead disposition back and the buyer lead resubmit it', async () => {
+    const supplier = await qualifiedSupplier();
+    const freeze = await submit(buyerLead.token, { supplier: supplier.id, action: 'freeze', reason: '质量问题' });
+    const first = await decide(manager.token, freeze.id, 'revise', '请写明不合格批次');
+    expect((await disposition(freeze.id)).approval_status).toBe('returned');
+
+    await stack.hooks.run(SupplierDisposition.name, 'update', { id: freeze.id, reason: '示例批次连续两批不合格' }, { as: buyerLead.token });
+    const res = await stack.apiAs(buyerLead.token, 'POST', `/approvals/requests/${first.id}/resubmit`, {});
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(await pendingApprovers(freeze.id)).toContain(manager.id);
+    await decide(manager.token, freeze.id, 'approve');
+    await decide(director.token, freeze.id, 'reject', '先发整改单');
+    expect(await disposition(freeze.id)).toMatchObject({ status: 'rejected', reject_reason: '先发整改单', reason: '示例批次连续两批不合格' });
+    expect(await supplierStatus(supplier.id)).toBe('qualified');
+  });
+
+  it('does not count the category manager approving again on a later level (BR-11)', async () => {
+    const cmGm = await person('srm_category_manager', 'srm_general_manager');
+    const supplier = await qualifiedSupplier();
+    const blacklist = await submit(buyerLead.token, { supplier: supplier.id, action: 'blacklist' });
+    await decide(cmGm.token, blacklist.id, 'approve');
+    await decide(director.token, blacklist.id, 'approve');
+    await decide(cmGm.token, blacklist.id, 'approve');
+    expect(await disposition(blacklist.id)).toMatchObject({ status: 'in_review', approval_status: 'pending', category_approver: cmGm.id });
+    expect(await disposition(blacklist.id)).not.toHaveProperty('gm_approver', cmGm.id);
+    await decide(gm.token, blacklist.id, 'approve');
+    await decide(compliance.token, blacklist.id, 'approve');
+    expect(await disposition(blacklist.id)).toMatchObject({
+      status: 'applied',
+      category_approver: cmGm.id,
+      director_approver: director.id,
+      gm_approver: gm.id,
+      compliance_approver: compliance.id,
+    });
+    expect(await supplierStatus(supplier.id)).toBe('blacklisted');
   });
 
   it('refuses actions the supplier status does not allow', async () => {

@@ -388,7 +388,8 @@ upsert 写入，结构不变。
 （`freeze` / `unfreeze` / `eliminate` / `blacklist` / `remove_blacklist`）、
 `scope`（`all` 全部品类 / `category` 指定品类，只有冻结和解冻可以指定品类）、`categories`（多值 lookup 品类，
 指定品类时必填）、`reason`（必填）、`effective_date`（默认当天）、`status`（`in_review` 审批中 / `applied` 已执行 /
-`rejected` 已驳回）、`approval_status`（审批节点写入）、只读的 `director_approver` / `gm_approver` /
+`rejected` 已驳回）、`approval_status`（审批节点写入）、只读的 `category_approver`（发起人不是品类经理时才有
+这一级，[03 §5](./03-processes-and-automation.md#5-p2-信息变更与供应商处置)）/ `director_approver` / `gm_approver` /
 `compliance_approver`、`reject_reason`、`applied_at`。
 
 新建即进入审批，供应商、动作、范围和品类只在新建时填写，原因和生效日期在被退回修改期间可改。审批通过即执行，

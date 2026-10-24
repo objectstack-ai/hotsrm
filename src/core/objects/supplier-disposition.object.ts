@@ -1,7 +1,7 @@
 import { P, cel } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
-// 供应商处置单（02 §4.2、§5.1，03 §5，FR-208）：品类经理在供应商档案下新建，新建即进入审批
+// 供应商处置单（02 §4.2、§5.1，03 §5，FR-208）：品类经理（或采购主管）在供应商档案下新建，新建即进入审批
 // （srm_disposition_approval），通过后由 srm_disposition_apply 以系统身份改供应商状态和品类资格。
 // 动作与供应商当前状态的合法组合在新建时校验，与供应商状态机（02 §5.1）一致；同一家供应商同时
 // 只能有一张审批中的处置单，免得两张单子审完后互相覆盖。
@@ -93,6 +93,8 @@ export const SupplierDisposition = ObjectSchema.create({
         { label: '已撤回', value: 'recalled' },
       ],
     }),
+    // 发起人不是品类经理时才有品类经理一级；品类经理发起时为空，发起人即是这一级
+    category_approver: Field.user({ label: '品类经理审批人', group: 'review', readonly: true }),
     director_approver: Field.user({ label: '采购总监审批人', group: 'review', readonly: true }),
     gm_approver: Field.user({ label: '总经理审批人', group: 'review', readonly: true }),
     compliance_approver: Field.user({ label: '内控会签人', group: 'review', readonly: true }),

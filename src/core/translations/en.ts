@@ -329,6 +329,7 @@ export const en: TranslationData = {
           label: 'Approval Result',
           options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', returned: 'Returned for Revision', recalled: 'Recalled' },
         },
+        category_approver: { label: 'Category Manager Approver' },
         director_approver: { label: 'Procurement Director Approver' },
         gm_approver: { label: 'General Manager Approver' },
         compliance_approver: { label: 'Compliance Countersigner' },
