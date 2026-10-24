@@ -46,6 +46,31 @@ export const SupplierViews = defineView({
       ],
       sort: [{ field: 'supplier_no', order: 'asc' }],
     },
+    // 黑名单名录（FR-208，v0.5）：拉黑日期、原因、处置单与禁入期满日；期满前提醒，解除仍走处置单审批
+    blacklist: {
+      label: '黑名单名录',
+      type: 'grid',
+      data,
+      columns: [
+        { field: 'supplier_no' },
+        { field: 'name' },
+        { field: 'country' },
+        { field: 'blacklisted_on' },
+        { field: 'blacklist_until' },
+        { field: 'blacklist_reason' },
+        { field: 'blacklist_disposition' },
+      ],
+      filter: [{ field: 'status', operator: 'equals', value: 'blacklisted' }],
+      sort: [{ field: 'blacklisted_on', order: 'desc' }],
+    },
+    // 有未关闭风险事件的供应商（v0.5）
+    open_risk: {
+      label: '有未关闭风险',
+      type: 'grid',
+      data,
+      columns: [{ field: 'supplier_no' }, { field: 'name' }, { field: 'status' }, { field: 'open_risk_event_count' }, { field: 'qualification_alert' }],
+      filter: [{ field: 'open_risk_event_count', operator: 'greater_than', value: 0 }],
+    },
     // 同一批导入里的两位主联系人校验规则拦不住（objectstack#25477），在这里人工处理
     primary_contact_conflict: {
       label: '主联系人重复',

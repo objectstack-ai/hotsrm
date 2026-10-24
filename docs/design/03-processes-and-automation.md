@@ -236,6 +236,13 @@ ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预�
 - 执行以系统身份改供应商状态和品类资格（结果见 [02 §4.2](./02-domain-model.md#42-生命周期) 处置单），
   处置单置为「已执行」，通知发起人并提醒在 ERP 同步冻结标志；驳回不改供应商，记下驳回意见。
 - 通知供应商与门户账号回收随门户（v0.6）；冻结后不能新建合同由合同的校验规则负责（v0.3 C1）。
+- 处置单草稿（v0.5）：高风险事件（§11）和绩效结果应用（§10 第 6 步）由 flow 生成草稿，不直接发起审批。品类经理或
+  采购主管在草稿上点「提交审批」（screen flow `srm_disposition_submit`），审批 flow 在草稿变为审批中时发起，发起人
+  是提交人（`submitted_by`；手工新建的处置单是新建人），品类经理一级的判断与 BR-11 比对都按发起人；不需要处置时点
+  「作废」（`srm_disposition_cancel`，写明理由）。提交时再校验一次动作与供应商当前状态、是否已有审批中的处置单。
+- 黑名单名录（v0.5）：拉入黑名单执行时把拉黑日期、禁入期满日（拉黑日期 + `blacklist_years` 年）、处置单和原因写到
+  供应商上，「黑名单名录」视图列出全部黑名单供应商。`srm_blacklist_expiry_notice` 在期满前 30 天和当天通知拉黑处置单
+  的发起人和供应商各品类的品类经理；期满不自动解除，解除仍发起「解除黑名单」处置单，按 §12 审批。
 
 ## 6. P4 合同审批、签署与到期（v0.3）
 
@@ -391,7 +398,14 @@ stateDiagram-v2
 | 供应商修改证书 | 证书的编号、有效期或附件被门户修改 | flow 把 `verified` 重置为 false，通知 SQE 重新核验 |
 | 资质恢复 | 证书或品类资格写入后的记录触发（`srm_supplier_qualification_recalc`） | 先按该供应商全部品类的 `mandatory_cert_types` 重算每张证书的 `is_mandatory`；再重新计算：每一种必备资质类型都有 `status == 'valid'` 且 `verified == true` 的证书时，`qualification_alert = false`（v0.5 起关闭对应风险事件）。只上传新证书而未经 SQE 核验，不会解除异常 |
 | 风险事件处理 | 手工登记或系统生成（v0.5） | `high` 级事件通知品类经理并生成处置单草稿（冻结）；关闭时填写处理结论 |
+| 资质风险事件 | `srm_supplier_qualification_recalc`（证书状态或「必备」标志变化后） | 这张证书是必备证书且变为已过期时，新建 `qualification` 类、`source = system`、中风险的风险事件，`certificate` 指回证书；这张证书已有未关闭的事件时不再建。资质异常解除时关闭该供应商未关闭的系统资质事件，写处理结论；手工登记的事件不动 |
 | 外部风险 | `schedule`：每周一 04:00（客户驱动主题） | flow 按批 `loop` 合格供应商，`http` 节点调用企业信息服务；新出现的经营异常、失信、重大诉讼、股权变更按 `external_ref` 去重后建风险事件（FR-903）。有客户要求时立项 |
+
+> 风险事件处理（v0.5，`srm_risk_event_apply`）：事件新建为 `high` 或改为 `high`、还没有处置单时触发。供应商为合格且没有
+> 审批中的处置单时生成冻结（全部品类）草稿，原因写事件编号与描述；已有冻结草稿时不再建，事件指向那张草稿（多个高风险
+> 事件合并到一张处置单）；供应商不是合格状态或已有审批中的处置单时只通知。通知供应商各品类的品类经理，品类都没有品类
+> 经理时通知全部品类经理。草稿由品类经理核实后提交或作废（§5）。风险事件由品类经理、SQE 登记和处理，内部其余岗位只读
+> （04 §2.3）。
 
 > v0.1 先实现其中的一部分：`srm_certificate_expire_sweep` 每日一次，把证书状态对齐到已过期 / 即将到期（30 天内）/
 > 有效（有效期被延长时恢复）；`srm_supplier_qualification_recalc` 在证书状态或「必备」标志变化后重算
@@ -446,7 +460,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_admission_approval` | record_change：状态→`admission_review` | 准入申请 | v0.1 |
 | `srm_certificate_expiry_notice` | time_relative：`valid_to` −30 / −15 / −7 天 | 资质证书 | v0.1 |
 | `srm_certificate_expire_sweep` | schedule：每日 01:00（追赶式） | 资质证书 | v0.1 |
-| `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商 | v0.1 |
+| `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商（v0.5 起 → 风险事件） | v0.1 |
 | `srm_change_approval` / `srm_change_apply` | record_change：变更单新建 / 子 flow | 变更单 → 供应商、银行账户、联系人 | v0.2 |
 | `srm_contract_approval` | record_change：状态→`in_review` | 合同 | v0.3 |
 | `srm_contract_recalled` | record_change：审批中的合同审批结论→`recalled` | 合同 | v0.3 |
@@ -463,7 +477,8 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_performance_generate` | schedule：每月 1 日（按类别周期） | 考评单 | v0.5 |
 | `srm_performance_publish` | record_change：状态→`reviewing` | 考评单 → 供应商 | v0.5 |
 | `srm_performance_apply` | record_change：状态→`published` | 考评单 → 整改单、处置单 | v0.5 |
-| `srm_risk_event_apply` | record_change：风险事件新建 | 风险事件 → 处置单 | v0.5 |
+| `srm_risk_event_apply` | record_change：风险事件新建或改为高风险 | 风险事件 → 处置单（草稿） | v0.5 |
+| `srm_blacklist_expiry_notice` | time_relative：供应商 `blacklist_until` −30 / 0 天 | 供应商（黑名单） | v0.5 |
 | `srm_invitation_send` / `srm_invitation_expire_sweep` | record_change / schedule | 门户邀请 | v0.6 |
 | `srm_portal_position_backfill` | record_change：供应商 `portal_position` 写入 | 供应商 → 带 `portal_position` 的单据 | v0.6 |
 | `srm_single_source_approval` | record_change：状态→`approval_pending` | 寻源单 | v0.7 |
@@ -487,6 +502,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_contract_activate` 确认生效 | 合同（签署中） | 采购员、采购主管、品类经理 | v0.3 |
 | `srm_change_submit` 提交变更申请 | 门户：公司资料（v0.6 前内部在供应商档案下直接新建变更单） | 门户管理员 | v0.6 |
 | `srm_audit_finding_to_scar` 转整改单 | 供应商审核（已完成） | SQE、质量经理 | v0.4 |
+| `srm_disposition_submit` 提交审批 / `srm_disposition_cancel` 作废 | 处置单（草稿） | 品类经理、采购主管 | v0.5 |
 | `srm_score_submit` 提交评分 | 考评单 | 评分人 | v0.5 |
 | `srm_appeal_submit` 申诉 | 门户：绩效 | 门户管理员 | v0.6 |
 | `srm_portal_enable` 开通门户 | 供应商联系人 | `srm_supplier_admin` | v0.6 |

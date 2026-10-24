@@ -104,6 +104,8 @@ R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — �
 
 表中未列的权限集：`srm_executive`、`srm_auditor` 对全部对象只读（报价同样受封标约束）；
 `srm_legal` 对合同与明细读改（不新建）；`srm_iqc` 对检验增改；绩效评分只经「提交评分」screen flow。
+风险事件的 OWD 暂为 `public_read_write`（系统生成的事件要由品类经理、SQE 互相接手，objectstack#25470），来源、相关证书、
+处置单三个字段只经 F 写入（v0.5）。
 
 **`controlled_by_parent` 的写入规则**：子记录（联系人、证书、银行账户、合同明细、报价
 明细）的修改要求对父记录有编辑权。所以门户对供应商、报价单都授予编辑权，再用字段级

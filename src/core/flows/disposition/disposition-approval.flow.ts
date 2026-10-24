@@ -1,7 +1,8 @@
 import { P, cel } from '@objectstack/spec';
 import type * as Automation from '@objectstack/spec/automation';
 
-// 供应商处置审批（03 §5、§12，FR-208，BR-11）：持 srm_supplier_admin 的岗位新建处置单即发起审批。
+// 供应商处置审批（03 §5、§12，FR-208，BR-11）：持 srm_supplier_admin 的岗位新建处置单即发起审批；
+// flow 生成的处置单草稿在「提交审批」（srm_disposition_submit）后发起，发起人是提交人（submitted_by）。
 // 第 1 级品类经理：发起人是品类经理时发起即是这一级；不是（如采购主管）时先由品类经理审批。
 // 冻结 / 解冻：再经采购总监；淘汰 / 黑名单 / 解除黑名单：再加总经理；拉入黑名单最后由内控会签。
 // 第一个审批节点可以通过、驳回或退回修改；后面几级只能通过或驳回（见下）。全部通过后经 srm_disposition_apply
@@ -11,6 +12,9 @@ import type * as Automation from '@objectstack/spec/automation';
 // 审批本人单据」的开关（objectstack#25446），岗位又可能兼任，所以每级通过后由 flow 读审批记录比对：
 // 撞人时这次通过不算数，通知审批人后重新开一轮同级审批（临时做法，平台支持后改为节点配置）。
 const cel$ = (source: string) => ({ dialect: 'cel' as const, source });
+
+// 发起人：草稿的提交人；手工新建的处置单没有 submitted_by，是新建人
+const initiator = `(has(record.submitted_by) && record.submitted_by != null ? record.submitted_by : record.created_by)`;
 
 const approval = (label: string, position: string, maxRevisions: number) => ({
   type: 'approval' as const,
@@ -69,7 +73,7 @@ const recordApprover = (id: string, label: string, field: string, actor: string,
 
 // 审批人撞人：发起人或前面各级的审批人（没经过的级别变量是空串，不会撞上）
 const collides = (actor: string, earlier: string[]) =>
-  [`${actor}.actor_id == record.created_by`, ...earlier.map((v) => `${actor}.actor_id == ${v}`)].join(' || ');
+  [`${actor}.actor_id == ${initiator}`, ...earlier.map((v) => `${actor}.actor_id == ${v}`)].join(' || ');
 const sodEdges = (prefix: string, decision: string, actor: string, earlier: string[], selfNode: string, okNode: string, review: string) => [
   { id: `e_${prefix}_self`, source: decision, target: selfNode, type: 'conditional' as const, condition: cel$(collides(actor, earlier)), label: '撞人' },
   { id: `e_${prefix}_ok`, source: decision, target: okNode, type: 'conditional' as const, condition: cel$(`!(${collides(actor, earlier)})`), label: '不同的人' },
@@ -90,11 +94,11 @@ export const DispositionApprovalFlow: Automation.Flow = {
     {
       id: 'start',
       type: 'start',
-      label: '新建处置单',
+      label: '新建处置单或提交草稿',
       config: {
         objectName: 'srm_supplier_disposition',
-        triggerType: 'record-after-create',
-        condition: P`record.status == 'in_review'`,
+        triggerType: 'record-after-write',
+        condition: P`record.status == 'in_review' && (previous == null || (has(previous.status) && previous.status == 'draft'))`,
       },
     },
     { id: 'init', type: 'assignment', label: '初始化审批人变量', config: { assignments: { categoryActor: '', directorActor: '', gmActor: '' } } },
@@ -104,7 +108,7 @@ export const DispositionApprovalFlow: Automation.Flow = {
       label: '发起人是品类经理？',
       config: {
         objectName: 'sys_user_position',
-        filter: { user_id: cel`record.created_by`, position: 'srm_category_manager' },
+        filter: { user_id: cel$(initiator), position: 'srm_category_manager' },
         outputVariable: 'initiatorCm',
       },
     },
@@ -199,7 +203,7 @@ export const DispositionApprovalFlow: Automation.Flow = {
       type: 'notify',
       label: '通知发起人：已执行',
       config: {
-        recipients: cel`record.created_by`,
+        recipients: cel$(initiator),
         title: '处置单 {{ record.disposition_no }} 已审批通过并执行',
         message: '供应商状态和品类资格已按处置单更新。请通知采购员在 ERP 同步供应商的冻结标志。',
         sourceObject: 'srm_supplier_disposition',
@@ -231,7 +235,7 @@ export const DispositionApprovalFlow: Automation.Flow = {
       type: 'notify',
       label: '通知发起人：已驳回',
       config: {
-        recipients: cel`record.created_by`,
+        recipients: cel$(initiator),
         title: '处置单 {{ record.disposition_no }} 已驳回',
         message: '供应商状态未作修改，驳回原因见处置单。',
         severity: 'warning',

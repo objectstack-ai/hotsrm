@@ -42,6 +42,15 @@ export const Workbench = App.create({
       ],
     },
     {
+      id: 'group_performance_risk',
+      type: 'group',
+      label: '绩效与风险',
+      icon: 'gauge',
+      children: [
+        { id: 'nav_risk_event', type: 'object', objectName: 'srm_risk_event', label: '风险事件', icon: 'siren' },
+      ],
+    },
+    {
       id: 'group_analytics',
       type: 'group',
       label: '分析',
@@ -49,6 +58,7 @@ export const Workbench = App.create({
       children: [
         { id: 'nav_delivery_dashboard', type: 'dashboard', dashboardName: 'srm_delivery_dashboard', label: '交付看板', icon: 'truck' },
         { id: 'nav_quality_dashboard', type: 'dashboard', dashboardName: 'srm_quality_dashboard', label: '质量看板', icon: 'shield-check' },
+        { id: 'nav_supplier_dashboard', type: 'dashboard', dashboardName: 'srm_supplier_dashboard', label: '供应商看板', icon: 'factory' },
         { id: 'nav_delivery_scorecard', type: 'report', reportName: 'srm_delivery_scorecard', label: '供应商交付与质量', icon: 'table' },
       ],
     },
