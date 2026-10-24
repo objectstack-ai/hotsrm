@@ -91,7 +91,7 @@
 | SCAR / 8D | Supplier Corrective Action Request，供应商纠正措施要求；8D 为整改方法 |
 | OTD | On-Time Delivery，交付准时率 |
 | PPM | 每百万件不良数 |
-| QCDS | 质量 Quality、成本 Cost、交付 Delivery、服务 Service，绩效四维度 |
+| QCDS | 质量 Quality、成本 Cost、交付 Delivery、服务 Service；核心绩效维度是 QCDS 加安全环保（HSE）共五个 |
 | OWD | 组织级默认可见性（private / public_read / public_read_write / controlled_by_parent） |
 | RLS / FLS | 行级安全 / 字段级安全 |
 | 权限集 / 岗位 | permission set（能做什么）/ position（权限集的挂载点） |

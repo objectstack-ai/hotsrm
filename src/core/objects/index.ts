@@ -13,5 +13,6 @@ export { Contract } from './contract.object.js';
 export { ContractLine } from './contract-line.object.js';
 export { DeliveryRecord } from './delivery-record.object.js';
 export { QualityIssue } from './quality-issue.object.js';
+export { Kpi } from './kpi.object.js';
 export { SupplierAudit } from './supplier-audit.object.js';
 export { SupplierAuditFinding } from './supplier-audit-finding.object.js';

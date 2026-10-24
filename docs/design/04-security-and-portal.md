@@ -32,7 +32,7 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 
 | 岗位（position） | 中文 | 挂载的权限集 |
 |---|---|---|
-| `srm_procurement_director` | 采购总监 | `srm_internal_base`、`srm_sourcing`、`srm_buyer`、`srm_executive` |
+| `srm_procurement_director` | 采购总监 | `srm_internal_base`、`srm_sourcing`、`srm_buyer`、`srm_executive`、`srm_performance` |
 | `srm_category_manager` | 品类经理 | `srm_internal_base`、`srm_sourcing`、`srm_supplier_admin` |
 | `srm_sourcing_engineer` | 寻源工程师 | `srm_internal_base`、`srm_sourcing` |
 | `srm_buyer` | 采购员 | `srm_internal_base`、`srm_buyer` |
@@ -60,6 +60,7 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 | `srm_finance` | 银行账号可读，核验经 screen flow；银行账户变更的第 2 级审批；整改单索赔结论标记 |
 | `srm_legal` | 合同读改（审批由 flow 授予） |
 | `srm_executive` | 全部 SRM 对象只读 + 仪表盘；审批由 flow 授予，不需要额外写权限 |
+| `srm_performance` | 绩效指标库的增改（采购总监，FR-701）；改别人建的指标由共享规则 `srm_kpi_director_edit` 放行，不能删除。不并入 `srm_executive`，否则总经理也能改指标 |
 | `srm_auditor` | 全部 SRM 对象只读（报价同样受封标约束），可读审批历史与字段历史，不可导出银行账号 |
 | `srm_admin` | 品类、指标库、编码、通知模板的配置；物料导入与维护；存量供应商、联系人、证书的导入（v0.2，唯一能写「存量导入」标记的权限集，[导入说明](../implementation/legacy-supplier-import.md)）；不授予报价读权限 |
 | `srm_portal_supplier` | 供应商门户用户：见 §3.2 |
@@ -96,6 +97,7 @@ R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — �
 | 交付记录 | R | — | — | R | RCE（录入） | R | R（本公司） |
 | 供应商审核（含问题项） | R | — | R | — | RCE（计划年度、问题项的整改单只读）+ F（转整改单） | — | — |
 | 整改单 | R | — | — | R | RCE（逾期标志只读） | RE（只改索赔状态：标记已扣款） | RE（本公司：回复） |
+| 绩效指标 | R | R | R | R | R | R | — |
 | 考评单 / 评分明细 | R | — | — | R | R | — | R（本公司，已发布）+ F（申诉） |
 | 风险事件 | R | R | RCE | R | RCE | R | — |
 | 门户邀请 | — | — | RCE | RC | — | — | — |
@@ -103,7 +105,7 @@ R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — �
 | 对账单、发票 | 不做（ERP） | | | | | | |
 
 表中未列的权限集：`srm_executive`、`srm_auditor` 对全部对象只读（报价同样受封标约束）；
-`srm_legal` 对合同与明细读改（不新建）；`srm_iqc` 对检验增改；绩效评分只经「提交评分」screen flow。
+`srm_performance` 对绩效指标增改、`srm_admin` 对绩效指标增改删；`srm_legal` 对合同与明细读改（不新建）；`srm_iqc` 对检验增改；绩效评分只经「提交评分」screen flow。
 
 **`controlled_by_parent` 的写入规则**：子记录（联系人、证书、银行账户、合同明细、报价
 明细）的修改要求对父记录有编辑权。所以门户对供应商、报价单都授予编辑权，再用字段级

@@ -2,7 +2,8 @@
 // 挂载的权限集同样是子集：`srm_sourcing` 等权限集随其对象上线后补挂。
 // 岗位与权限集的标签暂时只有中文：翻译包还没有岗位、权限集的词条（objectstack#25652），平台补上后加英文。
 export const SrmPositions = [
-  { name: 'srm_procurement_director', label: '采购总监', permissionSets: ['srm_internal_base', 'srm_buyer', 'srm_executive'] },
+  // 采购总监另挂 srm_performance：维护绩效指标库（FR-701，v0.5）
+  { name: 'srm_procurement_director', label: '采购总监', permissionSets: ['srm_internal_base', 'srm_buyer', 'srm_executive', 'srm_performance'] },
   { name: 'srm_category_manager', label: '品类经理', permissionSets: ['srm_internal_base', 'srm_supplier_admin'] },
   { name: 'srm_buyer', label: '采购员', permissionSets: ['srm_internal_base', 'srm_buyer'] },
   { name: 'srm_buyer_lead', label: '采购主管', permissionSets: ['srm_internal_base', 'srm_buyer', 'srm_supplier_admin'] },

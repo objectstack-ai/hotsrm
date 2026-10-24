@@ -42,6 +42,15 @@ export const Workbench = App.create({
       ],
     },
     {
+      id: 'group_performance',
+      type: 'group',
+      label: '绩效与风险',
+      icon: 'gauge',
+      children: [
+        { id: 'nav_kpi', type: 'object', objectName: 'srm_kpi', label: '绩效指标', icon: 'gauge' },
+      ],
+    },
+    {
       id: 'group_analytics',
       type: 'group',
       label: '分析',
