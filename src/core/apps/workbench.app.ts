@@ -21,6 +21,15 @@ export const Workbench = App.create({
       ],
     },
     {
+      id: 'group_contract',
+      type: 'group',
+      label: '合同',
+      icon: 'file-signature',
+      children: [
+        { id: 'nav_contract', type: 'object', objectName: 'srm_contract', label: '合同', icon: 'file-signature' },
+      ],
+    },
+    {
       id: 'group_master_data',
       type: 'group',
       label: '基础数据',

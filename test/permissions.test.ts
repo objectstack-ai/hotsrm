@@ -63,6 +63,8 @@ describe('internal permissions', () => {
     expect(visibility('srm_ap_accountant')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_contract": "R",
+        "srm_contract_line": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -79,6 +81,8 @@ describe('internal permissions', () => {
     expect(visibility('srm_buyer_lead')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_contract": "RCE",
+        "srm_contract_line": "RCE",
         "srm_material": "RE",
         "srm_plant": "R",
         "srm_supplier": "RCE",
@@ -97,6 +101,8 @@ describe('internal permissions', () => {
     expect(visibility('srm_legal_counsel')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_contract": "RE",
+        "srm_contract_line": "RE",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -112,6 +118,8 @@ describe('internal permissions', () => {
     expect(visibility('srm_general_manager')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_contract": "R",
+        "srm_contract_line": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
@@ -129,6 +137,8 @@ describe('internal permissions', () => {
     expect(visibility('srm_procurement_compliance')).toMatchInlineSnapshot(`
       {
         "srm_category": "R",
+        "srm_contract": "R",
+        "srm_contract_line": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_supplier": "R",
