@@ -1,4 +1,5 @@
 import { Supplier } from '../objects/supplier.object.js';
+import { Contract } from '../objects/contract.object.js';
 
 // 内部权限集（04 §2.2）的 v0.1 子集。一律不设 isDefault（AGENTS.md 红线 2）。
 // 状态类字段（供应商状态、资质异常、证书状态）只由 flow 写入，权限集里一律只读。
@@ -31,6 +32,13 @@ export const InternalBasePermissionSet = {
   },
 };
 
+const contractFieldsReadOnly = Object.fromEntries(Object.keys(Contract.fields).map((field) => [`srm_contract.${field}`, readOnly]));
+// 协议标志由 srm_contract_agreement_recalc 维护
+const agreementFlags = {
+  'srm_supplier.quality_agreement_signed': flowOwned,
+  'srm_supplier.integrity_agreement_signed': flowOwned,
+};
+
 // 采购员：物料是 ERP 的只读副本（ADR-0008），采购员只维护物料与品类的关联，不新建、不删除
 export const BuyerPermissionSet = {
   name: 'srm_buyer',
@@ -40,8 +48,15 @@ export const BuyerPermissionSet = {
     // 代供应商发起信息变更（v0.6 前）；改只限自己发起、被退回修改的变更单（对象上的 readonlyWhen）。
     // 采购员没有完整账号的读写能力，银行账户变更由品类经理或采购主管发起
     srm_supplier_change_request: { ...write },
+    // 合同只读，签署中上传签署件、填签署日期（04 §2.3）；合同 OWD 暂为 public_read_write（objectstack#25470），
+    // 其余字段 FLS 只读
+    srm_contract: { ...read, allowEdit: true },
+    srm_contract_line: read,
   },
   fields: {
+    ...contractFieldsReadOnly,
+    'srm_contract.signed_file': { readable: true, editable: true },
+    'srm_contract.signed_date': { readable: true, editable: true },
     'srm_material.erp_material_no': readOnly,
     'srm_material.material_code': readOnly,
     'srm_material.name': readOnly,
@@ -65,6 +80,9 @@ export const SupplierAdminPermissionSet = {
     srm_supplier_change_request: write,
     // 新建账户后为「待核验」并锁定；核验只经 srm_bank_verify，已有账户的修改走信息变更单（v0.2 M4）
     srm_supplier_bank_account: write,
+    // 起草合同与明细；状态只经 flow 推进（提交审批、确认生效、到期扫描）
+    srm_contract: write,
+    srm_contract_line: write,
     // 发起冻结 / 解冻 / 淘汰 / 黑名单；新建即进入审批，改只限被退回修改期间（对象上的 readonlyWhen，v0.3）
     srm_supplier_disposition: write,
   },
@@ -76,6 +94,7 @@ export const SupplierAdminPermissionSet = {
     'srm_supplier_certificate.status': flowOwned,
     'srm_supplier_category.status': flowOwned,
     'srm_supplier_category.approved_date': flowOwned,
+    ...agreementFlags,
     'srm_supplier_category.status_before_freeze': flowOwned,
     'srm_supplier_category.freeze_scope': flowOwned,
     'srm_supplier_category.freeze_disposition': flowOwned,
@@ -117,6 +136,8 @@ export const ExecutivePermissionSet = {
     srm_supplier_category: read,
     srm_supplier_application: read,
     srm_supplier_change_request: read,
+    srm_contract: read,
+    srm_contract_line: read,
     srm_supplier_disposition: read,
   },
 };
@@ -133,6 +154,8 @@ export const FinancePermissionSet = {
     srm_supplier_bank_account: read,
     // 银行账户变更的第 2 级审批（BR-11）；审批权由 flow 授予
     srm_supplier_change_request: read,
+    srm_contract: read,
+    srm_contract_line: read,
   },
   systemPermissions: ['srm_view_bank_account_no'],
 };
@@ -152,15 +175,19 @@ export const AdminPermissionSet = {
   fields: {
     'srm_supplier.status': flowOwned,
     'srm_supplier.qualification_alert': flowOwned,
+    ...agreementFlags,
     'srm_supplier_certificate.status': flowOwned,
   },
 };
 
-// 法务：合同读改，审批由 flow 授予（04 §2.2）。合同对象随 v0.3 C1 上线后在这里补对象权限
+// 法务：合同与明细读改（草稿期间改条款；提交后合同只读），审批由 flow 授予（04 §2.2）
 export const LegalPermissionSet = {
   name: 'srm_legal',
   label: 'SRM 法务',
-  objects: {},
+  objects: {
+    srm_contract: { ...read, allowEdit: true },
+    srm_contract_line: { ...read, allowEdit: true },
+  },
 };
 
 // 内控 / 审计：全部 SRM 对象只读（04 §2.2）。不授予 srm_view_bank_account_no，银行账号只看到后 4 位，
@@ -179,6 +206,8 @@ export const AuditorPermissionSet = {
     srm_supplier_bank_account: read,
     srm_supplier_application: read,
     srm_supplier_change_request: read,
+    srm_contract: read,
+    srm_contract_line: read,
     srm_supplier_disposition: read,
   },
 };
