@@ -148,6 +148,32 @@ export const AdminPermissionSet = {
   },
 };
 
+// 法务：合同读改，审批由 flow 授予（04 §2.2）。合同对象随 v0.3 C1 上线后在这里补对象权限
+export const LegalPermissionSet = {
+  name: 'srm_legal',
+  label: 'SRM 法务',
+  objects: {},
+};
+
+// 内控 / 审计：全部 SRM 对象只读（04 §2.2）。不授予 srm_view_bank_account_no，银行账号只看到后 4 位，
+// 也就导不出完整账号；报价对象上线后同样受封标 RLS 约束（ADR-0004）
+export const AuditorPermissionSet = {
+  name: 'srm_auditor',
+  label: 'SRM 内控审计',
+  objects: {
+    srm_category: read,
+    srm_plant: read,
+    srm_material: read,
+    srm_supplier: read,
+    srm_supplier_contact: read,
+    srm_supplier_certificate: read,
+    srm_supplier_category: read,
+    srm_supplier_bank_account: read,
+    srm_supplier_application: read,
+    srm_supplier_change_request: read,
+  },
+};
+
 export const SrmPermissionSets = [
   InternalBasePermissionSet,
   BuyerPermissionSet,
@@ -155,5 +181,7 @@ export const SrmPermissionSets = [
   QualityPermissionSet,
   ExecutivePermissionSet,
   FinancePermissionSet,
+  LegalPermissionSet,
+  AuditorPermissionSet,
   AdminPermissionSet,
 ];

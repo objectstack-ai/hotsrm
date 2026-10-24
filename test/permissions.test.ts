@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
-import { Supplier, SupplierApplication } from '../src/core/objects';
+import { Supplier, SupplierApplication, SupplierBankAccount } from '../src/core/objects';
 import { SrmPermissionSets } from '../src/core/security/permission-sets';
 import { SrmPositions } from '../src/core/security/positions';
 
@@ -90,6 +90,85 @@ describe('internal permissions', () => {
         "srm_supplier_contact": "RCED",
       }
     `);
+  });
+
+  // v0.3 C4：法务、总经理、内控（04 §2.1–2.2）。srm_legal 的合同权限随合同对象（v0.3 C1）补齐
+  it('keeps what a legal counsel can see', () => {
+    expect(visibility('srm_legal_counsel')).toMatchInlineSnapshot(`
+      {
+        "srm_category": "R",
+        "srm_material": "R",
+        "srm_plant": "R",
+        "srm_supplier": "R",
+        "srm_supplier_bank_account": "R",
+        "srm_supplier_category": "R",
+        "srm_supplier_certificate": "R",
+        "srm_supplier_contact": "R",
+      }
+    `);
+  });
+
+  it('keeps what a general manager can see', () => {
+    expect(visibility('srm_general_manager')).toMatchInlineSnapshot(`
+      {
+        "srm_category": "R",
+        "srm_material": "R",
+        "srm_plant": "R",
+        "srm_supplier": "R",
+        "srm_supplier_application": "R",
+        "srm_supplier_bank_account": "R",
+        "srm_supplier_category": "R",
+        "srm_supplier_certificate": "R",
+        "srm_supplier_change_request": "R",
+        "srm_supplier_contact": "R",
+      }
+    `);
+  });
+
+  it('keeps what procurement compliance can see', () => {
+    expect(visibility('srm_procurement_compliance')).toMatchInlineSnapshot(`
+      {
+        "srm_category": "R",
+        "srm_material": "R",
+        "srm_plant": "R",
+        "srm_supplier": "R",
+        "srm_supplier_application": "R",
+        "srm_supplier_bank_account": "R",
+        "srm_supplier_category": "R",
+        "srm_supplier_certificate": "R",
+        "srm_supplier_change_request": "R",
+        "srm_supplier_contact": "R",
+      }
+    `);
+  });
+
+  it('lets legal, the general manager and compliance read suppliers but not edit or create one', async () => {
+    const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { system: true });
+    for (const position of ['srm_legal_counsel', 'srm_general_manager', 'srm_procurement_compliance']) {
+      const reader = await person(position);
+      const [row] = await stack.rows(Supplier.name, { id: supplier.id }, { as: reader });
+      expect(row!.name).toBe(supplier.name);
+      await expect(stack.hooks.run(Supplier.name, 'update', { id: supplier.id, short_name: '越权改名' }, { as: reader })).rejects.toBeTruthy();
+      await expect(stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { as: reader })).rejects.toBeTruthy();
+    }
+  });
+
+  it('lets compliance read admission applications and see only the last 4 digits of a bank account', async () => {
+    const manager = await person('srm_category_manager');
+    const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { as: manager });
+    const [category] = await stack.rows('srm_category', { code: 'ELEC' }, { as: manager });
+    const app = await stack.hooks.run(SupplierApplication.name, 'insert', { supplier: supplier.id, applied_categories: [category!.id] }, { as: manager });
+    const account = await stack.hooks.run(
+      SupplierBankAccount.name,
+      'insert',
+      { supplier: supplier.id, bank_name: '示例银行', branch_name: '示例支行', account_name: supplier.name, account_no: `62220000${String(++seq).padStart(8, '0')}` },
+      { as: manager },
+    );
+    const compliance = await person('srm_procurement_compliance');
+    expect(await stack.rows(SupplierApplication.name, { id: app.id }, { as: compliance })).toHaveLength(1);
+    const [masked] = await stack.rows(SupplierBankAccount.name, { id: account.id }, { as: compliance });
+    expect(masked!.account_no).not.toBe(account.account_no);
+    expect(String(masked!.account_no).endsWith(String(account.account_no).slice(-4))).toBe(true);
   });
 
   it('lets an AP accountant read suppliers but not edit or create one', async () => {

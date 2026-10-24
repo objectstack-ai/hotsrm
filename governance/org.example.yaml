@@ -49,6 +49,8 @@ position:
   sqe: 供应商质量工程师
   ap_accountant: 应付会计
   legal: 法务
+  general_manager: 总经理
+  procurement_compliance: 内控
 
 # 本企业对行业物资的称呼，用在扩展包段落里
 terms:
