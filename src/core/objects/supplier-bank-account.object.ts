@@ -4,7 +4,9 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 // 银行账户（02 §4.1，v0.2 M2）。采购侧新建后为「待核验」并锁定，应付会计经「核验银行账户」
 // screen flow 置为有效（双人审批，04 §4.2）；有效账户的关键字段只读，修改走信息变更单（v0.2 M4）。
 // 收款与付款留在 ERP（ADR-0008），这里只保存账户主数据。
-const locked = P`record.status == 'pending_verify' || record.status == 'active' || record.status == 'inactive'`;
+// 新建表单里 status 已带默认值「待核验」，界面照样按 readonlyWhen 锁字段（服务端新建时不看 readonlyWhen），
+// 所以先判断记录已保存（有 id），新建表单才能填写。临时绕法（objectstack#25584），平台修复后去掉 id 判断
+const locked = P`has(record.id) && record.id != null && (record.status == 'pending_verify' || record.status == 'active' || record.status == 'inactive')`;
 
 export const SupplierBankAccount = ObjectSchema.create({
   name: 'srm_supplier_bank_account',
