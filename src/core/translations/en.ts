@@ -118,11 +118,18 @@ export const en: TranslationData = {
         primary_contact_count: { label: 'Primary Contacts' },
         expired_certificate_count: { label: 'Expired Certificates' },
         default_bank_account_count: { label: 'Default Bank Accounts' },
+        blacklisted_on: { label: 'Blacklisted On' },
+        blacklist_until: { label: 'Blacklist Ban Ends' },
+        blacklist_disposition: { label: 'Blacklist Disposition' },
+        blacklist_reason: { label: 'Blacklist Reason' },
+        open_risk_event_count: { label: 'Open Risk Events' },
       },
       _views: {
         default: { label: 'All Suppliers' },
         qualification_alert: { label: 'Qualification Alerts' },
         legacy_review: { label: 'Legacy Imports to Review' },
+        blacklist: { label: 'Blacklist Register' },
+        open_risk: { label: 'With Open Risks' },
         primary_contact_conflict: { label: 'Duplicate Primary Contacts' },
       },
       _actions: {
@@ -306,6 +313,12 @@ export const en: TranslationData = {
         disposition_categories_required: { message: 'Select at least one category' },
         disposition_action_allowed: { message: 'This action is not allowed for the supplier\'s current status' },
         one_open_disposition: { message: 'This supplier already has a disposition in review; wait until it is decided' },
+        disposition_action_allowed_on_submit: { message: 'This action is not allowed for the supplier\'s current status' },
+        one_open_disposition_on_submit: { message: 'This supplier already has a disposition in review; wait until it is decided' },
+      },
+      _actions: {
+        srm_disposition_submit: { label: 'Submit for Approval' },
+        srm_disposition_cancel: { label: 'Cancel Draft' },
       },
       fields: {
         disposition_no: { label: 'Disposition No.' },
@@ -324,7 +337,11 @@ export const en: TranslationData = {
         categories: { label: 'Categories' },
         reason: { label: 'Reason' },
         effective_date: { label: 'Effective Date' },
-        status: { label: 'Status', options: { in_review: 'In Review', applied: 'Applied', rejected: 'Rejected' } },
+        status: {
+          label: 'Status',
+          options: { draft: 'Draft', in_review: 'In Review', applied: 'Applied', rejected: 'Rejected', cancelled: 'Cancelled' },
+        },
+        submitted_by: { label: 'Submitted By' },
         approval_status: {
           label: 'Approval Result',
           options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', returned: 'Returned for Revision', recalled: 'Recalled' },
@@ -338,6 +355,7 @@ export const en: TranslationData = {
       },
       _views: {
         default: { label: 'All Dispositions' },
+        draft: { label: 'Drafts to Submit' },
         in_review: { label: 'In Review' },
         applied: { label: 'Applied' },
       },
@@ -684,6 +702,34 @@ export const en: TranslationData = {
         quality_issue: { label: 'SCAR' },
       },
     },
+    srm_risk_event: {
+      label: 'Risk Event',
+      pluralLabel: 'Risk Events',
+      _sections: { event: { label: 'Risk Event' }, handling: { label: 'Handling' }, external: { label: 'External Systems' } },
+      _validations: {
+        risk_event_status_flow: { message: 'This risk event status change is not allowed' },
+      },
+      fields: {
+        event_no: { label: 'Risk Event No.' },
+        supplier: { label: 'Supplier' },
+        risk_type: { label: 'Risk Type' },
+        severity: { label: 'Severity', options: { high: 'High', medium: 'Medium', low: 'Low' } },
+        source: { label: 'Source', options: { system: 'System', external_api: 'External Service', manual: 'Manual Entry' } },
+        certificate: { label: 'Related Certificate' },
+        description: { label: 'Description' },
+        status: { label: 'Status', options: { open: 'Open', mitigating: 'Mitigating', closed: 'Closed' } },
+        mitigation_plan: { label: 'Mitigation Plan' },
+        owner_note: { label: 'Conclusion' },
+        disposition: { label: 'Disposition' },
+        external_ref: { label: 'External Event No.' },
+      },
+      _views: {
+        default: { label: 'All Risk Events' },
+        board: { label: 'Risk Board' },
+        unclosed: { label: 'Open Risk Events' },
+        by_type: { label: 'By Type' },
+      },
+    },
   },
   picklists: {
     srm_country: {
@@ -726,6 +772,19 @@ export const en: TranslationData = {
     srm_material_class: {
       label: 'Material Class',
       options: { class_a: 'Class A (Strategic)', class_b: 'Class B (Important)', class_c: 'Class C (General)' },
+    },
+    srm_risk_type: {
+      label: 'Risk Type',
+      options: {
+        qualification: 'Qualification',
+        legal: 'Litigation',
+        operation: 'Business Irregularity',
+        financial: 'Financial',
+        delivery: 'Delivery',
+        quality: 'Quality',
+        esg: 'ESG',
+        sanction: 'Sanctions List',
+      },
     },
     srm_contract_type: {
       label: 'Contract Type',
@@ -804,6 +863,36 @@ export const en: TranslationData = {
         refuse_none: { message: 'No nonconformities left to raise: observations are not raised, and findings already raised are not raised again' },
       },
     },
+    srm_disposition_submit: {
+      label: 'Submit Disposition for Approval',
+      successMessage: 'Disposition submitted for approval',
+      screens: {
+        confirm: {
+          title: 'Submit disposition: {{ disp.disposition_no }}',
+          description:
+            'Reason: {{ disp.reason }}\nOnce submitted, the disposition goes to approval with you as its initiator. If the reason does not fit, cancel the draft and raise a disposition by hand.',
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only category managers or buyer leads can submit dispositions' },
+        refuse_status: { message: 'Only draft dispositions need submitting; a disposition raised by hand is already in review' },
+      },
+    },
+    srm_disposition_cancel: {
+      label: 'Cancel Disposition Draft',
+      successMessage: 'Disposition draft cancelled',
+      screens: {
+        confirm: {
+          title: 'Cancel disposition draft: {{ disp.disposition_no }}',
+          description: 'The draft will not be submitted for approval and the supplier status stays as it is.',
+          fields: { cancel_reason: { label: 'Cancellation Reason' } },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only category managers or buyer leads can cancel disposition drafts' },
+        refuse_status: { message: 'Only drafts can be cancelled; a disposition in review is rejected by its approvers' },
+      },
+    },
   },
   apps: {
     srm_workbench: {
@@ -824,9 +913,11 @@ export const en: TranslationData = {
         nav_supplier_audit: { label: 'Supplier Audits' },
         group_performance: { label: 'Performance and Risk' },
         nav_kpi: { label: 'Performance KPIs' },
+        nav_risk_event: { label: 'Risk Events' },
         group_analytics: { label: 'Analytics' },
         nav_delivery_dashboard: { label: 'Delivery Dashboard' },
         nav_quality_dashboard: { label: 'Quality Dashboard' },
+        nav_supplier_dashboard: { label: 'Supplier Dashboard' },
         nav_delivery_scorecard: { label: 'Supplier Delivery and Quality' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },
@@ -857,8 +948,50 @@ export const en: TranslationData = {
         overdue_issues: { title: 'Overdue Corrective Action Requests' },
       },
     },
+    srm_supplier_dashboard: {
+      label: 'Suppliers',
+      description: 'Suppliers by lifecycle status, qualification alerts and blacklisted suppliers, open risk events by severity and type',
+      widgets: {
+        suppliers_by_status: { title: 'Suppliers by Lifecycle Status' },
+        qualification_alerts: { title: 'Suppliers with Qualification Alerts' },
+        blacklisted_suppliers: { title: 'Blacklisted Suppliers' },
+        unclosed_risks_by_severity: { title: 'Open Risk Events by Severity' },
+        unclosed_risks_by_type: { title: 'Open Risk Events by Type' },
+        unclosed_high_risks: { title: 'Open High-severity Risk Events' },
+      },
+    },
   },
   datasets: {
+    srm_risk_event_metrics: {
+      label: 'Risk Event Statistics',
+      description: 'Risk events by severity, type, source and supplier, with the open count (risk events, 05 §4.2)',
+      dimensions: {
+        severity: { label: 'Severity' },
+        risk_type: { label: 'Risk Type' },
+        source: { label: 'Source' },
+        status: { label: 'Status' },
+        supplier: { label: 'Supplier' },
+        created_month: { label: 'Month Registered' },
+      },
+      measures: {
+        event_count: { label: 'Risk Events' },
+        unclosed_count: { label: 'Open Risk Events' },
+        unclosed_high_count: { label: 'Open High-severity Risk Events' },
+      },
+    },
+    srm_supplier_metrics: {
+      label: 'Supplier Statistics',
+      description: 'Suppliers by lifecycle status and type, with qualification alerts and blacklisted suppliers (suppliers, 05 §4.2)',
+      dimensions: {
+        status: { label: 'Status' },
+        supplier_type: { label: 'Supplier Type' },
+      },
+      measures: {
+        supplier_count: { label: 'Suppliers' },
+        alert_count: { label: 'Suppliers with Qualification Alerts' },
+        blacklisted_count: { label: 'Blacklisted Suppliers' },
+      },
+    },
     srm_quality_issue_metrics: {
       label: 'Corrective Action Request Statistics',
       description: 'Corrective action requests by status, supplier and severity, with the overdue count (05 §4.2)',

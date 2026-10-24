@@ -8,12 +8,15 @@ import type * as Automation from '@objectstack/spec/automation';
 //   「指定品类」冻结的），原本就暂停的资格不动；全部品类时供应商→合格；
 // - 淘汰 / 拉入黑名单：供应商→淘汰 / 黑名单，品类资格全部暂停并清掉冻结记录，重新准入时按申请品类恢复；
 // - 解除黑名单：供应商→淘汰，之后只能重新走准入（FR-208）。
+// 拉入黑名单同时写供应商的黑名单名录字段（拉黑日期、禁入期满日、处置单、原因，v0.5）。禁入期限取
+// params/core.yaml 的 blacklist_years（示例 5 年），客户改参数时同步 BLACKLIST_YEARS。
+const BLACKLIST_YEARS = 5;
 
-const setSupplier = (id: string, label: string, status: string) => ({
+const setSupplier = (id: string, label: string, status: string, extra: Record<string, unknown> = {}) => ({
   id,
   type: 'update_record' as const,
   label,
-  config: { objectName: 'srm_supplier', filter: { id: cel`disp.supplier` }, fields: { status } },
+  config: { objectName: 'srm_supplier', filter: { id: cel`disp.supplier` }, fields: { status, ...extra } },
 });
 
 // 指定品类时只动所选品类的资格
@@ -91,7 +94,12 @@ export const DispositionApplyFlow: Automation.Flow = {
 
     // 淘汰 / 黑名单 / 解除黑名单
     setSupplier('eliminate_supplier', '供应商淘汰', 'eliminated'),
-    setSupplier('blacklist_supplier', '供应商拉入黑名单', 'blacklisted'),
+    setSupplier('blacklist_supplier', '供应商拉入黑名单', 'blacklisted', {
+      blacklisted_on: cel`isoDate(today())`,
+      blacklist_until: { dialect: 'cel', source: `isoDate(addMonths(today(), ${BLACKLIST_YEARS * 12}))` },
+      blacklist_disposition: cel`disp.id`,
+      blacklist_reason: cel`disp.reason`,
+    }),
     suspendAll('suspend_all'),
     setSupplier('remove_blacklist_supplier', '解除黑名单（转为淘汰）', 'eliminated'),
 

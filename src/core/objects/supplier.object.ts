@@ -148,6 +148,24 @@ export const Supplier = ObjectSchema.create({
         filter: { status: 'in_review' },
       },
     }),
+    // 黑名单名录（02 §4.1，FR-208）：拉入黑名单的处置单执行时由 srm_disposition_apply 写入，只读。
+    // 禁入期满日 = 拉黑日期 + blacklist_years 年，到期前 30 天和当天提醒（srm_blacklist_expiry_notice），
+    // 只提醒，解除仍走「解除黑名单」处置单审批。解除后保留为最近一次拉黑的记录
+    blacklisted_on: Field.date({ label: '拉黑日期', group: 'qualification', readonly: true }),
+    blacklist_until: Field.date({ label: '禁入期满日', group: 'qualification', readonly: true }),
+    blacklist_disposition: Field.lookup('srm_supplier_disposition', { label: '拉黑处置单', group: 'qualification', readonly: true }),
+    blacklist_reason: Field.textarea({ label: '拉黑原因', group: 'qualification', readonly: true }),
+    // 未关闭的风险事件（未处理、处理中），供供应商列表与名录参考（v0.5）
+    open_risk_event_count: Field.summary({
+      label: '未关闭风险事件数',
+      group: 'qualification',
+      summaryOperations: {
+        object: 'srm_risk_event',
+        field: 'id',
+        function: 'count',
+        filter: { status: { $in: ['open', 'mitigating'] } },
+      },
+    }),
     // 银行账户「每家至多一个默认账户」的校验读这个计数（v0.2）
     default_bank_account_count: Field.summary({
       label: '默认银行账户数',

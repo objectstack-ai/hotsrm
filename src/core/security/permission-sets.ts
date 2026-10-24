@@ -37,6 +37,8 @@ export const InternalBasePermissionSet = {
     // 供应商审核内部只读：品类经理推进准入时看审核结论（v0.4）
     srm_supplier_audit: read,
     srm_supplier_audit_finding: read,
+    // 风险事件内部只读（04 §2.3），品类经理与 SQE 登记和处理（v0.5）
+    srm_risk_event: read,
     // 绩效指标库内部只读（v0.5）：评分人按评分规则说明打分
     srm_kpi: read,
   },
@@ -95,6 +97,8 @@ export const SupplierAdminPermissionSet = {
     srm_contract_line: write,
     // 发起冻结 / 解冻 / 淘汰 / 黑名单；新建即进入审批，改只限被退回修改期间（对象上的 readonlyWhen，v0.3）
     srm_supplier_disposition: write,
+    // 登记与处理风险事件（04 §2.3，v0.5）；来源、相关证书、处置单只由 flow 写入（对象上的 readonly）
+    srm_risk_event: write,
   },
   // 银行账号完整可读（BR-20，04 §4.2）
   systemPermissions: ['srm_view_bank_account_no'],
@@ -134,6 +138,8 @@ export const QualityPermissionSet = {
     // 供应商审核：安排准入、专项审核，执行年度计划，录入结论与问题项（FR-607）
     srm_supplier_audit: write,
     srm_supplier_audit_finding: write,
+    // 登记与处理风险事件（04 §2.3，v0.5）：资质、质量类风险由 SQE 跟进
+    srm_risk_event: write,
   },
   fields: {
     ...supplierFieldsReadOnly,
@@ -177,6 +183,7 @@ export const ExecutivePermissionSet = {
     srm_quality_issue: read,
     srm_supplier_audit: read,
     srm_supplier_audit_finding: read,
+    srm_risk_event: read,
     srm_kpi: read,
   },
 };
@@ -276,6 +283,7 @@ export const AuditorPermissionSet = {
     srm_quality_issue: read,
     srm_supplier_audit: read,
     srm_supplier_audit_finding: read,
+    srm_risk_event: read,
     srm_kpi: read,
   },
 };

@@ -48,6 +48,7 @@ export const Workbench = App.create({
       icon: 'gauge',
       children: [
         { id: 'nav_kpi', type: 'object', objectName: 'srm_kpi', label: '绩效指标', icon: 'gauge' },
+        { id: 'nav_risk_event', type: 'object', objectName: 'srm_risk_event', label: '风险事件', icon: 'siren' },
       ],
     },
     {
@@ -58,6 +59,7 @@ export const Workbench = App.create({
       children: [
         { id: 'nav_delivery_dashboard', type: 'dashboard', dashboardName: 'srm_delivery_dashboard', label: '交付看板', icon: 'truck' },
         { id: 'nav_quality_dashboard', type: 'dashboard', dashboardName: 'srm_quality_dashboard', label: '质量看板', icon: 'shield-check' },
+        { id: 'nav_supplier_dashboard', type: 'dashboard', dashboardName: 'srm_supplier_dashboard', label: '供应商看板', icon: 'factory' },
         { id: 'nav_delivery_scorecard', type: 'report', reportName: 'srm_delivery_scorecard', label: '供应商交付与质量', icon: 'table' },
       ],
     },

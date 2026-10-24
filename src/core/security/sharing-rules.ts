@@ -16,4 +16,23 @@ export const KpiDirectorEdit = defineSharingRule({
   sharedWith: { type: 'position', value: 'srm_procurement_director' },
 });
 
-export const SrmSharingRules = [KpiDirectorEdit];
+// 风险事件（02 §4.9，04 §2.3）：品类经理、采购主管、SQE、质量经理登记和处理风险事件，要能接手别人登记的和系统生成的
+// 事件。事件描述必填，description != '' 覆盖全部事件
+const riskEventEdit = (position: string, label: string) =>
+  defineSharingRule({
+    name: `srm_risk_event_edit_${position.replace(/^srm_/, '')}`,
+    label: `${label}处理风险事件`,
+    object: 'srm_risk_event',
+    type: 'criteria',
+    condition: P`record.description != ''`,
+    accessLevel: 'edit',
+    sharedWith: { type: 'position', value: position },
+  });
+export const RiskEventEditRules = [
+  riskEventEdit('srm_category_manager', '品类经理'),
+  riskEventEdit('srm_buyer_lead', '采购主管'),
+  riskEventEdit('srm_sqe', 'SQE '),
+  riskEventEdit('srm_quality_manager', '质量经理'),
+];
+
+export const SrmSharingRules = [KpiDirectorEdit, ...RiskEventEditRules];

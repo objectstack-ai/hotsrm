@@ -212,6 +212,9 @@ erDiagram
 | `expired_certificate_count` | summary | `count` 资质证书，条件 `status == 'expired'` |
 | `default_bank_account_count` | summary | `count` 银行账户，条件 `is_default == true`；「每家至多一个默认账户」的校验读它（v0.2） |
 | `open_disposition_count` | summary | `count` 处置单，条件 `status == 'in_review'`；「同一家供应商同时只能有一张审批中的处置单」的校验读它（v0.3） |
+| `blacklisted_on` / `blacklist_until` | date（只读） | 黑名单名录（v0.5）：拉入黑名单的处置单执行时写入拉黑日期和禁入期满日（拉黑日期 + `blacklist_years` 年）。期满前 30 天和当天由 `srm_blacklist_expiry_notice` 提醒，只提醒，解除仍走「解除黑名单」处置单；解除后保留为最近一次拉黑的记录 |
+| `blacklist_disposition` / `blacklist_reason` | lookup → 处置单 / textarea（只读） | 拉黑的处置单与处置原因，与上两项同时写入（v0.5） |
+| `open_risk_event_count` | summary | `count` 风险事件，条件 `status in ['open', 'mitigating']`（v0.5） |
 
 关键信息锁定（v0.2）：`name`、`country`、`credit_code`、`registration_no`、`legal_representative`、
 `registered_capital`、`address` 在 `potential` / `qualifying` 期间可以直接改；准入通过后（合格、冻结、
@@ -387,12 +390,18 @@ upsert 写入，结构不变。
 `disposition_no`（自动编号 `DSP{YYYY}{00000}`）、`supplier`、`action`
 （`freeze` / `unfreeze` / `eliminate` / `blacklist` / `remove_blacklist`）、
 `scope`（`all` 全部品类 / `category` 指定品类，只有冻结和解冻可以指定品类）、`categories`（多值 lookup 品类，
-指定品类时必填）、`reason`（必填）、`effective_date`（默认当天）、`status`（`in_review` 审批中 / `applied` 已执行 /
-`rejected` 已驳回）、`approval_status`（审批节点写入）、只读的 `category_approver`（发起人不是品类经理时才有
+指定品类时必填）、`reason`（必填）、`effective_date`（默认当天）、`status`（`draft` 草稿 / `in_review` 审批中 /
+`applied` 已执行 / `rejected` 已驳回 / `cancelled` 已作废；草稿与作废随 v0.5）、`submitted_by`（user，只读：草稿的提交人，v0.5）、
+`approval_status`（审批节点写入）、只读的 `category_approver`（发起人不是品类经理时才有
 这一级，[03 §5](./03-processes-and-automation.md#5-p2-信息变更与供应商处置)）/ `director_approver` / `gm_approver` /
 `compliance_approver`、`reject_reason`、`applied_at`。
 
-新建即进入审批，供应商、动作、范围和品类只在新建时填写，原因和生效日期在被退回修改期间可改。审批通过即执行，
+新建即进入审批，供应商、动作、范围和品类只在新建时填写，原因和生效日期在被退回修改期间可改。
+**草稿**（v0.5）只由 flow 生成（高风险事件，[03 §11](./03-processes-and-automation.md#11-p10-资质与风险监控资质-v01风险事件-v05)；
+绩效结果应用，03 §10），原因由 flow 写好；品类经理或采购主管经「提交审批」进入审批（提交人写入 `submitted_by` 并成为记录所有者，
+审批以它为发起人），或经「作废」放弃（作废理由写入 `reject_reason`）。状态机：`draft` → `in_review` / `cancelled`，
+`in_review` → `applied` / `rejected`；`initialStates` 为 `in_review`、`draft`。提交时再校验一次动作与供应商当前状态、
+是否已有审批中的处置单（草稿期间供应商状态可能已变）。审批通过即执行，
 `effective_date` 记录业务生效日，供采购员在 ERP 同步冻结标志时参照。新建时校验动作与供应商当前状态
 （[§5.1](#51-供应商-srm_supplierstatus)）：
 
@@ -689,6 +698,27 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 `description`、`status`（`open` / `mitigating` / `closed`）、`mitigation_plan`、`owner_note`、
 `disposition`（lookup，`high` 级事件生成的处置单草稿）。
 
+实现（v0.5）：OWD `public_read`；品类经理、采购主管、SQE、质量经理要能接手别人登记的和系统生成的事件，用按岗位授 `edit`
+的共享规则 `srm_risk_event_edit_*`（可改不可删，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470) 的裁定写法）。
+开启字段历史，门户不可见。
+
+| 字段 | 类型 | 说明 / 约束 |
+|---|---|---|
+| `event_no` | autonumber | `RSK{YYYY}{00000}` |
+| `supplier` | lookup → 供应商 | 必填，新建后只读；供应商详情页的风险事件列表 |
+| `risk_type` | select | 共享选项列表 `srm_risk_type`，必填 |
+| `severity` | select | `high` / `medium` / `low`，默认 `medium`；`high` 触发 `srm_risk_event_apply` |
+| `source` | select（只读） | 手工登记为 `manual`（默认值）；`system` 只由 flow 写入；`external_api` 预留 |
+| `certificate` | lookup → 资质证书（只读） | 资质类系统事件指回过期的必备证书；同一证书有未关闭的事件时不重复建 |
+| `description` | textarea | 必填 |
+| `status` | select（stageField） | `open` 未处理（open）→ `mitigating` 处理中（open）/ `closed` 已关闭（won）；`mitigating` → `open` / `closed`；`closed` → `open`（关错或风险复现时重新打开） |
+| `mitigation_plan` | textarea | 应对措施 |
+| `owner_note` | textarea | 处理结论，`closed` 时必填（`requiredWhen`）；资质恢复自动关闭时由 flow 写入 |
+| `disposition` | lookup → 处置单（只读） | 高风险事件生成或并入的冻结处置单草稿 |
+| `external_ref` | text（只读） | 外部服务的事件编号，外部拉取上线后按它去重 |
+
+关闭后类型、严重度、描述、应对措施只读。
+
 ## 5. 状态机
 
 每个状态字段都是所在对象的 `stageField`。表中「kind」列即选项的 `kind`；「允许
@@ -802,6 +832,7 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 | 整改单 | `SCAR{YYYY}{00000}` | SCAR202600007 | 按年 |
 | 供应商审核 | `AUD{YYYY}{00000}` | AUD202600012 | 按年 |
 | 考评单 | `PR{YYYY}{00000}` | PR202600210 | 按年 |
+| 风险事件 | `RSK{YYYY}{00000}` | RSK202600009 | 按年 |
 | 送货单（预留） | `ASN{YYYYMMDD}{0000}` | ASN202610220015 | 按日 |
 
 物料、交付记录、工厂沿用 ERP 编号，不在 SRM 内另行编号。

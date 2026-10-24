@@ -23,3 +23,7 @@ export { ScarOverdueSweepFlow } from './quality/scar-overdue-sweep.flow.js';
 export { AuditAdmissionApplyFlow } from './audit/admission-apply.flow.js';
 export { AuditFindingToScarFlow } from './audit/finding-to-scar.flow.js';
 export { AuditPlanGenerateFlow } from './audit/plan-generate.flow.js';
+export { DispositionSubmitFlow } from './disposition/disposition-submit.flow.js';
+export { DispositionCancelFlow } from './disposition/disposition-cancel.flow.js';
+export { RiskEventApplyFlow } from './risk/risk-event-apply.flow.js';
+export { BlacklistExpiryNoticeFlow } from './risk/blacklist-expiry-notice.flow.js';

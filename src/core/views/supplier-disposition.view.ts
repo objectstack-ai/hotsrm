@@ -10,6 +10,7 @@ const columns = [
   { field: 'approval_status' },
   { field: 'effective_date' },
   { field: 'created_by' },
+  { field: 'submitted_by' },
   { field: 'applied_at' },
 ];
 
@@ -23,6 +24,14 @@ export const SupplierDispositionViews = defineView({
   },
 
   listViews: {
+    // flow 生成的草稿（高风险事件、绩效结果应用，v0.5）：品类经理核实后提交审批或作废
+    draft: {
+      label: '待提交草稿',
+      type: 'grid',
+      data,
+      columns,
+      filter: [{ field: 'status', operator: 'equals', value: 'draft' }],
+    },
     in_review: {
       label: '审批中',
       type: 'grid',
