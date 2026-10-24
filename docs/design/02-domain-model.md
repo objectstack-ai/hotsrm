@@ -209,6 +209,7 @@ erDiagram
 | `primary_contact_count` | summary | `count` 联系人，条件 `is_primary == true`；联系人的主联系人守卫规则读它（v0.2） |
 | `expired_certificate_count` | summary | `count` 资质证书，条件 `status == 'expired'` |
 | `default_bank_account_count` | summary | `count` 银行账户，条件 `is_default == true`；「每家至多一个默认账户」的校验读它（v0.2） |
+| `open_disposition_count` | summary | `count` 处置单，条件 `status == 'in_review'`；「同一家供应商同时只能有一张审批中的处置单」的校验读它（v0.3） |
 
 关键信息锁定（v0.2）：`name`、`country`、`credit_code`、`registration_no`、`legal_representative`、
 `registered_capital`、`address` 在 `potential` / `qualifying` 期间可以直接改；准入通过后（合格、冻结、
@@ -270,6 +271,9 @@ flow 拒绝新建人核验自己建的账户（03 §13）。
 **`srm_supplier_category` 供货品类资格**（master_detail → 供应商）：`category`
 （lookup）、`status`（`trial` 试供 / `qualified` 合格 / `suspended` 暂停）、
 `approved_date`、`source_application`（lookup 准入申请）。同一供应商同一品类唯一。
+处置单冻结时由 flow 写三个只读字段（v0.3）：`status_before_freeze`（`trial` / `qualified`，暂停前的状态）、
+`freeze_scope`（`all` / `category`，哪种范围的冻结暂停了它）、`freeze_disposition`（lookup 处置单）。
+解冻只恢复同一范围冻结的资格，原本就暂停的资格没有冻结记录，不会被解冻恢复。
 
 **`srm_material` 物料**（只读副本，OWD `public_read`，暂用 `public_read_write`，见下方说明；v0.2）：`erp_material_no`
 （组织内唯一，导入匹配键）、`material_code`、`name`、`specification`、`uom`、`category`（lookup）、
@@ -356,10 +360,30 @@ upsert 写入，结构不变。
 新值用分类型字段而不是直接编辑 json：表单能按类型显示、校验，退回后发起人能直接改。变更内容只在新建时和
 `approval_status == 'returned'` 期间可改（`readonlyWhen`），审批中平台锁定记录。
 
-**`srm_supplier_disposition` 供应商处置单**（v0.3）：`supplier`、`action`
+**`srm_supplier_disposition` 供应商处置单**（OWD `private`，内部岗位全部可读；v0.3）：
+`disposition_no`（自动编号 `DSP{YYYY}{00000}`）、`supplier`、`action`
 （`freeze` / `unfreeze` / `eliminate` / `blacklist` / `remove_blacklist`）、
-`scope`（`all` 全部品类 / `category` 指定品类）、`categories`、`reason`（必填）、
-`effective_date`、`status`。
+`scope`（`all` 全部品类 / `category` 指定品类，只有冻结和解冻可以指定品类）、`categories`（多值 lookup 品类，
+指定品类时必填）、`reason`（必填）、`effective_date`（默认当天）、`status`（`in_review` 审批中 / `applied` 已执行 /
+`rejected` 已驳回）、`approval_status`（审批节点写入）、只读的 `director_approver` / `gm_approver` /
+`compliance_approver`、`reject_reason`、`applied_at`。
+
+新建即进入审批，供应商、动作、范围和品类只在新建时填写，原因和生效日期在被退回修改期间可改。审批通过即执行，
+`effective_date` 记录业务生效日，供采购员在 ERP 同步冻结标志时参照。新建时校验动作与供应商当前状态
+（[§5.1](#51-供应商-srm_supplierstatus)）：
+
+| 动作 | 供应商当前状态 | 执行结果 |
+|---|---|---|
+| 冻结（全部品类） | `qualified` | 供应商 → `frozen`；未暂停的品类资格 → `suspended` |
+| 冻结（指定品类） | `qualified` | 供应商不变；所选品类中未暂停的资格 → `suspended` |
+| 解冻（全部品类） | `frozen` | 供应商 → `qualified`；全部品类冻结暂停的资格恢复为冻结前的状态 |
+| 解冻（指定品类） | `qualified` | 供应商不变；所选品类中指定品类冻结暂停的资格恢复 |
+| 淘汰 | `potential` / `qualified` / `frozen` | 供应商 → `eliminated`；品类资格全部 `suspended`，清掉冻结记录 |
+| 拉入黑名单 | `qualified` / `frozen` / `eliminated` | 供应商 → `blacklisted`；品类资格全部 `suspended`，清掉冻结记录 |
+| 解除黑名单 | `blacklisted` | 供应商 → `eliminated`（只能再走准入） |
+
+同一家供应商同时只能有一张审批中的处置单（读供应商的 `open_disposition_count`），免得两张单子审完后互相覆盖。
+淘汰和黑名单清掉冻结记录，是为了重新准入后再冻结、解冻时，不会把没有重新准入的品类恢复。
 
 **`srm_supplier_invitation` 门户邀请**（OWD `private`；v0.6）：`supplier`（lookup，
 可空：存量供应商批量邀请时填）、`company_name`、`contact_name`、`contact_email`、
