@@ -3,9 +3,9 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 合同 / 协议（02 §4.4、§5.5，03 §6）。品类经理起草 → 提交审批（srm_contract_submit）→ 审批（srm_contract_approval，v0.3 C2）
 // → 签署中上传双方盖章件、填签署日期 → 确认生效（srm_contract_activate）→ 到期扫描置为已到期（srm_contract_expire_sweep）。
-// 状态只由 flow 写入。合同内容只在草稿期间可改；签署件与签署日期只在签署中可改。
+// 状态只由 flow 写入。合同内容只在草稿期间和被退回修改期间可改（审批中平台锁定记录）；签署件与签署日期只在签署中可改。
 // 电子签（esign_request_id）、ERP 合同号、来源寻源单（v0.7 随寻源单加入）预留，现阶段不写。
-const notDraft = P`record.status != 'draft'`;
+const notDraft = P`record.status != 'draft' && record.approval_status != 'returned'`;
 const notSigning = P`record.status != 'signing'`;
 const blank = (k: string) => `(!has(record.${k}) || record.${k} == null || isBlank(record.${k}))`;
 
@@ -24,6 +24,7 @@ export const Contract = ObjectSchema.create({
 
   fieldGroups: [
     { key: 'contract', label: '合同信息', icon: 'file-signature' },
+    { key: 'review', label: '审批', icon: 'stamp' },
     { key: 'signing', label: '签署', icon: 'pen-line' },
     { key: 'external', label: '外部系统', icon: 'link' },
   ],
@@ -84,6 +85,27 @@ export const Contract = ObjectSchema.create({
     // 自动续签生成的草稿指回原合同，由 srm_contract_renew 写入
     renewed_from: Field.lookup('srm_contract', { label: '续签自', group: 'contract', readonly: true }),
 
+    // 审批（03 §6、§12）：提交人由 srm_contract_submit 写入，审批结论和各级审批人由 srm_contract_approval 写入
+    submitted_by: Field.user({ label: '提交人', group: 'review', readonly: true }),
+    // 审批节点写入的审批结论；returned = 退回修改，合同内容解锁
+    approval_status: Field.select({
+      label: '审批结论',
+      group: 'review',
+      readonly: true,
+      options: [
+        { label: '审批中', value: 'pending' },
+        { label: '已批准', value: 'approved' },
+        { label: '已驳回', value: 'rejected' },
+        { label: '退回修改', value: 'returned' },
+        { label: '已撤回', value: 'recalled' },
+      ],
+    }),
+    legal_approver: Field.user({ label: '法务审批人', group: 'review', readonly: true }),
+    category_approver: Field.user({ label: '品类经理审批人', group: 'review', readonly: true }),
+    director_approver: Field.user({ label: '采购总监审批人', group: 'review', readonly: true }),
+    gm_approver: Field.user({ label: '总经理审批人', group: 'review', readonly: true }),
+    reject_reason: Field.textarea({ label: '驳回原因', group: 'review', readonly: true }),
+
     signed_file: Field.file({ label: '签署件', group: 'signing', readonlyWhen: notSigning }),
     signed_date: Field.date({ label: '签署日期', group: 'signing', readonlyWhen: notSigning }),
 
@@ -123,6 +145,14 @@ export const Contract = ObjectSchema.create({
       events: ['insert'],
       message: '只能与「合格」的供应商签订新合同',
       condition: P`has(record.supplier.status) && record.supplier.status != 'qualified'`,
+    },
+    {
+      // 职责分离（BR-11）：起草人不能指定自己做法务审核人
+      name: 'legal_reviewer_not_drafter',
+      type: 'script',
+      severity: 'error',
+      message: '法务审核人不能是合同起草人',
+      condition: P`has(record.legal_reviewer) && record.legal_reviewer != null && has(record.created_by) && record.legal_reviewer == record.created_by`,
     },
     {
       // 生效必须有签署件和签署日期（03 §6 第 3–4 步）；确认生效的 screen flow 先查一遍，这里兜底

@@ -2,7 +2,7 @@ import { P, F } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 合同明细（02 §4.4）。金额 = 数量 × 单价，由平台按表达式计算后存储，合同上的 line_amount 汇总它。
-// 明细跟随合同（controlled_by_parent），只在合同为草稿时可增改（字段谓词读不到父记录，用 script 规则读一跳）。
+// 明细跟随合同（controlled_by_parent），只在合同为草稿或被退回修改时可增改（字段谓词读不到父记录，用 script 规则读一跳）。
 export const ContractLine = ObjectSchema.create({
   name: 'srm_contract_line',
   label: '合同明细',
@@ -50,8 +50,8 @@ export const ContractLine = ObjectSchema.create({
       name: 'line_contract_draft',
       type: 'script',
       severity: 'error',
-      message: '只有草稿合同可以修改明细',
-      condition: P`has(record.contract.status) && record.contract.status != 'draft'`,
+      message: '只有草稿或退回修改中的合同可以修改明细',
+      condition: P`has(record.contract.status) && record.contract.status != 'draft' && (!has(record.contract.approval_status) || record.contract.approval_status != 'returned')`,
     },
   ],
 });
