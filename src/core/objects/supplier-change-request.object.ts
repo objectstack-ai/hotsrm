@@ -5,10 +5,12 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 // 填写变更后的值；新建即进入审批（srm_change_approval），审批通过后由 flow 写回供应商、银行账户或联系人。
 // 变更后的值放在本单的分类型字段里（表单可校验、退回后可修改），before_value / after_value 是 flow 写入的
 // json 快照，供审计对照。银行账号不进快照（BR-20：本单对采购员可读，快照没有脱敏规则）。
-// 供应商、类型和要改的对象只在新建时填写（readonlyWhen 不管新建；三个状态覆盖了所有已建记录）
-const created = P`record.status == 'in_review' || record.status == 'applied' || record.status == 'rejected'`;
+// 供应商、类型和要改的对象只在新建时填写（三个状态覆盖了所有已建记录）。服务端新建时不看 readonlyWhen，
+// 新建表单却会按默认值（状态「审批中」、审批结论为空）把字段锁住，所以两条都先判断记录已保存（有 id）。
+// 临时绕法（objectstack#25584），平台修复后去掉 id 判断
+const created = P`has(record.id) && record.id != null && (record.status == 'in_review' || record.status == 'applied' || record.status == 'rejected')`;
 // 变更内容只在新建时和被退回修改期间可改；审批中平台锁定记录，审结后只读
-const proposal = P`record.approval_status != 'returned'`;
+const proposal = P`has(record.id) && record.id != null && record.approval_status != 'returned'`;
 
 export const SupplierChangeRequest = ObjectSchema.create({
   name: 'srm_supplier_change_request',
@@ -22,10 +24,11 @@ export const SupplierChangeRequest = ObjectSchema.create({
 
   fieldGroups: [
     { key: 'request', label: '变更申请', icon: 'file-pen' },
-    { key: 'basic', label: '基本信息变更', icon: 'building' },
-    { key: 'address', label: '地址变更', icon: 'map-pin' },
-    { key: 'bank', label: '银行账户变更', icon: 'landmark' },
-    { key: 'contact', label: '联系人变更', icon: 'contact' },
+    // 分组也按变更类型显示：详情页只按分组判断，字段上的 visibleWhen 拦不住带默认值的「新账户币种」
+    { key: 'basic', label: '基本信息变更', icon: 'building', visibleWhen: P`record.change_type == 'basic'` },
+    { key: 'address', label: '地址变更', icon: 'map-pin', visibleWhen: P`record.change_type == 'address'` },
+    { key: 'bank', label: '银行账户变更', icon: 'landmark', visibleWhen: P`record.change_type == 'bank_account'` },
+    { key: 'contact', label: '联系人变更', icon: 'contact', visibleWhen: P`record.change_type == 'contact'` },
     { key: 'review', label: '审批与写回', icon: 'shield-check' },
   ],
 
