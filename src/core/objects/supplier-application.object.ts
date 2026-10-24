@@ -2,7 +2,8 @@ import { P } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 准入申请（02 §4.2、§5.2）。v0.1 由内部人员为已登记的潜在供应商发起：没有公开表单和门户，
-// 所以申请直接关联供应商，申请品类用多值 lookup；现场审核分支随供应商审核对象加入（v0.2）。
+// 所以申请直接关联供应商，申请品类用多值 lookup；现场审核分支随供应商审核对象加入（v0.4）：
+// 高风险品类的申请要有通过或有条件通过的准入审核才能进入准入评审（FR-204）。
 // v0.3 起淘汰供应商可以重新申请（沿用旧档），黑名单供应商的申请由受理 flow 自动驳回（FR-208、BR-02）。
 export const SupplierApplication = ObjectSchema.create({
   name: 'srm_supplier_application',
@@ -68,6 +69,19 @@ export const SupplierApplication = ObjectSchema.create({
         { label: '低', value: 'low' },
       ],
     }),
+    // 准入审核完成时由 srm_audit_admission_apply 写入（03 §3 第 5 步），只读；审核报告在审核记录上
+    audit_passed: Field.boolean({ label: '现场审核通过', group: 'review', defaultValue: false, readonly: true }),
+    // 有条件通过的申请批准后品类资格为「试供」（WI-01 6.6.2）
+    audit_result: Field.select({
+      label: '现场审核结论',
+      group: 'review',
+      readonly: true,
+      options: [
+        { label: '通过', value: 'pass' },
+        { label: '有条件通过', value: 'conditional' },
+        { label: '不通过', value: 'fail' },
+      ],
+    }),
     reviewer: Field.user({ label: '初审人', group: 'review' }),
     // 审批节点写入的审批结论，只读
     approval_status: Field.select({
@@ -115,6 +129,15 @@ export const SupplierApplication = ObjectSchema.create({
       severity: 'error',
       message: '进入准入评审前需要指定初审人',
       condition: P`record.status == 'admission_review' && (!has(record.reviewer) || record.reviewer == null || isBlank(record.reviewer))`,
+    },
+    {
+      // 高风险品类以现场审核为前置（FR-204，03 §3 第 5 步）
+      name: 'audit_before_review',
+      type: 'script',
+      severity: 'error',
+      events: ['update'],
+      message: '高风险品类的申请要有通过或有条件通过的现场审核，才能进入准入评审',
+      condition: P`record.status == 'admission_review' && has(previous.status) && previous.status != 'admission_review' && has(record.risk_class) && record.risk_class == 'high' && record.audit_passed != true`,
     },
     {
       name: 'reject_reason_required',

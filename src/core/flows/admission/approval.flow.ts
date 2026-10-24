@@ -5,10 +5,12 @@ import type * as Automation from '@objectstack/spec/automation';
 // 第 1 级是申请上的初审人，第 2 级是采购总监岗位；A 类物资或高风险品类的申请第 2 级并行加质量经理会签
 // （03 §12）：采购总监、质量经理各一人通过才算通过（per_group，同岗位多人时任一人即可），任一人驳回即驳回。
 // 任一级驳回，申请退回「资料审核」。
-// 批准后：申请→准入通过，供应商→合格，按申请品类建供货品类资格（v0.1 没有现场审核，一律合格）。
+// 批准后：申请→准入通过，供应商→合格，按申请品类建供货品类资格：现场审核结论为有条件通过时为「试供」，
+// 否则为「合格」（03 §3 第 7 步，WI-01 6.6.2）。
 
 const cel$ = (source: string) => ({ dialect: 'cel' as const, source });
 // v0.4 之前受理的申请没有这两个字段，按不会签处理
+const grantStatus = cel`has(record.audit_result) && record.audit_result == 'conditional' ? 'trial' : 'qualified'`;
 const needsQuality = `(has(record.material_class) && record.material_class == 'class_a') || (has(record.risk_class) && record.risk_class == 'high')`;
 
 export const AdmissionApprovalFlow: Automation.Flow = {
@@ -112,14 +114,14 @@ export const AdmissionApprovalFlow: Automation.Flow = {
                         fields: {
                           supplier: cel`record.supplier`,
                           category: cel`categoryId`,
-                          status: 'qualified',
+                          status: grantStatus,
                           approved_date: cel`today()`,
                         },
                       },
                     },
                   ],
                 },
-                // 重新准入的供应商可能已有该品类的资格记录（唯一约束），改为恢复合格
+                // 重新准入的供应商可能已有该品类的资格记录（唯一约束），改为恢复
                 catch: {
                   nodes: [
                     {
@@ -131,7 +133,7 @@ export const AdmissionApprovalFlow: Automation.Flow = {
                         filter: { supplier: cel`record.supplier`, category: cel`categoryId` },
                         // 按条件更新要声明 multi；供应商 + 品类唯一，实际只有一条
                         multi: true,
-                        fields: { status: 'qualified', approved_date: cel`today()` },
+                        fields: { status: grantStatus, approved_date: cel`today()` },
                       },
                     },
                   ],

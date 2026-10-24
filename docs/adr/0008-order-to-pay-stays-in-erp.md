@@ -67,3 +67,8 @@
   寻源与合同，可以最先做（[ADR-0009](./0009-core-first-pack-criteria-and-customer-layer.md)）。
 - `srm_integration` 权限集、I1–I15 数据流、与主流 ERP 的字段对照保留在文档里作为
   预留，立项时直接沿用。
+
+## 补充（2026-10-24）
+
+v0.4 实现供应商审核时，审核问题项从 repeater 字段改为子对象 `srm_supplier_audit_finding`（平台的 repeater 不能声明子字段，
+问题项也无法关联整改单），核心对象由 27 个变为 28 个，见 [02 §2](../design/02-domain-model.md#2-对象总览)。本记录的决定不变。

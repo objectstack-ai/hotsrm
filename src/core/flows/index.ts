@@ -20,3 +20,6 @@ export { ScarCreateFlow } from './quality/scar-create.flow.js';
 export { ScarReviewFlow } from './quality/scar-review.flow.js';
 export { ScarReopenFlow } from './quality/scar-reopen.flow.js';
 export { ScarOverdueSweepFlow } from './quality/scar-overdue-sweep.flow.js';
+export { AuditAdmissionApplyFlow } from './audit/admission-apply.flow.js';
+export { AuditFindingToScarFlow } from './audit/finding-to-scar.flow.js';
+export { AuditPlanGenerateFlow } from './audit/plan-generate.flow.js';

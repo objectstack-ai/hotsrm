@@ -65,3 +65,8 @@
 - 实施手册（`docs/implementation/`，待建）要写明客户层的四种定制方式和边界。
 - 源语言已定为中文源、英文译（2026-10-24，[ADR-0007](./0007-china-first-with-overseas-seams.md)
   补充说明），不影响本记录。
+
+## 补充（2026-10-24）
+
+v0.4 实现供应商审核时，审核问题项从 repeater 字段改为子对象 `srm_supplier_audit_finding`（平台的 repeater 不能声明子字段，
+问题项也无法关联整改单），核心对象由 27 个变为 28 个，见 [02 §2](../design/02-domain-model.md#2-对象总览)。本记录的决定不变。
