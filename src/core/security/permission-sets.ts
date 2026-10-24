@@ -122,6 +122,13 @@ export const QualityPermissionSet = {
   },
 };
 
+// IQC 检验员：交付记录的录入（没有质量系统的客户，04 §2.2）。交付记录对象随 v0.4 Q1 上线后在这里补对象权限
+export const IqcPermissionSet = {
+  name: 'srm_iqc',
+  label: 'SRM 来料检验',
+  objects: {},
+};
+
 // 管理层：全部只读；审批由 flow 授予，不需要写权限
 export const ExecutivePermissionSet = {
   name: 'srm_executive',
@@ -217,6 +224,7 @@ export const SrmPermissionSets = [
   BuyerPermissionSet,
   SupplierAdminPermissionSet,
   QualityPermissionSet,
+  IqcPermissionSet,
   ExecutivePermissionSet,
   FinancePermissionSet,
   LegalPermissionSet,

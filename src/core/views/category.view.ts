@@ -9,6 +9,7 @@ export const CategoryViews = defineView({
       { field: 'code' },
       { field: 'name' },
       { field: 'parent' },
+      { field: 'material_class' },
       { field: 'risk_class' },
       { field: 'is_direct' },
       { field: 'category_manager' },

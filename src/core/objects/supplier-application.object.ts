@@ -56,6 +56,18 @@ export const SupplierApplication = ObjectSchema.create({
         { label: '淘汰后重新准入', value: 'reapply' },
       ],
     }),
+    // 受理 flow 从申请品类复制的最高物资类别与风险等级，只读；A 类或高风险时准入审批加质量经理会签（03 §12）
+    material_class: Field.select({ label: '物资类别', group: 'review', readonly: true, picklist: 'srm_material_class' }),
+    risk_class: Field.select({
+      label: '风险等级',
+      group: 'review',
+      readonly: true,
+      options: [
+        { label: '高', value: 'high' },
+        { label: '中', value: 'medium' },
+        { label: '低', value: 'low' },
+      ],
+    }),
     reviewer: Field.user({ label: '初审人', group: 'review' }),
     // 审批节点写入的审批结论，只读
     approval_status: Field.select({

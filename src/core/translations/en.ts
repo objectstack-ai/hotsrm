@@ -14,6 +14,7 @@ export const en: TranslationData = {
         category_manager: { label: 'Category Manager' },
         sqe: { label: 'SQE' },
         is_direct: { label: 'Direct Material' },
+        material_class: { label: 'Material Class' },
         risk_class: {
           label: 'Risk Class',
           options: { high: 'High', medium: 'Medium', low: 'Low' },
@@ -369,6 +370,8 @@ export const en: TranslationData = {
           label: 'Duplicate Check',
           options: { pass: 'Passed', duplicate: 'Duplicate', blacklisted: 'Blacklisted', reapply: 'Re-admission' },
         },
+        material_class: { label: 'Material Class' },
+        risk_class: { label: 'Risk Class', options: { high: 'High', medium: 'Medium', low: 'Low' } },
         reviewer: { label: 'Reviewer' },
         approval_status: { label: 'Approval Result', options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' } },
         approved_date: { label: 'Approved Date' },
@@ -490,6 +493,10 @@ export const en: TranslationData = {
         ccc: 'CCC Certification',
         other: 'Other',
       },
+    },
+    srm_material_class: {
+      label: 'Material Class',
+      options: { class_a: 'Class A (Strategic)', class_b: 'Class B (Important)', class_c: 'Class C (General)' },
     },
     srm_contract_type: {
       label: 'Contract Type',

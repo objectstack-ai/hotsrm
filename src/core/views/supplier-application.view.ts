@@ -5,6 +5,7 @@ const columns = [
   { field: 'application_no' },
   { field: 'supplier' },
   { field: 'applied_categories' },
+  { field: 'material_class' },
   { field: 'status' },
   { field: 'duplicate_check' },
   { field: 'reviewer' },

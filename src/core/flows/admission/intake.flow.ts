@@ -6,6 +6,19 @@ import type * as Automation from '@objectstack/spec/automation';
 // - 淘汰：重新准入（FR-208），沿用旧档，供应商回到「准入中」，品类资格在批准后按申请品类恢复；
 // - 潜在：通过，供应商进入「准入中」。
 // 内部登记时供应商已由唯一约束查重，其余状态在建申请时被校验规则拦下，所以这里不会出现 duplicate。
+// 查重前先把申请品类中最高的物资类别和风险等级复制到申请（03 §3 步骤 1），准入审批据此决定是否会签质量经理。
+// 申请品类中任找一条满足条件的品类；找不到时输出变量为 null
+const categoryWith = (id: string, label: string, where: Record<string, string>, outputVariable: string) => ({
+  id,
+  type: 'get_record' as const,
+  label,
+  config: {
+    objectName: 'srm_category',
+    filter: { id: { $in: cel`record.applied_categories` }, ...where },
+    outputVariable,
+  },
+});
+
 export const ApplicationIntakeFlow: Automation.Flow = {
   name: 'srm_application_intake',
   label: '准入申请受理',
@@ -25,6 +38,23 @@ export const ApplicationIntakeFlow: Automation.Flow = {
       type: 'get_record',
       label: '读取供应商',
       config: { objectName: 'srm_supplier', filter: { id: cel`record.supplier` }, outputVariable: 'vendor' },
+    },
+    categoryWith('find_class_a', '找 A 类申请品类', { material_class: 'class_a' }, 'classA'),
+    categoryWith('find_class_b', '找 B 类申请品类', { material_class: 'class_b' }, 'classB'),
+    categoryWith('find_risk_high', '找高风险申请品类', { risk_class: 'high' }, 'riskHigh'),
+    categoryWith('find_risk_medium', '找中风险申请品类', { risk_class: 'medium' }, 'riskMedium'),
+    {
+      id: 'copy_classes',
+      type: 'update_record',
+      label: '写入最高物资类别与风险等级',
+      config: {
+        objectName: 'srm_supplier_application',
+        filter: { id: cel`record.id` },
+        fields: {
+          material_class: cel`classA != null ? 'class_a' : (classB != null ? 'class_b' : 'class_c')`,
+          risk_class: cel`riskHigh != null ? 'high' : (riskMedium != null ? 'medium' : 'low')`,
+        },
+      },
     },
     { id: 'by_status', type: 'decision', label: '按供应商状态查重' },
     {
@@ -83,7 +113,12 @@ export const ApplicationIntakeFlow: Automation.Flow = {
 
   edges: [
     { id: 'e1', source: 'start', target: 'load_supplier', type: 'default' },
-    { id: 'e2', source: 'load_supplier', target: 'by_status', type: 'default' },
+    { id: 'e2', source: 'load_supplier', target: 'find_class_a', type: 'default' },
+    { id: 'e_c1', source: 'find_class_a', target: 'find_class_b', type: 'default' },
+    { id: 'e_c2', source: 'find_class_b', target: 'find_risk_high', type: 'default' },
+    { id: 'e_c3', source: 'find_risk_high', target: 'find_risk_medium', type: 'default' },
+    { id: 'e_c4', source: 'find_risk_medium', target: 'copy_classes', type: 'default' },
+    { id: 'e_c5', source: 'copy_classes', target: 'by_status', type: 'default' },
     {
       id: 'e_blacklisted',
       source: 'by_status',
