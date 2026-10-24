@@ -1,5 +1,6 @@
 import { Supplier } from '../objects/supplier.object.js';
 import { Contract } from '../objects/contract.object.js';
+import { QualityIssue } from '../objects/quality-issue.object.js';
 
 // 内部权限集（04 §2.2）的 v0.1 子集。一律不设 isDefault（AGENTS.md 红线 2）。
 // 状态类字段（供应商状态、资质异常、证书状态）只由 flow 写入，权限集里一律只读。
@@ -31,6 +32,8 @@ export const InternalBasePermissionSet = {
     srm_supplier_disposition: read,
     // 交付记录内部只读（02 §4.6）：采购员、品类经理看 OTD 与不合格交付
     srm_delivery_record: read,
+    // 整改单内部只读（04 §2.3）
+    srm_quality_issue: read,
   },
 };
 
@@ -118,11 +121,15 @@ export const QualityPermissionSet = {
     srm_supplier_application: read,
     // 交付记录：每月导入 ERP 收货与检验结果，没有质量系统时逐条录入（02 §4.6，03 §8）
     srm_delivery_record: write,
+    // 整改单：手工新建（客户投诉、制程等），v0.6 前代供应商填写 8D 回复、推进状态、登记索赔（03 §8）
+    srm_quality_issue: write,
   },
   fields: {
     ...supplierFieldsReadOnly,
     'srm_supplier_certificate.status': flowOwned,
     'srm_supplier_certificate.legacy_imported': flowOwned,
+    // 逾期标志由 srm_scar_overdue_sweep 维护
+    'srm_quality_issue.is_overdue': flowOwned,
   },
 };
 
@@ -153,8 +160,11 @@ export const ExecutivePermissionSet = {
     srm_contract_line: read,
     srm_supplier_disposition: read,
     srm_delivery_record: read,
+    srm_quality_issue: read,
   },
 };
+
+const qualityIssueFieldsReadOnly = Object.fromEntries(Object.keys(QualityIssue.fields).map((field) => [`srm_quality_issue.${field}`, readOnly]));
 
 // 财务（应付会计）：供应商档案与银行账户只读，银行账号完整可读（BR-20）；
 // 核验只经「核验银行账户」screen flow（srm_bank_verify），不直接改记录
@@ -170,8 +180,15 @@ export const FinancePermissionSet = {
     srm_supplier_change_request: read,
     srm_contract: read,
     srm_contract_line: read,
+    // 整改单只能改索赔状态：在 ERP 扣款后把「供应商已接受」的索赔标记为「已扣款」（03 §8 第 6 步）；
+    // 整改单 OWD 暂为 public_read_write（objectstack#25470），其余字段 FLS 只读
+    srm_quality_issue: { ...read, allowEdit: true },
   },
   systemPermissions: ['srm_view_bank_account_no'],
+  fields: {
+    ...qualityIssueFieldsReadOnly,
+    'srm_quality_issue.claim_status': { readable: true, editable: true },
+  },
 };
 
 // 系统管理员：维护品类与工厂等配置，执行物料导入和存量供应商、联系人、证书导入（04 §2.2）
@@ -227,6 +244,7 @@ export const AuditorPermissionSet = {
     srm_contract_line: read,
     srm_supplier_disposition: read,
     srm_delivery_record: read,
+    srm_quality_issue: read,
   },
 };
 

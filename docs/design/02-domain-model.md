@@ -588,29 +588,32 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `received_quantity_mn` | number | 存储表达式：实收数量 ÷ 1,000,000。PPM = Σ不良数 ÷ Σ`received_quantity_mn`，看板用两个合计之比得出（[05 §4.1](./05-experience-and-analytics.md#41-指标口径)） |
 | `portal_position` | text | v0.6 加；供应商在门户只能看本公司的交付记录 |
 
-**`srm_quality_issue` 质量整改单 SCAR**
+**`srm_quality_issue` 质量整改单 SCAR**（OWD 暂为 `public_read_write`：自动开的单属于系统、SQE 之间要互相接手，
+目标是 `public_read` + 质量岗位改所有记录，等 objectstack#25470；能改哪些字段由权限集与 FLS 决定，删除只给 `srm_admin`）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `issue_no` | autonumber | `SCAR{YYYY}{00000}` |
 | `supplier` / `material` | lookup | |
 | `delivery_record` | lookup | 来源交付记录（可空） |
-| `audit` | lookup | 来源审核（可空） |
+| `audit` | lookup | 来源审核（可空）；随供应商审核对象在 v0.4 Q3 加 |
 | `source` | select（共享选项列表 `srm_quality_issue_source`） | `iqc` 来料 / `production` 制程 / `customer` 客户投诉 / `audit` 审核发现 / `performance` 绩效改善 |
 | `severity` | select | 同检验 |
 | `problem_description` | richtext | D2 问题描述，必填 |
 | `status` | select（stageField） | 见 §5.6 |
 | `sqe` | user | 负责 SQE |
-| `containment_due` / `final_due` | datetime / date | 创建时按严重度计算：临时措施 72 小时，最终回复 30 天 |
-| `containment_action` | richtext | D3，供应商填写（v0.6 前由 SQE 代填） |
-| `root_cause` | richtext | D4 |
-| `corrective_action` / `preventive_action` | richtext | D5–D7 |
-| `evidence` | file | 整改证据 |
+| `containment_due` / `final_due` | datetime / date | 只读，创建时按参数算好：临时措施 `scar_containment_hours`（示例 72 小时），最终回复 `scar_final_days`（示例 30 天）；问题复发重新打开时按重开时间重算 |
+| `containment_action` | richtext | D3，供应商填写（v0.6 前由 SQE 代填）；提交临时措施后必填 |
+| `root_cause` | richtext | D4；提交根因与措施后必填 |
+| `corrective_action` / `preventive_action` | richtext | D5–D6 / D7；纠正措施提交后必填 |
+| `evidence` | file（多个） | 整改证据 |
 | `sqe_comment` | textarea | 审核意见，退回时必填 |
 | `is_overdue` | boolean | 默认 false，逾期 flow 维护 |
 | `claim_amount` | currency | 索赔金额 |
-| `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计手工标记；SRM 不生成扣款） |
-| `steps` | repeater | 8D 各步骤的完成日期、责任人、附件（D1–D8），供看板显示进度 |
+| `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计从「供应商已接受」手工标记，选项对其他人不可选；SRM 不生成扣款）；不是 `none` 时必须填索赔金额 |
+| `steps` | repeater | 8D 各步骤的完成日期、责任人、附件（D1–D8），供门户整改回复页分段显示；随门户（v0.6）加，之前状态即 8D 进度 |
+
+整改单上 8D 内容在关闭或撤销后只读。
 
 ### 4.7 绩效（v0.5）
 

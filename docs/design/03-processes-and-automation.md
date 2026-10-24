@@ -79,7 +79,7 @@
 |---|---|
 | R1 强制性规则不依赖计时器 | 「截止后不能改报价」由校验规则在**写入时**用 `now()` 比较冗余在报价上的截止时间；「截止前不能开标」由寻源单的校验规则比较 `locked_deadline`。计时器失灵也不会放过一次越界写入 |
 | R2 扫描任务是追赶式且幂等的 | 每次扫描处理「所有已到期而尚未处理」的记录，而不是「今天到期」的记录；处理后打标记，重复运行不重复处理。漏掉一次，下一次自动补上 |
-| R3 关键扫描有外部心跳 | 截标、PO 催办、SCAR 逾期这三个时效敏感的扫描，同时暴露为 `api` 触发的 flow，由外部调度器（ERP 中间件或运维定时任务）每 10 分钟调用一次，保证准时 |
+| R3 关键扫描有外部心跳 | 截标、PO 催办、SCAR 逾期这三个时效敏感的扫描，同时暴露为 `api` 触发的 flow，由外部调度器（ERP 中间件或运维定时任务）每 10 分钟调用一次，保证准时。平台的 `api` flow 只能把签名密钥写死在元数据里，公开仓库不能这么做，心跳 flow 暂不提供、只靠定时任务，等平台支持部署时注入密钥（objectstack#25675） |
 
 ## 3. P1 供应商登记与准入
 
@@ -325,11 +325,12 @@ stateDiagram-v2
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 生成 | 交付记录写入，`inspection_result == 'fail'` 且 `severity in ['critical','major']`；或审核问题项经「转整改单」screen flow | flow `srm_scar_create`：新建整改单，`sqe` 取物料品类的 SQE，`containment_due = 创建时间 + scar_containment_hours`、`final_due = 创建日期 + scar_final_days`（参数见 `params/core.yaml`）；通知供应商 `quality` 联系人与 SQE（BR-15）。`minor` 不合格只计入绩效，不自动开单。v0.6 前供应商的回复由 SQE 代填 |
-| 2 临时措施 | 供应商提交 D3 | 状态→`containment_submitted`；通知 SQE |
-| 3 根因与措施 | 供应商提交 D4–D7 | 状态→`action_submitted`；flow 发起 `approval` 节点：`field` 审批人 = `sqe`，驳回走「退回修改」回到供应商，退回意见写入 `sqe_comment`（FR-604） |
-| 4 效果验证 | SQE 审核通过 | 状态→`verifying`；SQE 跟踪后续批次，确认有效后关闭 |
-| 5 逾期升级 | 追赶式扫描 `srm_scar_overdue_sweep`（每小时 + 外部心跳） | 超过 `containment_due` 仍为 `open`、或超过 `final_due` 仍未到 `verifying`：`is_overdue = true`，提醒供应商并通知 SQE 主管（FR-605） |
+| 1 生成 | 交付记录写入（新建或修改，月度导入是 upsert），**变成** `inspection_result == 'fail'` 且 `severity in ['critical','major']`；或审核问题项经「转整改单」screen flow；客户投诉、制程等来源由 SQE 手工新建 | flow `srm_scar_create`：同一条交付记录已有整改单时不再开（重复导入不重复开单）；新建整改单，`sqe` 取物料品类的 SQE，`containment_due = 创建时间 + scar_containment_hours`、`final_due = 创建日期 + scar_final_days`（参数见 `params/core.yaml`，由字段默认值算好）；通知 SQE，品类没有 SQE 时通知质量经理指派（BR-15）；供应商 `quality` 联系人的通知等 objectstack#25444 或 v0.6 门户。`minor` 不合格只计入绩效，不自动开单。v0.6 前供应商的回复由 SQE 代填 |
+| 2 临时措施 | 供应商提交 D3（v0.6 前 SQE 代填 D3 后把状态改为「已提交临时措施」） | 状态→`containment_submitted`；D3 必填。SQE 认为临时措施不够时退回到 `open`，退回意见写入 `sqe_comment`（必填） |
+| 3 根因与措施 | 供应商提交 D4–D7（v0.6 前 SQE 代填后改状态） | 状态→`action_submitted`；flow `srm_scar_review` 发起 `approval` 节点：`field` 审批人 = `sqe`（没填时交给质量经理），审批期间锁定记录。SQE 用审批的「驳回」退回：状态回到 `containment_submitted`，审批意见写入 `sqe_comment`（FR-604），改好后再次提交重新审核。平台的「退回修改」窗口只能原样回到审批节点、中间改不了状态，所以退回用驳回表达；驳回时没写意见的不算数，提醒 SQE 后重新审核 |
+| 4 效果验证 | SQE 审核通过 | 状态→`verifying`；SQE 跟踪后续批次，确认有效后关闭（D8），或验证不通过退回 `action_submitted` 重新审核 |
+| 5 逾期升级 | 追赶式扫描 `srm_scar_overdue_sweep`（每小时；外部心跳见 §2.3 R3） | 超过 `containment_due` 仍为 `open`、或超过 `final_due` 仍未到 `verifying`：`is_overdue = true`，通知负责 SQE 与质量经理（SQE 主管，FR-605）；标志保留到关闭，供「SCAR 按期关闭率」统计；提醒供应商等 objectstack#25444 或 v0.6 |
+| 5a 复发重开 | SQE 把已关闭的整改单改回 `open` | flow `srm_scar_reopen`：期限按重开时间重算，逾期标志清掉，通知负责 SQE |
 | 6 索赔 | SQE 填写 `claim_amount`，`claim_status → proposed` | 供应商在门户接受或提出异议（v0.6 前线下确认后由 SQE 记录）；接受后（`supplier_accepted`）由财务在 ERP 扣款，应付会计回来标记 `settled`。SRM 不生成扣款 |
 
 ## 9. P8 对账与结算（不做，留在 ERP）
@@ -437,7 +438,8 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单 | v0.3 |
 | `srm_scar_create` | record_change：交付记录不合格 | 交付记录 → 整改单 | v0.4 |
 | `srm_scar_review` | record_change：状态→`action_submitted` | 整改单 | v0.4 |
-| `srm_scar_overdue_sweep` | schedule：每小时 + api 心跳 | 整改单 | v0.4 |
+| `srm_scar_reopen` | record_change：状态 `closed`→`open` | 整改单 | v0.4 |
+| `srm_scar_overdue_sweep` | schedule：每小时（api 心跳等 objectstack#25675） | 整改单 | v0.4 |
 | `srm_performance_generate` | schedule：每月 1 日（按类别周期） | 考评单 | v0.5 |
 | `srm_performance_publish` | record_change：状态→`reviewing` | 考评单 → 供应商 | v0.5 |
 | `srm_performance_apply` | record_change：状态→`published` | 考评单 → 整改单、处置单 | v0.5 |
