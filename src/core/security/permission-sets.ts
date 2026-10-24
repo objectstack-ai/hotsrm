@@ -29,6 +29,8 @@ export const InternalBasePermissionSet = {
     srm_supplier_bank_account: read,
     // 采购员按已执行的处置单在 ERP 同步冻结标志（v0.3）
     srm_supplier_disposition: read,
+    // 交付记录内部只读（02 §4.6）：采购员、品类经理看 OTD 与不合格交付
+    srm_delivery_record: read,
   },
 };
 
@@ -114,6 +116,8 @@ export const QualityPermissionSet = {
     srm_supplier: { ...read, allowEdit: true },
     srm_supplier_certificate: write,
     srm_supplier_application: read,
+    // 交付记录：每月导入 ERP 收货与检验结果，没有质量系统时逐条录入（02 §4.6，03 §8）
+    srm_delivery_record: write,
   },
   fields: {
     ...supplierFieldsReadOnly,
@@ -122,11 +126,13 @@ export const QualityPermissionSet = {
   },
 };
 
-// IQC 检验员：交付记录的录入（没有质量系统的客户，04 §2.2）。交付记录对象随 v0.4 Q1 上线后在这里补对象权限
+// IQC 检验员：没有质量系统的客户由检验员逐条录入、更正交付记录（04 §2.2，02 §4.6）
 export const IqcPermissionSet = {
   name: 'srm_iqc',
   label: 'SRM 来料检验',
-  objects: {},
+  objects: {
+    srm_delivery_record: write,
+  },
 };
 
 // 管理层：全部只读；审批由 flow 授予，不需要写权限
@@ -146,6 +152,7 @@ export const ExecutivePermissionSet = {
     srm_contract: read,
     srm_contract_line: read,
     srm_supplier_disposition: read,
+    srm_delivery_record: read,
   },
 };
 
@@ -178,6 +185,9 @@ export const AdminPermissionSet = {
     srm_supplier: write,
     srm_supplier_contact: write,
     srm_supplier_certificate: write,
+    // 删除只给系统管理员（04 §2.3）：导错的交付记录删掉后由 SQE 重导。删别人导入的记录要 modifyAllRecords，
+    // 平台的 modifyAllRecords 同时放开了修改（objectstack#25470），管理员因此也能改交付记录
+    srm_delivery_record: { ...read, allowDelete: true, modifyAllRecords: true },
   },
   fields: {
     'srm_supplier.status': flowOwned,
@@ -216,6 +226,7 @@ export const AuditorPermissionSet = {
     srm_contract: read,
     srm_contract_line: read,
     srm_supplier_disposition: read,
+    srm_delivery_record: read,
   },
 };
 

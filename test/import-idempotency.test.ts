@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
-import { Supplier, SupplierCertificate, SupplierContact } from '../src/core/objects';
+import { DeliveryRecord, Material, Supplier, SupplierCertificate, SupplierContact } from '../src/core/objects';
 
 // 存量供应商导入（07 R6、docs/implementation/legacy-supplier-import.md）：样例三张表格用平台导入跑两遍，结果一致；
 // 不合格行逐行报错不影响其他行；重复导入不回退流程写入的状态。
@@ -208,5 +208,70 @@ describe('legacy supplier import', () => {
     const pending = await stack.rows(Supplier.name, { legacy_imported: true, legacy_reviewed: false }, { as: importer });
     expect(pending.map((s) => s.name)).not.toContain('示例工业品商贸有限公司');
     expect(pending.map((s) => s.name)).toContain('示例精密五金有限公司');
+  });
+});
+
+// 交付记录月度导入（v0.4 Q1，03 §8、docs/implementation/delivery-import.md）：同一张月度表格导两遍，第二遍只更新、
+// 不新增，记录与算出的准时、期间不变。
+describe('delivery record import', () => {
+  let stack: VerifyStack;
+  let seq = 0;
+
+  type ImportResult = { created: number; updated: number; errors: number };
+  type Described = { name: string; fields: Record<string, { label?: unknown }> };
+
+  const sample = (file: string) => readFileSync(new URL(`../data/samples/${file}`, import.meta.url), 'utf8');
+  const person = async (position: string) => {
+    const token = await stack.signUp(`${position}-delivery-${++seq}@example.com`);
+    const context = await stack.contextFor(token);
+    const org = context.tenantId ? { organization_id: String(context.tenantId) } : {};
+    await stack.seed('sys_user_position', [{ user_id: String(context.userId), position, ...org }]);
+    return token;
+  };
+  const run = async (token: string, object: Described, file: string, matchFields: string[], skipBlankMatchKey = false) => {
+    const res = await stack.apiAs(token, 'POST', `/data/${object.name}/import`, {
+      format: 'csv',
+      csv: sample(file),
+      mapping: Object.fromEntries(Object.entries(object.fields).map(([name, field]) => [String(field.label), name])),
+      writeMode: 'upsert',
+      matchFields,
+      skipBlankMatchKey,
+    });
+    const body = (await res.json()) as ImportResult & { data?: ImportResult };
+    expect(res.status, JSON.stringify(body)).toBe(200);
+    return body.data ?? body;
+  };
+  let sqe: string;
+  const importDeliveries = () => run(sqe, DeliveryRecord, 'srm_delivery_record.csv', ['erp_receipt_no', 'erp_order_no', 'erp_line_no']);
+  const snapshot = async () =>
+    (await stack.rows(DeliveryRecord.name, {}, { as: sqe }))
+      .map((r) =>
+        ['id', 'erp_receipt_no', 'erp_order_no', 'erp_line_no', 'supplier', 'material', 'plant', 'receipt_date', 'received_quantity', 'inspection_result', 'severity', 'defect_quantity', 'on_time', 'period', 'received_quantity_mn']
+          .map((k) => r[k] ?? null),
+      )
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+
+  beforeAll(async () => {
+    stack = await bootStack(config);
+    const admin = await person('srm_admin');
+    sqe = await person('srm_sqe');
+    await run(admin, Material, 'srm_material.csv', ['erp_material_no']);
+    await run(admin, Supplier, 'srm_supplier.csv', ['credit_code'], true);
+    await run(admin, Supplier, 'srm_supplier.csv', ['country', 'registration_no'], true);
+  });
+
+  afterAll(async () => {
+    await stack?.stop();
+  });
+
+  it('gives the same result when the monthly sheet is imported twice', async () => {
+    const first = await importDeliveries();
+    expect([first.created, first.updated, first.errors], JSON.stringify(first)).toEqual([15, 0, 0]);
+    const before = await snapshot();
+    expect(before).toHaveLength(15);
+
+    const second = await importDeliveries();
+    expect([second.created, second.updated, second.errors], JSON.stringify(second)).toEqual([0, 15, 0]);
+    expect(await snapshot()).toEqual(before);
   });
 });

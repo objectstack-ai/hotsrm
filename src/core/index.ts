@@ -5,6 +5,7 @@ import * as views from './views/index.js';
 import * as flows from './flows/index.js';
 import * as apps from './apps/index.js';
 import * as actions from './actions/index.js';
+import { DeliveryMetrics, DeliveryDashboard, QualityDashboard, DeliveryScorecardReport } from './analytics/index.js';
 import * as translations from './translations/index.js';
 import { SrmSeedData } from './data/index.js';
 import { SrmPermissionSets } from './security/permission-sets.js';
@@ -35,6 +36,9 @@ export default defineStack({
   flows: Object.values(flows),
   actions: Object.values(actions),
   apps: Object.values(apps),
+  datasets: [DeliveryMetrics],
+  dashboards: [DeliveryDashboard, QualityDashboard],
+  reports: [DeliveryScorecardReport],
   capabilities: SrmCapabilities,
   permissions: SrmPermissionSets,
   positions: SrmPositions,
