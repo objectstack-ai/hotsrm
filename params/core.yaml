@@ -70,14 +70,28 @@ perf_grade_min:
   example: { A: 90, B: 80, C: 70 }
   display: A 级 ≥ {A}，B 级 ≥ {B}，C 级 ≥ {C}
   used_in: [QP-01 6.7.3]
-  system: 考评单汇总分级规则（核心 03 §10 第 4 步）
+  system: 考评单汇总分级 srm_performance_publish 与申诉调整总分 srm_appeal_resolve，flow 的 GRADE_MIN 与本参数由测试核对一致（核心 03 §10 第 4 步）
+
+perf_score_days:
+  label: 绩效人工评分期限
+  unit: 日历日（转人工评分起）
+  example: 10
+  used_in: []
+  system: 考评单转人工评分时写入评分截止日 score_due，截止前 3 天提醒未评项，截止后由 srm_score_overdue_sweep 按缺评处理；flow 的 SCORE_DAYS 与本参数由测试核对一致（核心 03 §10 第 3 步）
+
+perf_missing_score:
+  label: 绩效评分缺评默认分
+  unit: 分
+  example: 60
+  used_in: []
+  system: 评分截止后未评的评分项取本分值并标记「未评」（srm_score_overdue_sweep）；flow 的 MISSING_SCORE 与本参数由测试核对一致（核心 03 §10 第 3 步，FR-703）
 
 perf_appeal_days:
   label: 绩效结果申诉期限
   unit: 日历日（发布后）
   example: 7
   used_in: [QP-01 6.7.5]
-  system: 申诉 screen flow srm_appeal_submit 的时限校验（核心 03 §10 第 7 步）
+  system: 申诉 screen flow srm_appeal_submit 的时限校验，flow 的 APPEAL_DAYS 与本参数由测试核对一致（核心 03 §10 第 7 步）
 
 perf_d_exit_periods:
   label: 启动淘汰的连续 D 级期数

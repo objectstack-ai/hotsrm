@@ -13,6 +13,8 @@ export const SrmPositions = [
   { name: 'srm_iqc_inspector', label: 'IQC 检验员', permissionSets: ['srm_internal_base', 'srm_iqc'] },
   { name: 'srm_ap_accountant', label: '应付会计', permissionSets: ['srm_internal_base', 'srm_finance'] },
   { name: 'srm_legal_counsel', label: '法务', permissionSets: ['srm_internal_base', 'srm_legal'] },
+  // 需求部门评分人（v0.5）：只读，绩效评分只经「提交评分」screen flow；指派到品类的 evaluator 字段上（03 §10 第 3 步）
+  { name: 'srm_evaluator', label: '评分人', permissionSets: ['srm_internal_base'] },
   { name: 'srm_general_manager', label: '总经理', permissionSets: ['srm_internal_base', 'srm_executive'] },
   // 内控 / 监标：只挂 srm_auditor（已含全部 SRM 对象只读）；淘汰、黑名单的会签审批由 flow 授予
   { name: 'srm_procurement_compliance', label: '内控 / 监标', permissionSets: ['srm_auditor'] },

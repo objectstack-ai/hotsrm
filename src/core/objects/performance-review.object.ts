@@ -2,8 +2,10 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 绩效考评单（02 §4.7、§5.7，03 §10，FR-702）：srm_performance_generate 每期为活跃供应商生成（calculating），按启用
 // 指标建评分明细并快照权重，从交付记录算出 OTD、批次合格率、PPM 与对应得分后转人工评分（scoring）。本期没有交付记录、
-// 某项自动指标没有数据时标记「数据不全」，该项不给分（07 R7）。人工评分、汇总分级、审定发布、申诉随 v0.5 P3 加入，
-// 这些步骤要写的字段（各维度得分、总分、等级、审定人、申诉）在这里先建好。
+// 某项自动指标没有数据时标记「数据不全」，该项不给分（07 R7）。v0.5 P3：评分人经「提交评分」打分，截止后缺评取默认分
+// （srm_score_overdue_sweep）→ 审定中：srm_performance_publish 汇总分级并交采购总监审定，通过即发布并回写供应商等级，
+// 驳回即退回重评 → 发布后可代录申诉一次（srm_appeal_submit），采购总监处理（srm_appeal_resolve）后回到已发布。
+// 全部字段由 flow 写入，对用户只读。
 // 同一供应商同一期间只有一张考评单（唯一索引兜底，flow 先查后建，重复运行不重复建）。
 // 门户上线（v0.6）时加 portal_position，供应商只看本公司已发布的考评单（04 §3）。
 export const PerformanceReview = ObjectSchema.create({
@@ -11,7 +13,7 @@ export const PerformanceReview = ObjectSchema.create({
   label: '绩效考评单',
   pluralLabel: '绩效考评单',
   icon: 'award',
-  // 内部只读（04 §2.3）：考评单只由 flow 生成和推进，评分只经「提交评分」screen flow（v0.5 P3）
+  // 内部只读（04 §2.3）：考评单只由 flow 生成和推进，评分只经「提交评分」screen flow
   sharingModel: 'public_read',
   enable: { trackHistory: true },
   stageField: 'status',
@@ -65,7 +67,9 @@ export const PerformanceReview = ObjectSchema.create({
     }),
     // 本期没有交付记录或某项自动指标没有数据（07 R7）：该项不给零分，留给人工评分环节处理
     data_incomplete: Field.boolean({ label: '数据不全', group: 'basic', defaultValue: false, readonly: true }),
-    reviewer: Field.user({ label: '审定人', group: 'basic' }),
+    // 评分截止日：转人工评分时为当天 + perf_score_days；退回重评时重新起算（03 §10 第 3、5 步）
+    score_due: Field.date({ label: '评分截止日', group: 'basic', readonly: true }),
+    void_reason: Field.textarea({ label: '作废理由', group: 'basic', readonly: true, maxLength: 2000 }),
 
     // 交付记录按期汇总（05 §4.1，口径同数据集 srm_delivery_metrics）；没有数据的项为空
     otd_rate: Field.percent({ label: '交付准时率', group: 'metrics', readonly: true, scale: 2 }),
@@ -95,8 +99,38 @@ export const PerformanceReview = ObjectSchema.create({
       ],
     }),
 
-    appeal_reason: Field.textarea({ label: '申诉理由', group: 'appeal', maxLength: 2000 }),
-    appeal_result: Field.textarea({ label: '申诉处理结果', group: 'appeal', maxLength: 2000 }),
+    // 审定发布（03 §10 第 5 步）：审批节点写审批结论，flow 写审定人、意见和发布日期
+    approval_status: Field.select({
+      label: '审批结论',
+      group: 'scores',
+      readonly: true,
+      options: [
+        { label: '审批中', value: 'pending' },
+        { label: '已批准', value: 'approved' },
+        { label: '已驳回', value: 'rejected' },
+        { label: '退回修改', value: 'returned' },
+        { label: '已撤回', value: 'recalled' },
+      ],
+    }),
+    reviewer: Field.user({ label: '审定人', group: 'scores', readonly: true }),
+    review_comment: Field.textarea({ label: '审定意见', group: 'scores', readonly: true, maxLength: 2000 }),
+    published_date: Field.date({ label: '发布日期', group: 'scores', readonly: true }),
+
+    // 申诉（03 §10 第 7 步，FR-706）：发布后 perf_appeal_days 内一次；v0.6 前由采购代录
+    appeal_reason: Field.textarea({ label: '申诉理由', group: 'appeal', readonly: true, maxLength: 2000 }),
+    appeal_date: Field.date({ label: '申诉日期', group: 'appeal', readonly: true }),
+    appeal_recorded_by: Field.user({ label: '申诉代录人', group: 'appeal', readonly: true }),
+    appeal_result: Field.textarea({ label: '申诉处理结果', group: 'appeal', readonly: true, maxLength: 2000 }),
+    appeal_outcome: Field.select({
+      label: '申诉结论',
+      group: 'appeal',
+      readonly: true,
+      options: [
+        { label: '维持原结果', value: 'maintained' },
+        { label: '调整总分', value: 'adjusted' },
+      ],
+    }),
+    appeal_handled_by: Field.user({ label: '申诉处理人', group: 'appeal', readonly: true }),
   },
 
   indexes: [{ name: 'srm_performance_review_period', fields: ['supplier', 'period'], unique: 'organization' }],
@@ -111,7 +145,8 @@ export const PerformanceReview = ObjectSchema.create({
       transitions: {
         calculating: ['scoring', 'void'],
         scoring: ['reviewing', 'void'],
-        reviewing: ['published', 'void'],
+        // 采购总监驳回即退回重评（03 §10 第 5 步）
+        reviewing: ['published', 'scoring', 'void'],
         published: ['appealed'],
         appealed: ['published'],
         void: [],

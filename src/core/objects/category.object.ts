@@ -19,6 +19,9 @@ export const Category = ObjectSchema.create({
     parent: { type: 'tree', label: '上级品类', group: 'basic', reference: 'srm_category' },
     category_manager: Field.user({ label: '品类经理', group: 'basic' }),
     sqe: Field.user({ label: 'SQE', group: 'basic' }),
+    // 绩效评分人（v0.5，02 §4.7 scorer_type）：考评生成时按指标的评分人类型从供应商的品类上取
+    buyer: Field.user({ label: '采购员', group: 'basic' }),
+    evaluator: Field.user({ label: '需求部门评分人', group: 'basic' }),
     is_direct: Field.boolean({ label: '直接物料', group: 'basic', defaultValue: true }),
     // 物资 A / B / C 分类（P-D2）：A 类准入审批加质量经理会签（03 §12）
     material_class: Field.select({ label: '物资类别', group: 'admission', required: true, defaultValue: 'class_c', picklist: 'srm_material_class' }),

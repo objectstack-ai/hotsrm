@@ -1,4 +1,5 @@
 import type { TranslationData } from '@objectstack/spec/system';
+import { APPEAL_DAYS } from '../flows/performance/params.js';
 
 // 源码里的标签是中文；英文词条覆盖全部对象、字段、选项、视图与导航（ADR-0007）。
 export const en: TranslationData = {
@@ -13,6 +14,8 @@ export const en: TranslationData = {
         parent: { label: 'Parent Category' },
         category_manager: { label: 'Category Manager' },
         sqe: { label: 'SQE' },
+        buyer: { label: 'Buyer' },
+        evaluator: { label: 'Requesting-department Scorer' },
         is_direct: { label: 'Direct Material' },
         material_class: { label: 'Material Class' },
         risk_class: {
@@ -97,6 +100,8 @@ export const en: TranslationData = {
         },
         qualification_alert: { label: 'Qualification Alert' },
         risk_level: { label: 'Risk Level', options: { low: 'Low', medium: 'Medium', high: 'High' } },
+        grade: { label: 'Performance Grade', options: { grade_a: 'A', grade_b: 'B', grade_c: 'C', grade_d: 'D' } },
+        latest_score: { label: 'Latest Performance Score' },
         registered_capital: { label: 'Registered Capital' },
         established_date: { label: 'Established Date' },
         legal_representative: { label: 'Legal Representative' },
@@ -568,6 +573,10 @@ export const en: TranslationData = {
           options: { otd_rate: 'On-time Delivery (OTD)', lot_pass_rate: 'Lot Acceptance Rate', ppm: 'PPM', ack_on_time_rate: 'Order Acknowledgement On-time Rate' },
         },
         weight: { label: 'Weight' },
+        scorer_type: {
+          label: 'Scorer',
+          options: { category_manager: 'Category Manager', buyer: 'Buyer', sqe: 'SQE', evaluator: 'Requesting-department Scorer' },
+        },
         active: { label: 'Active' },
         scoring_rule: { label: 'Scoring Rule Description' },
         full_score_value: {
@@ -761,7 +770,8 @@ export const en: TranslationData = {
           },
         },
         data_incomplete: { label: 'Data Incomplete' },
-        reviewer: { label: 'Reviewed By' },
+        score_due: { label: 'Scoring Due Date' },
+        void_reason: { label: 'Void Reason' },
         otd_rate: { label: 'On-time Delivery Rate' },
         lot_pass_rate: { label: 'Lot Acceptance Rate' },
         ppm: { label: 'PPM' },
@@ -774,12 +784,32 @@ export const en: TranslationData = {
         hse_score: { label: 'HSE Score' },
         total_score: { label: 'Total Score' },
         grade: { label: 'Grade', options: { grade_a: 'A', grade_b: 'B', grade_c: 'C', grade_d: 'D' } },
+        approval_status: {
+          label: 'Approval Result',
+          options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', returned: 'Returned for Revision', recalled: 'Recalled' },
+        },
+        reviewer: { label: 'Reviewed By' },
+        review_comment: { label: 'Review Comment' },
+        published_date: { label: 'Published On' },
         appeal_reason: { label: 'Appeal Reason' },
+        appeal_date: { label: 'Appeal Date' },
+        appeal_recorded_by: { label: 'Appeal Recorded By' },
         appeal_result: { label: 'Appeal Outcome' },
+        appeal_outcome: { label: 'Appeal Decision', options: { maintained: 'Result Upheld', adjusted: 'Total Score Adjusted' } },
+        appeal_handled_by: { label: 'Appeal Handled By' },
+      },
+      _actions: {
+        srm_score_submit: { label: 'Submit Scores' },
+        srm_performance_void: { label: 'Void' },
+        srm_appeal_submit: { label: 'Appeal' },
+        srm_appeal_resolve: { label: 'Resolve Appeal' },
       },
       _views: {
         default: { label: 'All Reviews' },
         scoring: { label: 'Awaiting Scores' },
+        reviewing: { label: 'Under Review' },
+        appealed: { label: 'Under Appeal' },
+        published: { label: 'Published' },
         incomplete: { label: 'Data Incomplete' },
       },
     },
@@ -795,6 +825,11 @@ export const en: TranslationData = {
         scorer: { label: 'Scorer' },
         comment: { label: 'Scoring Note' },
         scored: { label: 'Scored' },
+        defaulted: { label: 'Not Scored (Default Score)' },
+      },
+      _views: {
+        default: { label: 'All Score Lines' },
+        mine: { label: 'Awaiting My Scores' },
       },
     },
   },
@@ -960,6 +995,75 @@ export const en: TranslationData = {
         refuse_status: { message: 'Only drafts can be cancelled; a disposition in review is rejected by its approvers' },
       },
     },
+    srm_score_submit: {
+      label: 'Submit Scores',
+      successMessage: 'Scores submitted',
+      screens: {
+        score_line: {
+          title: 'Score: {{ kpiName }} ({{ n }} / {{ count }})',
+          description:
+            'Review: {{ review.review_no }}  Supplier: {{ vendor.name }}  Period: {{ review.period }}\n'
+            + 'Scoring rule: {{ ruleText }}\nRaw value: {{ rawText }}  Weight: {{ weightText }}%\n{{ noteText }}',
+          fields: { score: { label: 'Score (0–100)' }, score_note: { label: 'Scoring Note' } },
+        },
+      },
+      refusals: {
+        refuse_status: { message: 'Scores can be submitted only while the review is in manual scoring' },
+        refuse_none: { message: 'No score lines of this review are assigned to you' },
+      },
+    },
+    srm_performance_void: {
+      label: 'Void Performance Review',
+      successMessage: 'Performance review voided',
+      screens: {
+        confirm: {
+          title: 'Void performance review: {{ review.review_no }}',
+          description: 'A voided review is no longer scored or published. To review the same period again, ask the SRM administrator to delete it and rerun generation.',
+          fields: { reason_text: { label: 'Void Reason' } },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only the procurement director can void performance reviews' },
+        refuse_status: { message: 'Only reviews in manual scoring can be voided; send a review under review back for rescoring first' },
+      },
+    },
+    srm_appeal_submit: {
+      label: 'Performance Appeal',
+      successMessage: 'Appeal recorded; the procurement director will handle it',
+      screens: {
+        confirm: {
+          title: 'Performance appeal: {{ review.review_no }}',
+          description: 'Period {{ review.period }}, total score {{ review.total_score }}. A review can be appealed only once; the procurement director handles the appeal.',
+          fields: { appeal_text: { label: 'Appeal Reason' } },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Supplier appeals are recorded by buyers, buyer leads or category managers' },
+        refuse_status: { message: 'Only published reviews can be appealed' },
+        refuse_once: { message: 'A review can be appealed only once, and this one has been appealed' },
+        refuse_window: { message: `The appeal period has passed: a result can be appealed within ${APPEAL_DAYS} days of publication` },
+      },
+    },
+    srm_appeal_resolve: {
+      label: 'Resolve Performance Appeal',
+      successMessage: 'Appeal resolved; the review is published again',
+      screens: {
+        resolve: {
+          title: 'Resolve appeal: {{ review.review_no }}',
+          description: 'Period {{ review.period }}, original total score {{ review.total_score }}.\nAppeal reason: {{ review.appeal_reason }}',
+          fields: {
+            outcome: { label: 'Decision', options: { maintained: 'Uphold the Result', adjusted: 'Adjust the Total Score' } },
+            adjusted_score: { label: 'Adjusted Total Score (0–100)' },
+            result_text: { label: 'Outcome' },
+          },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Performance appeals are handled by the procurement director' },
+        refuse_status: { message: 'Only reviews under appeal need resolving' },
+        refuse_scorer: { message: 'You scored this review; ask another procurement director to handle the appeal' },
+      },
+    },
   },
   apps: {
     srm_workbench: {
@@ -981,6 +1085,7 @@ export const en: TranslationData = {
         group_performance: { label: 'Performance and Risk' },
         nav_kpi: { label: 'Performance KPIs' },
         nav_performance_review: { label: 'Performance Reviews' },
+        nav_my_scores: { label: 'Awaiting My Scores' },
         nav_risk_event: { label: 'Risk Events' },
         group_analytics: { label: 'Analytics' },
         nav_delivery_dashboard: { label: 'Delivery Dashboard' },
