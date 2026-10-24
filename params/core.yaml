@@ -81,15 +81,36 @@ scar_containment_hours:
   label: 整改临时措施提交时限
   unit: 小时
   example: 72
-  used_in: [QP-01 6.8.2, GL-07]
+  used_in: [QP-01 6.8.2, QP-04 6.3.1, QP-04 第 7 章, GL-07 4.1, GL-07 第 7 章, GL-07 附录 B]
   system: srm_quality_issue.containment_due 的计算规则（核心 03 §8）
 
 scar_final_days:
   label: 整改根本原因与永久措施提交时限
   unit: 日历日
   example: 30
-  used_in: [QP-01 6.8.2, GL-07]
+  used_in: [QP-01 6.8.2, QP-04 6.3.1, QP-04 第 7 章, GL-07 4.2, GL-07 第 7 章, GL-07 附录 B]
   system: srm_quality_issue.final_due 的计算规则（核心 03 §8）
+
+scar_escalation_days:
+  label: 整改逾期升级至供应商管理层的天数
+  unit: 日历日（逾期后）
+  example: 7
+  used_in: [GL-07 6.6.2]
+  system: 制度要求；逾期标记与通知由 srm_scar_overdue_sweep 完成（核心 03 §8 第 5 步），升级由质量经理线下督办
+
+scar_verify_batches:
+  label: 整改效果验证的连续合格批次
+  unit: 批
+  example: 3
+  used_in: [GL-07 6.5.1]
+  system: 制度要求；SQE 按交付记录的后续批次判定后关闭整改单（核心 03 §8 第 4 步）
+
+claim_response_days:
+  label: 质量索赔的供应商确认期限
+  unit: 日历日（收到通知后）
+  example: 15
+  used_in: [GL-07 6.8.2]
+  system: 制度要求；确认结果由 SQE 记入整改单 claim_status（v0.6 起供应商在门户确认，核心 03 §8 第 6 步）
 
 inactivity_exit_months:
   label: 无交易淘汰期限
@@ -123,7 +144,7 @@ record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
   example: 3
-  used_in: [QP-01 第 8 章, QP-02 第 8 章, GL-01 第 8 章, GL-04 6.7.1, WI-01 第 8 章]
+  used_in: [QP-01 第 8 章, QP-02 第 8 章, QP-03 第 8 章, QP-04 第 8 章, GL-01 第 8 章, GL-04 6.7.1, GL-07 第 8 章, WI-01 第 8 章]
   system: 制度要求
 
 contract_reminder_days:
@@ -247,7 +268,7 @@ management_targets:
   label: 采购与供应商管理目标
   example: { avl_spend: 98%, competitive: 85%, exception: 5%, admission_days: 30 日, lot_pass: 98%, scar_ontime: 90% }
   display: 名录内采购金额占比 ≥ {avl_spend}，竞争性采购比例 ≥ {competitive}，单一来源与紧急采购比例 ≤ {exception}，准入周期 ≤ {admission_days}，来料批次合格率 ≥ {lot_pass}，整改按时关闭率 ≥ {scar_ontime}
-  used_in: [ZC-01 6]
+  used_in: [ZC-01 6, GL-07 6.9.1]
   system: 采购总览、寻源、供应商、质量仪表盘对照的目标值（核心 05 §4）
 
 # ---- 采购与寻源（QP-02、GL-02） ----
