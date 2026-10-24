@@ -384,6 +384,7 @@ export const en: TranslationData = {
       pluralLabel: 'Contracts',
       _sections: {
         contract: { label: 'Contract' },
+        review: { label: 'Approval' },
         signing: { label: 'Signing' },
         external: { label: 'External Systems' },
       },
@@ -391,6 +392,7 @@ export const en: TranslationData = {
         contract_status_flow: { message: 'This contract status change is not allowed' },
         end_date_after_start_date: { message: 'The end date cannot be earlier than the start date' },
         supplier_qualified: { message: 'New contracts can only be signed with qualified suppliers' },
+        legal_reviewer_not_drafter: { message: 'The legal reviewer cannot be the person who drafted the contract' },
         signed_before_active: { message: 'Upload the signed copy and enter the signing date first' },
       },
       _actions: {
@@ -427,6 +429,16 @@ export const en: TranslationData = {
           },
         },
         renewed_from: { label: 'Renewed From' },
+        submitted_by: { label: 'Submitted By' },
+        approval_status: {
+          label: 'Approval Result',
+          options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', returned: 'Returned for Revision', recalled: 'Recalled' },
+        },
+        legal_approver: { label: 'Legal Approver' },
+        category_approver: { label: 'Category Manager Approver' },
+        director_approver: { label: 'Procurement Director Approver' },
+        gm_approver: { label: 'General Manager Approver' },
+        reject_reason: { label: 'Rejection Reason' },
         signed_file: { label: 'Signed Copy' },
         signed_date: { label: 'Signing Date' },
         esign_request_id: { label: 'E-signature Request ID' },
@@ -444,7 +456,7 @@ export const en: TranslationData = {
       _sections: { line: { label: 'Line' } },
       _validations: {
         line_valid_to_after_valid_from: { message: 'Valid to cannot be earlier than valid from' },
-        line_contract_draft: { message: 'Lines can only be changed while the contract is a draft' },
+        line_contract_draft: { message: 'Lines can only be changed while the contract is a draft or returned for revision' },
       },
       fields: {
         contract: { label: 'Contract' },
@@ -533,6 +545,8 @@ export const en: TranslationData = {
       refusals: {
         refuse_position: { message: 'Only category managers or buyer leads can submit contracts for approval' },
         refuse_status: { message: 'Only draft contracts can be submitted for approval' },
+        refuse_amount: { message: 'Enter the contract amount first (the estimated annual amount for a framework agreement); approval levels depend on it' },
+        refuse_legal: { message: 'The legal reviewer cannot be the submitter; choose another legal counsel' },
       },
     },
     srm_contract_activate: {

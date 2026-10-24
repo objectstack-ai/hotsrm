@@ -6,7 +6,8 @@ import { Category, Contract, ContractLine, Supplier } from '../src/core/objects'
 
 // v0.3 C1 合同（02 §4.4、§5.5，03 §6）：起草带明细 → 提交审批 → 签署中上传签署件 → 确认生效 →
 // 到期提醒 → 到期扫描置为已到期（自动续签的生成续签草稿）；只能与合格供应商签新合同；
-// 质量协议 / 廉洁协议生效后供应商标志为 true。审批 flow 在 C2，这里以系统身份把状态推进到「签署中」。
+// 质量协议 / 廉洁协议生效后供应商标志为 true。主流程走一遍真实审批（C2，分档与职责分离见 contract-approval.test.ts），
+// 其余用例以系统身份把状态推进到「签署中」。
 // 测试数据全部在这里生成（示例公司名、示例品类），不依赖外部样本。
 describe('contract', () => {
   let stack: VerifyStack;
@@ -153,7 +154,9 @@ describe('contract', () => {
   });
 
   it('drafts a framework agreement with lines, signs it and makes it active', async () => {
-    const created = await draft(manager.token, { supplier: await supplier(), category });
+    const legal = await person('srm_legal_counsel');
+    const director = await person('srm_procurement_director');
+    const created = await draft(manager.token, { supplier: await supplier(), category, legal_reviewer: legal.id });
     await line(manager.token, created.id, { line_no: 1, description: '示例紧固件 M8', quantity: 1000, uom: '件', unit_price: 1.5, tax_rate: 0.13 });
     await line(manager.token, created.id, { line_no: 2, description: '示例紧固件 M10', quantity: 200, uom: '件', unit_price: 2.25 });
     const lines = await stack.rows(ContractLine.name, { contract: created.id });
@@ -167,8 +170,13 @@ describe('contract', () => {
     expect((submitted as { success?: boolean }).success, JSON.stringify(submitted)).not.toBe(false);
     expect((await contract(created.id)).status).toBe('in_review');
 
-    // C2 的审批通过后进入签署中；这里以系统身份代替
-    await toSigning(created.id);
+    // 50 万、品类经理起草：法务 → 采购总监（C2）通过后进入签署中
+    for (const approver of [legal, director]) {
+      const [req] = (await stack.rows('sys_approval_request', { record_id: created.id })).filter((r) => r.status === 'pending');
+      const res = await stack.apiAs(approver.token, 'POST', `/approvals/requests/${req!.id}/approve`, {});
+      expect(res.status, await res.clone().text()).toBe(200);
+    }
+    expect((await contract(created.id)).status).toBe('signing');
     await stack.hooks.run(Contract.name, 'update', { id: created.id, signed_file: await signedFile(), signed_date: day(0) }, { as: buyer.token });
     await runScreen('srm_contract_activate', buyer.token, created.id);
     expect(await contract(created.id)).toMatchObject({ status: 'active', signed_date: day(0) });

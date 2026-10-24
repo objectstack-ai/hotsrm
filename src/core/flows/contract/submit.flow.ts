@@ -4,7 +4,12 @@ import type * as Automation from '@objectstack/spec/automation';
 // 提交合同审批（03 §6 第 2 步）：草稿 → 审批中。审批本身由 srm_contract_approval 在状态变为「审批中」时
 // 发起（v0.3 C2）。以系统身份运行，因为状态对所有人只读；进门的检查都在 flow 里做（品类经理、采购主管，
 // 只提交草稿）。临时做法同 srm_bank_verify：平台还不能在 flow 上声明谁可以启动（objectstack#25481）。
+// 审批按合同金额分档（03 §12），所以金额必填才能提交；提交人记入 submitted_by，审批时与起草人一起回避（BR-11）。
 const allowed = `current_user != null && ('srm_category_manager' in current_user.positions || 'srm_buyer_lead' in current_user.positions)`;
+const isDraft = `contract != null && contract.status == 'draft'`;
+const noAmount = `(!has(contract.amount) || contract.amount == null || double(contract.amount) <= 0.0)`;
+const selfLegal = `(has(contract.legal_reviewer) && contract.legal_reviewer == current_user.id)`;
+const cel$ = (source: string) => ({ dialect: 'cel' as const, source });
 
 export const ContractSubmitFlow: Automation.Flow = {
   name: 'srm_contract_submit',
@@ -38,6 +43,18 @@ export const ContractSubmitFlow: Automation.Flow = {
       config: { outcome: 'refused', message: '只有草稿合同可以提交审批' },
     },
     {
+      id: 'refuse_amount',
+      type: 'end',
+      label: '没有合同金额',
+      config: { outcome: 'refused', message: '请先填写合同金额（框架协议填年度预计金额），审批按金额分档' },
+    },
+    {
+      id: 'refuse_legal',
+      type: 'end',
+      label: '法务审核人是提交人',
+      config: { outcome: 'refused', message: '法务审核人不能是提交人本人，请改为另一位法务' },
+    },
+    {
       id: 'confirm',
       type: 'screen',
       label: '确认提交',
@@ -51,7 +68,7 @@ export const ContractSubmitFlow: Automation.Flow = {
       id: 'submit',
       type: 'update_record',
       label: '置为审批中',
-      config: { objectName: 'srm_contract', filter: { id: cel`contract.id` }, fields: { status: 'in_review' } },
+      config: { objectName: 'srm_contract', filter: { id: cel`contract.id` }, fields: { status: 'in_review', submitted_by: cel`current_user.id` } },
     },
     { id: 'end', type: 'end', label: '结束' },
   ],
@@ -65,15 +82,31 @@ export const ContractSubmitFlow: Automation.Flow = {
       source: 'gate',
       target: 'refuse_status',
       type: 'conditional',
-      condition: { dialect: 'cel', source: `${allowed} && (contract == null || contract.status != 'draft')` },
+      condition: cel$(`${allowed} && !(${isDraft})`),
       label: '不是草稿',
+    },
+    {
+      id: 'e3a',
+      source: 'gate',
+      target: 'refuse_amount',
+      type: 'conditional',
+      condition: cel$(`${allowed} && ${isDraft} && ${noAmount}`),
+      label: '没有金额',
+    },
+    {
+      id: 'e3b',
+      source: 'gate',
+      target: 'refuse_legal',
+      type: 'conditional',
+      condition: cel$(`${allowed} && ${isDraft} && !${noAmount} && ${selfLegal}`),
+      label: '自己做法务',
     },
     {
       id: 'e4',
       source: 'gate',
       target: 'confirm',
       type: 'conditional',
-      condition: { dialect: 'cel', source: `${allowed} && contract != null && contract.status == 'draft'` },
+      condition: cel$(`${allowed} && ${isDraft} && !${noAmount} && !${selfLegal}`),
       label: '可以',
     },
     { id: 'e5', source: 'confirm', target: 'submit', type: 'default' },

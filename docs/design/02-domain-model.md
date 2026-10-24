@@ -473,7 +473,7 @@ upsert 写入，结构不变。
 
 ### 4.4 合同（v0.3）
 
-**`srm_contract` 合同 / 协议**（OWD `private`，暂用 `public_read_write`：采购员要给品类经理建的合同上传签署件，`modifyAllRecords` 会连删除一起放开，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：合同信息、签署、外部系统）
+**`srm_contract` 合同 / 协议**（OWD `private`，暂用 `public_read_write`：采购员要给品类经理建的合同上传签署件，`modifyAllRecords` 会连删除一起放开，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：合同信息、审批、签署、外部系统）
 
 | 字段 | 类型 | 说明 / 约束 |
 |---|---|---|
@@ -488,21 +488,25 @@ upsert 写入，结构不变。
 | `line_amount` | summary | `sum` 明细 `amount` |
 | `start_date` / `end_date` | date | 必填；`end_date >= start_date` |
 | `auto_renew` | boolean | 默认 false；到期扫描为它生成续签草稿 |
-| `legal_reviewer` | user | 法务审核人，合同审批第 1 级（v0.3 C2） |
+| `legal_reviewer` | user | 法务审核人，合同审批第 1 级；不填时由法务岗位审批；不能是起草人（校验规则 `legal_reviewer_not_drafter`），也不能是提交人（提交时检查） |
 | `status` | select（stageField，只读） | 见 §5.5；只由 flow 写入 |
 | `renewed_from` | lookup → 合同（只读） | 续签草稿指回原合同，由 `srm_contract_renew` 写入 |
+| `submitted_by` | user（只读） | 提交人，由 `srm_contract_submit` 写入；与起草人一起不得审批本合同（BR-11） |
+| `approval_status` | select（只读） | 审批节点写入的审批结论：`pending` / `approved` / `rejected` / `returned` 退回修改 / `recalled` 已撤回 |
+| `legal_approver` / `category_approver` / `director_approver` / `gm_approver` | user（只读） | 各级实际审批人，由 `srm_contract_approval` 写入 |
+| `reject_reason` | textarea（只读） | 驳回意见，由 `srm_contract_approval` 写入 |
 | `signed_file` / `signed_date` | file / date | 签署件、签署日期；只在 `signing` 期间可改（`readonlyWhen`）；生效时两者必填（校验规则 `signed_before_active`） |
 | `esign_request_id` | text（只读） | 电子签流水号，预留；电子签接入为客户驱动主题 |
 | `erp_contract_no` | text（只读） | 预留，唯一 |
 | `source_event` | lookup → 寻源单 | 来源寻源单，v0.7 随寻源单对象加入 |
 
-锁定：合同信息分组的字段只在草稿期间可改（`readonlyWhen: status != 'draft'`）；审批中平台锁定记录，
-退回后回到草稿再改。
+锁定：合同信息分组的字段只在草稿期间和被退回修改期间可改（`readonlyWhen: status != 'draft' && approval_status != 'returned'`）；
+审批中平台锁定记录。
 
 **`srm_contract_line` 合同明细**（master_detail → 合同，OWD `controlled_by_parent`，合同表单内联编辑）：`line_no`（必填）、
 `material`（lookup，可空）、`description`（必填）、`quantity`、`uom`、`unit_price`、`tax_rate`（percent，小数存储）、`amount`
 （currency，只读，= `quantity × unit_price`，由平台按字段 `expression` 计算后存储，合同的 `line_amount` 汇总它）、
-`valid_from` / `valid_to`。只有草稿合同可以增改明细（`script` 规则经一跳读合同状态）。价格协议的明细在合同生效时
+`valid_from` / `valid_to`。只有草稿或被退回修改的合同可以增改明细（`script` 规则经一跳读合同状态与审批结论）。价格协议的明细在合同生效时
 可经 flow 生成价格记录（v0.7 起）。
 
 ### 4.5 订单协同（预留：ERP 集成后的门户镜像，现阶段不建）
@@ -708,7 +712,7 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 | 值 | 标签 | kind | 允许跳转到 |
 |---|---|---|---|
 | `draft` ★ | 草稿 | open | `in_review`（「提交审批」screen flow） |
-| `in_review` | 审批中 | open | `signing`（审批通过）、`draft`（退回修改）、`rejected`（v0.3 C2） |
+| `in_review` | 审批中 | open | `signing`（审批通过）、`draft`（提交人撤回）、`rejected`（驳回）；退回修改时仍为审批中，审批结论为 `returned` |
 | `signing` | 签署中 | open | `active`（「确认生效」screen flow）、`terminated` |
 | `active` | 生效 | won | `expired`（到期扫描）、`terminated` |
 | `expired` | 已到期 | lost | — |

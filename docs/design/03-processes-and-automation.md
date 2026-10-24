@@ -240,11 +240,29 @@ ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预�
 | 步骤 | 触发 | 动作 |
 |---|---|---|
 | 1 起草 | 品类经理手工新建（v0.7 起定标后由 flow 生成草稿） | 只能与「合格」供应商建合同（冻结、淘汰、黑名单不能关联新合同）；带明细的，明细金额 = 数量 × 单价，合同汇总明细金额 |
-| 2 审批 | 「提交审批」screen flow `srm_contract_submit`（品类经理、采购主管）：`draft` → `in_review` | 法务（`field = legal_reviewer`）→ 按金额分档的采购审批（同 §12，v0.3 C2）；审批中合同只读（平台审批锁记录） |
+| 2 审批 | 「提交审批」screen flow `srm_contract_submit`（品类经理、采购主管）：`draft` → `in_review`，写入 `submitted_by`；合同金额必填，法务审核人不能是提交人 | `srm_contract_approval`：法务（`field = legal_reviewer`，没填时由法务岗位审批）→ 按金额分档的采购审批（§12）→ `signing`，通知起草人和提交人；审批中合同只读（平台审批锁记录）。细节见下 |
 | 3 签署 | 状态→`signing` | 采购员上传双方盖章扫描件、填写 `signed_date`（这两个字段只在签署中可改）；电子签（`http` 发起 + `api` 回调写回 `esign_request_id`）为客户驱动主题，字段已预留 |
 | 4 生效 | 「确认生效」screen flow `srm_contract_activate`（采购员、采购主管、品类经理） | 签署件与签署日期齐全、供应商仍为合格时状态→`active`；质量协议 / 廉洁协议进入或离开生效时，`srm_contract_agreement_recalc` 重算供应商对应的布尔字段 |
 | 5 到期提醒 | `time_relative`：`end_date`，提前 60 / 30 / 7 天（`contract_reminder_days`），只看生效中的合同 | `srm_contract_expiry_notice` 通知合同所有者和主要品类的品类经理；平台按天扫描，每份合同每个提醒日只发一次 |
 | 6 到期 | 追赶式扫描 `srm_contract_expire_sweep`：`end_date < today` 且仍为 `active` | 状态→`expired`；`auto_renew == true` 的合同再经 `srm_contract_renew` 生成续签草稿（期限紧接原合同、长度相同，复制明细，`renewed_from` 指回原合同）；供应商已不合格时不生成续签，通知所有者 |
+
+合同审批（v0.3 C2，flow `srm_contract_approval` / `srm_contract_recalled`）：
+
+- **分档**：金额取合同的 `amount`（框架协议为年度预计金额），档位取 `params/core.yaml` 的 `award_approval_tiers`（示例
+  10 万 / 100 万）：不足 `mid` 档为法务 → 品类经理；`mid` 至不足 `high` 档再加采购总监；`high` 档及以上再加总经理。金额按数值
+  比较、不按币种换算。
+- **起草人、提交人是品类经理**（现在合同只能由品类经理起草，所以是常态）：品类经理一级改由上一级采购总监审批，不足 `mid`
+  档的合同为法务 → 采购总监；`mid` 档以上品类经理一级并入采购总监。起草人和提交人都不是品类经理时（例如采购主管提交
+  自动续签生成的续签草稿）才走品类经理一级。
+- **驳回**：合同 → `rejected`，审批意见写入 `reject_reason`，通知起草人和提交人；需要继续合作的重新起草。
+- **退回修改**：法务一级可以退回（`revise` → `approval_revise`，至多 3 次）。合同仍为 `in_review`、审批结论为 `returned`，
+  合同信息和明细解锁，提交人改完在审批待办里重新提交，从法务重新审批。**临时做法**：法务之后的各级只能通过或驳回、
+  不能退回——平台 18.0.0 把第 2 个起的审批节点的提交人记成上一级审批人，退回后提交人无法重新提交（objectstack#24817
+  已在主干修复、未发版）；发版后加回退回。
+- **撤回**：提交人在审批中或退回修改期间撤回，审批结论为 `recalled`，`srm_contract_recalled` 把合同改回 `draft`，改完可以
+  再次提交。
+- **职责分离（BR-11）**：起草人、提交人不能审批本合同，各级审批人不能是同一人；做法同变更单（§5）：每级通过后读审批记录
+  比对，撞人时这次通过不算数，通知审批人并重新开一轮同级审批（objectstack#25446）。
 
 ## 7. P5 订单协同与 P6 送货收货（预留：ERP 集成后的门户镜像，现阶段不做）
 
@@ -378,7 +396,7 @@ GL-02 附录 A 按本表编写，制度里的岗位称谓经 `governance/org.yam
 | 定标 | `mid ≤ 金额 < high` 档（示例 10–100 万） | 品类经理 | 采购总监 | — | 串行 |
 | 定标 | `金额 ≥ high` 档（示例 100 万） | 品类经理 | 采购总监 | 总经理 | 串行 |
 | 定标 | 有效报价 < `min_valid_quotes`（按当前轮次） | 在上表基础上增加一级 | | | |
-| 合同 | 全部 | 法务（`field: legal_reviewer`） | 按定标同档金额审批（框架协议按年度预计金额） | | 串行 |
+| 合同 | 全部 | 法务（`field: legal_reviewer`） | 按定标同档金额审批（框架协议按年度预计金额）；起草人或提交人是品类经理时，品类经理一级由采购总监审批（§6） | | 串行 |
 | 银行账户新增 / 变更 | 全部 | 采购主管 | 应付会计 | — | 串行，两级不同岗位 |
 | 其他信息变更 | 全部 | 采购主管 | — | — | — |
 | 冻结 / 解冻 | 全部 | 品类经理 | 采购总监 | — | 串行 |
@@ -410,6 +428,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商 | v0.1 |
 | `srm_change_approval` / `srm_change_apply` | record_change：变更单新建 / 子 flow | 变更单 → 供应商、银行账户、联系人 | v0.2 |
 | `srm_contract_approval` | record_change：状态→`in_review` | 合同 | v0.3 |
+| `srm_contract_recalled` | record_change：审批中的合同审批结论→`recalled` | 合同 | v0.3 |
 | `srm_contract_expiry_notice` / `srm_contract_expire_sweep` | time_relative：`end_date` −60 / −30 / −7 天 / schedule：每日 01:10（追赶式） | 合同 | v0.3 |
 | `srm_contract_renew` | 子 flow：到期扫描调用 | 合同 → 续签草稿、明细 | v0.3 |
 | `srm_contract_agreement_recalc` | record_change：质量协议 / 廉洁协议进入或离开 `active` | 合同 → 供应商 | v0.3 |
