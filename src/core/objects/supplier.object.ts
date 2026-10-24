@@ -97,6 +97,9 @@ export const Supplier = ObjectSchema.create({
     address: Field.address({ label: '注册地址', group: 'basic' }),
     website: Field.url({ label: '网站', group: 'basic' }),
     is_related_party: Field.boolean({ label: '关联方', group: 'qualification', defaultValue: false }),
+    // 有生效中的质量协议 / 廉洁协议时为 true，由 srm_contract_agreement_recalc 维护（02 §4.1，v0.3）
+    quality_agreement_signed: Field.boolean({ label: '已签质量协议', group: 'qualification', defaultValue: false }),
+    integrity_agreement_signed: Field.boolean({ label: '已签廉洁协议', group: 'qualification', defaultValue: false }),
     // 存量导入（07 R6）：只能在新建时置为 true；已建档的供应商重复导入时该列被忽略（readonlyWhen）
     legacy_imported: Field.boolean({
       label: '存量导入',

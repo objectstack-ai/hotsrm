@@ -239,12 +239,12 @@ ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预�
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 起草 | 品类经理手工新建，或定标后由 flow 生成草稿 | 带出供应商、金额、来源寻源单 |
-| 2 审批 | 状态→`in_review` | 法务（`field = legal_reviewer`）→ 按金额分档的采购审批（同 §12）；审批中合同只读（平台审批锁记录） |
-| 3 签署 | 状态→`signing` | 上传双方盖章扫描件，填写 `signed_date`；电子签（`http` 发起 + `api` 回调写回 `esign_request_id`）为客户驱动主题，字段已预留 |
-| 4 生效 | 签署完成 | 状态→`active`；质量协议 / 廉洁协议生效时把供应商对应的布尔字段置为 true |
-| 5 到期提醒 | `time_relative`：`end_date`，提前 60 / 30 / 7 天 | 通知合同所有者和品类经理 |
-| 6 到期 | 追赶式扫描：`end_date < today` 且仍为 `active` | 状态→`expired`；`auto_renew == true` 的合同生成续签草稿 |
+| 1 起草 | 品类经理手工新建（v0.7 起定标后由 flow 生成草稿） | 只能与「合格」供应商建合同（冻结、淘汰、黑名单不能关联新合同）；带明细的，明细金额 = 数量 × 单价，合同汇总明细金额 |
+| 2 审批 | 「提交审批」screen flow `srm_contract_submit`（品类经理、采购主管）：`draft` → `in_review` | 法务（`field = legal_reviewer`）→ 按金额分档的采购审批（同 §12，v0.3 C2）；审批中合同只读（平台审批锁记录） |
+| 3 签署 | 状态→`signing` | 采购员上传双方盖章扫描件、填写 `signed_date`（这两个字段只在签署中可改）；电子签（`http` 发起 + `api` 回调写回 `esign_request_id`）为客户驱动主题，字段已预留 |
+| 4 生效 | 「确认生效」screen flow `srm_contract_activate`（采购员、采购主管、品类经理） | 签署件与签署日期齐全、供应商仍为合格时状态→`active`；质量协议 / 廉洁协议进入或离开生效时，`srm_contract_agreement_recalc` 重算供应商对应的布尔字段 |
+| 5 到期提醒 | `time_relative`：`end_date`，提前 60 / 30 / 7 天（`contract_reminder_days`），只看生效中的合同 | `srm_contract_expiry_notice` 通知合同所有者和主要品类的品类经理；平台按天扫描，每份合同每个提醒日只发一次 |
+| 6 到期 | 追赶式扫描 `srm_contract_expire_sweep`：`end_date < today` 且仍为 `active` | 状态→`expired`；`auto_renew == true` 的合同再经 `srm_contract_renew` 生成续签草稿（期限紧接原合同、长度相同，复制明细，`renewed_from` 指回原合同）；供应商已不合格时不生成续签，通知所有者 |
 
 ## 7. P5 订单协同与 P6 送货收货（预留：ERP 集成后的门户镜像，现阶段不做）
 
@@ -410,7 +410,9 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商 | v0.1 |
 | `srm_change_approval` / `srm_change_apply` | record_change：变更单新建 / 子 flow | 变更单 → 供应商、银行账户、联系人 | v0.2 |
 | `srm_contract_approval` | record_change：状态→`in_review` | 合同 | v0.3 |
-| `srm_contract_expiry_notice` / `srm_contract_expire_sweep` | time_relative / schedule | 合同 | v0.3 |
+| `srm_contract_expiry_notice` / `srm_contract_expire_sweep` | time_relative：`end_date` −60 / −30 / −7 天 / schedule：每日 01:10（追赶式） | 合同 | v0.3 |
+| `srm_contract_renew` | 子 flow：到期扫描调用 | 合同 → 续签草稿、明细 | v0.3 |
+| `srm_contract_agreement_recalc` | record_change：质量协议 / 廉洁协议进入或离开 `active` | 合同 → 供应商 | v0.3 |
 | `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单 | v0.3 |
 | `srm_delivery_apply` | record_change：交付记录写入 | 交付记录 | v0.4 |
 | `srm_scar_create` | record_change：交付记录不合格 | 交付记录 → 整改单 | v0.4 |
@@ -439,6 +441,8 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_certificate_verify` 核验证书 | 资质证书 | SQE | v0.1 |
 | `srm_primary_contact_set` 设为主联系人 | 供应商联系人 | `srm_supplier_admin` | v0.1 |
 | `srm_bank_verify` 核验银行账户 | 银行账户 | 应付会计 | v0.2 |
+| `srm_contract_submit` 提交审批 | 合同（草稿） | 品类经理、采购主管 | v0.3 |
+| `srm_contract_activate` 确认生效 | 合同（签署中） | 采购员、采购主管、品类经理 | v0.3 |
 | `srm_change_submit` 提交变更申请 | 门户：公司资料（v0.6 前内部在供应商档案下直接新建变更单） | 门户管理员 | v0.6 |
 | `srm_audit_finding_to_scar` 转整改单 | 供应商审核 | SQE | v0.4 |
 | `srm_score_submit` 提交评分 | 考评单 | 评分人 | v0.5 |

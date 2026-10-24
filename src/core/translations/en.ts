@@ -106,6 +106,8 @@ export const en: TranslationData = {
         address: { label: 'Registered Address' },
         website: { label: 'Website' },
         is_related_party: { label: 'Related Party' },
+        quality_agreement_signed: { label: 'Quality Agreement Signed' },
+        integrity_agreement_signed: { label: 'Integrity Agreement Signed' },
         legacy_imported: { label: 'Legacy Import' },
         legacy_reviewed: { label: 'Legacy Import Reviewed' },
         last_change_request: { label: 'Last Change Request' },
@@ -377,6 +379,87 @@ export const en: TranslationData = {
         in_progress: { label: 'In Progress' },
       },
     },
+    srm_contract: {
+      label: 'Contract',
+      pluralLabel: 'Contracts',
+      _sections: {
+        contract: { label: 'Contract' },
+        signing: { label: 'Signing' },
+        external: { label: 'External Systems' },
+      },
+      _validations: {
+        contract_status_flow: { message: 'This contract status change is not allowed' },
+        end_date_after_start_date: { message: 'The end date cannot be earlier than the start date' },
+        supplier_qualified: { message: 'New contracts can only be signed with qualified suppliers' },
+        signed_before_active: { message: 'Upload the signed copy and enter the signing date first' },
+      },
+      _actions: {
+        srm_contract_submit: { label: 'Submit for Approval' },
+        srm_contract_activate: { label: 'Confirm Effective' },
+      },
+      fields: {
+        contract_no: { label: 'Contract No.' },
+        title: { label: 'Contract Title' },
+        contract_type: { label: 'Contract Type' },
+        supplier: { label: 'Supplier' },
+        category: { label: 'Main Category' },
+        legal_entity: { label: 'Contracting Entity' },
+        amount: { label: 'Contract Amount' },
+        currency: {
+          label: 'Currency',
+          options: { cny: 'CNY', usd: 'USD', eur: 'EUR', jpy: 'JPY', hkd: 'HKD' },
+        },
+        line_amount: { label: 'Line Total' },
+        start_date: { label: 'Start Date' },
+        end_date: { label: 'End Date' },
+        auto_renew: { label: 'Auto-renew' },
+        legal_reviewer: { label: 'Legal Reviewer' },
+        status: {
+          label: 'Status',
+          options: {
+            draft: 'Draft',
+            in_review: 'In Review',
+            signing: 'Signing',
+            active: 'Active',
+            expired: 'Expired',
+            terminated: 'Terminated',
+            rejected: 'Rejected',
+          },
+        },
+        renewed_from: { label: 'Renewed From' },
+        signed_file: { label: 'Signed Copy' },
+        signed_date: { label: 'Signing Date' },
+        esign_request_id: { label: 'E-signature Request ID' },
+        erp_contract_no: { label: 'ERP Contract No.' },
+      },
+      _views: {
+        default: { label: 'All Contracts' },
+        expiring: { label: 'Expiring Soon' },
+        by_supplier: { label: 'By Supplier' },
+      },
+    },
+    srm_contract_line: {
+      label: 'Contract Line',
+      pluralLabel: 'Contract Lines',
+      _sections: { line: { label: 'Line' } },
+      _validations: {
+        line_valid_to_after_valid_from: { message: 'Valid to cannot be earlier than valid from' },
+        line_contract_draft: { message: 'Lines can only be changed while the contract is a draft' },
+      },
+      fields: {
+        contract: { label: 'Contract' },
+        line_no: { label: 'Line No.' },
+        material: { label: 'Material' },
+        description: { label: 'Description' },
+        quantity: { label: 'Quantity' },
+        uom: { label: 'Unit of Measure' },
+        unit_price: { label: 'Unit Price' },
+        tax_rate: { label: 'Tax Rate' },
+        amount: { label: 'Amount' },
+        valid_from: { label: 'Valid From' },
+        valid_to: { label: 'Valid To' },
+      },
+    },
   },
   picklists: {
     srm_country: {
@@ -408,6 +491,17 @@ export const en: TranslationData = {
         other: 'Other',
       },
     },
+    srm_contract_type: {
+      label: 'Contract Type',
+      options: {
+        framework: 'Framework Agreement',
+        price_agreement: 'Price Agreement',
+        purchase: 'Purchase Contract',
+        quality_agreement: 'Quality Agreement',
+        integrity: 'Integrity Agreement',
+        nda: 'Non-disclosure Agreement',
+      },
+    },
   },
   flows: {
     srm_bank_verify: {
@@ -427,6 +521,36 @@ export const en: TranslationData = {
         refuse_self: { message: 'You cannot verify a bank account you created; ask another AP accountant' },
       },
     },
+    srm_contract_submit: {
+      label: 'Submit Contract for Approval',
+      successMessage: 'Contract submitted for approval',
+      screens: {
+        confirm: {
+          title: 'Submit contract for approval: {{ contract.title }}',
+          description: 'Contract No.: {{ contract.contract_no }}\nOnce submitted, the contract and its lines cannot be changed unless the approval returns it.',
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only category managers or buyer leads can submit contracts for approval' },
+        refuse_status: { message: 'Only draft contracts can be submitted for approval' },
+      },
+    },
+    srm_contract_activate: {
+      label: 'Confirm Contract Effective',
+      successMessage: 'Contract is now active',
+      screens: {
+        confirm: {
+          title: 'Confirm contract effective: {{ contract.title }}',
+          description: 'Contract No.: {{ contract.contract_no }}\nSigning date: {{ contract.signed_date }}\nConfirm that the signed copy is the final version stamped by both parties.',
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only buyers, buyer leads or category managers can confirm a contract effective' },
+        refuse_status: { message: 'Only contracts being signed can be confirmed effective' },
+        refuse_unsigned: { message: 'Upload the signed copy and enter the signing date first' },
+        refuse_supplier: { message: 'The supplier is no longer qualified, so the contract cannot take effect' },
+      },
+    },
   },
   apps: {
     srm_workbench: {
@@ -439,6 +563,8 @@ export const en: TranslationData = {
         nav_bank_account: { label: 'Bank Accounts' },
         nav_change_request: { label: 'Change Requests' },
         nav_disposition: { label: 'Dispositions' },
+        group_contract: { label: 'Contracts' },
+        nav_contract: { label: 'Contracts' },
         group_master_data: { label: 'Master Data' },
         nav_category: { label: 'Purchasing Categories' },
         nav_material: { label: 'Materials' },

@@ -199,7 +199,7 @@ erDiagram
 | `address` | address | 注册地址 |
 | `website` | url | |
 | `is_related_party` | boolean | 默认 false；存在关联关系申报时为 true（FR-904） |
-| `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；协议生效时由合同 flow 置为 true |
+| `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；有生效中的质量协议 / 廉洁协议时为 true，由 `srm_contract_agreement_recalc` 在协议进入或离开「生效」时重算（协议到期、终止又没有续上的回到 false），只由 flow 写入（v0.3） |
 | `erp_vendor_code` | text | ERP 供应商编码，唯一；预留，ERP 集成前空着或由采购员手工填写 |
 | `last_change_request` | lookup → 信息变更单（只读） | 最近一次写回本档案的变更单，由 `srm_change_apply` 写入（v0.2） |
 | `portal_position` | text | 门户岗位标识，如 `srm_vendor_sup0000128`；开通门户时写入，只读。校验规则：非空时必须以 `srm_vendor_` 开头（没开通门户的供应商为空）。v0.6 加 |
@@ -473,17 +473,37 @@ upsert 写入，结构不变。
 
 ### 4.4 合同（v0.3）
 
-**`srm_contract` 合同 / 协议**：`contract_no`（`CT{YYYY}{00000}`）、`title`、
-`contract_type`（共享选项列表 `srm_contract_type`：`framework` 框架协议 / `price_agreement`
-价格协议 / `purchase` 采购合同 / `quality_agreement` 质量协议 / `integrity` 廉洁协议 /
-`nda` 保密协议）、`supplier`、`legal_entity`、`amount`、`currency`、`start_date` / `end_date`、
-`auto_renew`（boolean）、`source_event`（lookup 寻源单，v0.7 起有值）、`status`（见 §5.5）、
-`signed_file`（file）、`signed_date`、`esign_request_id`（电子签流水号，预留；电子签接入为
-客户驱动主题）、`legal_reviewer`（user）、`erp_contract_no`（预留）。
+**`srm_contract` 合同 / 协议**（OWD `private`，暂用 `public_read_write`：采购员要给品类经理建的合同上传签署件，`modifyAllRecords` 会连删除一起放开，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：合同信息、签署、外部系统）
 
-**`srm_contract_line` 合同明细**（master_detail → 合同）：`line_no`、`material`（lookup，
-可空）、`description`、`quantity`、`uom`、`unit_price`、`tax_rate`、`amount`、`valid_from` /
-`valid_to`。价格协议的明细在合同生效时可经 flow 生成价格记录（v0.7 起）。
+| 字段 | 类型 | 说明 / 约束 |
+|---|---|---|
+| `contract_no` | autonumber | `CT{YYYY}{00000}`，按年重置 |
+| `title` | text | 必填，可搜索 |
+| `contract_type` | select | 共享选项列表 `srm_contract_type`：`framework` 框架协议 / `price_agreement` 价格协议 / `purchase` 采购合同 / `quality_agreement` 质量协议 / `integrity` 廉洁协议 / `nda` 保密协议 |
+| `supplier` | lookup → 供应商 | 必填；只能是「合格」供应商（校验规则 `supplier_qualified`，新建时经一跳读供应商状态，07 §2.1 第 7 步）。供应商详情页显示合同相关列表 |
+| `category` | lookup → 品类 | 主要品类，可空；到期提醒通知它的品类经理 |
+| `legal_entity` | text | 签约法人 |
+| `amount` | currency | 合同金额：采购合同为合同总额，框架协议为年度预计金额；合同审批按它分档（03 §12） |
+| `currency` | select | `cny` / `usd` / `eur` / `jpy` / `hkd`，默认 `cny` |
+| `line_amount` | summary | `sum` 明细 `amount` |
+| `start_date` / `end_date` | date | 必填；`end_date >= start_date` |
+| `auto_renew` | boolean | 默认 false；到期扫描为它生成续签草稿 |
+| `legal_reviewer` | user | 法务审核人，合同审批第 1 级（v0.3 C2） |
+| `status` | select（stageField，只读） | 见 §5.5；只由 flow 写入 |
+| `renewed_from` | lookup → 合同（只读） | 续签草稿指回原合同，由 `srm_contract_renew` 写入 |
+| `signed_file` / `signed_date` | file / date | 签署件、签署日期；只在 `signing` 期间可改（`readonlyWhen`）；生效时两者必填（校验规则 `signed_before_active`） |
+| `esign_request_id` | text（只读） | 电子签流水号，预留；电子签接入为客户驱动主题 |
+| `erp_contract_no` | text（只读） | 预留，唯一 |
+| `source_event` | lookup → 寻源单 | 来源寻源单，v0.7 随寻源单对象加入 |
+
+锁定：合同信息分组的字段只在草稿期间可改（`readonlyWhen: status != 'draft'`）；审批中平台锁定记录，
+退回后回到草稿再改。
+
+**`srm_contract_line` 合同明细**（master_detail → 合同，OWD `controlled_by_parent`，合同表单内联编辑）：`line_no`（必填）、
+`material`（lookup，可空）、`description`（必填）、`quantity`、`uom`、`unit_price`、`tax_rate`（percent，小数存储）、`amount`
+（currency，只读，= `quantity × unit_price`，由平台按字段 `expression` 计算后存储，合同的 `line_amount` 汇总它）、
+`valid_from` / `valid_to`。只有草稿合同可以增改明细（`script` 规则经一跳读合同状态）。价格协议的明细在合同生效时
+可经 flow 生成价格记录（v0.7 起）。
 
 ### 4.5 订单协同（预留：ERP 集成后的门户镜像，现阶段不建）
 
@@ -685,9 +705,15 @@ ERP 集成前为空）、`reviewer`（user）、`appeal_reason`、`appeal_result
 
 ### 5.5 合同 `srm_contract.status`（v0.3）
 
-`draft` ★（open）→ `in_review` 审批中（open）→ `signing` 签署中（open）→ `active`
-生效（won）→ `expired` 已到期（lost）/ `terminated` 已终止（lost）；`in_review` 可退回
-`draft`，`rejected` 审批未通过（lost）。
+| 值 | 标签 | kind | 允许跳转到 |
+|---|---|---|---|
+| `draft` ★ | 草稿 | open | `in_review`（「提交审批」screen flow） |
+| `in_review` | 审批中 | open | `signing`（审批通过）、`draft`（退回修改）、`rejected`（v0.3 C2） |
+| `signing` | 签署中 | open | `active`（「确认生效」screen flow）、`terminated` |
+| `active` | 生效 | won | `expired`（到期扫描）、`terminated` |
+| `expired` | 已到期 | lost | — |
+| `terminated` | 已终止 | lost | — |
+| `rejected` | 审批未通过 | lost | — |
 
 ### 5.6 质量整改单 `srm_quality_issue.status`
 
