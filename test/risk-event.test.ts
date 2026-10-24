@@ -148,6 +148,10 @@ describe('risk events and the blacklist register', () => {
     expect(opened[0]).toMatchObject({ risk_type: 'qualification', source: 'system', severity: 'medium', status: 'open', certificate: cert });
     expect(String(opened[0]!.description)).toContain('ISO 9001');
 
+    // 系统生成的事件由品类经理接手处理
+    await stack.hooks.run(RiskEvent.name, 'update', { id: opened[0]!.id, status: 'mitigating', mitigation_plan: '示例：催供应商换证' }, { as: manager.token });
+    expect((await row(RiskEvent.name, opened[0]!.id as string)).status).toBe('mitigating');
+
     // 再扫一次、改证书的其他字段都不重复建
     await sweep();
     await stack.hooks.run(SupplierCertificate.name, 'update', { id: cert, issuer: '示例认证机构' }, { as: sqe.token });

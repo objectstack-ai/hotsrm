@@ -66,6 +66,7 @@ describe('internal permissions', () => {
         "srm_contract": "R",
         "srm_contract_line": "R",
         "srm_delivery_record": "R",
+        "srm_kpi": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_quality_issue": "RE",
@@ -90,6 +91,7 @@ describe('internal permissions', () => {
         "srm_contract": "RCE",
         "srm_contract_line": "RCE",
         "srm_delivery_record": "R",
+        "srm_kpi": "R",
         "srm_material": "RE",
         "srm_plant": "R",
         "srm_quality_issue": "R",
@@ -116,6 +118,7 @@ describe('internal permissions', () => {
         "srm_contract": "RE",
         "srm_contract_line": "RE",
         "srm_delivery_record": "R",
+        "srm_kpi": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_quality_issue": "R",
@@ -139,6 +142,7 @@ describe('internal permissions', () => {
         "srm_contract": "R",
         "srm_contract_line": "R",
         "srm_delivery_record": "R",
+        "srm_kpi": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_quality_issue": "R",
@@ -164,6 +168,7 @@ describe('internal permissions', () => {
         "srm_contract": "R",
         "srm_contract_line": "R",
         "srm_delivery_record": "R",
+        "srm_kpi": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_quality_issue": "R",
@@ -183,6 +188,32 @@ describe('internal permissions', () => {
   });
 
   // v0.4 Q0：质量经理权限同 SQE（会签由 flow 授予）；IQC 检验员录入交付记录（v0.4 Q1）
+  it('keeps what a procurement director can see', () => {
+    expect(visibility('srm_procurement_director')).toMatchInlineSnapshot(`
+      {
+        "srm_category": "R",
+        "srm_contract": "RE",
+        "srm_contract_line": "R",
+        "srm_delivery_record": "R",
+        "srm_kpi": "RCE",
+        "srm_material": "RE",
+        "srm_plant": "R",
+        "srm_quality_issue": "R",
+        "srm_risk_event": "R",
+        "srm_supplier": "R",
+        "srm_supplier_application": "R",
+        "srm_supplier_audit": "R",
+        "srm_supplier_audit_finding": "R",
+        "srm_supplier_bank_account": "R",
+        "srm_supplier_category": "R",
+        "srm_supplier_certificate": "R",
+        "srm_supplier_change_request": "RCE",
+        "srm_supplier_contact": "R",
+        "srm_supplier_disposition": "R",
+      }
+    `);
+  });
+
   it('gives the quality manager the same access as an SQE', () => {
     expect(visibility('srm_quality_manager')).toEqual(visibility('srm_sqe'));
   });
@@ -192,6 +223,7 @@ describe('internal permissions', () => {
       {
         "srm_category": "R",
         "srm_delivery_record": "RCE",
+        "srm_kpi": "R",
         "srm_material": "R",
         "srm_plant": "R",
         "srm_quality_issue": "R",

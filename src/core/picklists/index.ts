@@ -4,3 +4,4 @@ export { ContractTypePicklist } from './contract-type.picklist.js';
 export { MaterialClassPicklist } from './material-class.picklist.js';
 export { QualityIssueSourcePicklist } from './quality-issue-source.picklist.js';
 export { RiskTypePicklist } from './risk-type.picklist.js';
+export { KpiDimensionPicklist } from './kpi-dimension.picklist.js';

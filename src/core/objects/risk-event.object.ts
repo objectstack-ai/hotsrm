@@ -12,10 +12,9 @@ export const RiskEvent = ObjectSchema.create({
   label: '风险事件',
   pluralLabel: '风险事件',
   icon: 'siren',
-  // 临时：目标是 public_read + 风险岗位「改所有记录」。系统生成的事件属于系统，品类经理与 SQE 之间要互相接手，
-  // 平台的 modifyAllRecords 会连删除一起放开（objectstack#25470），只能先放宽 OWD；能改哪些字段由 allowEdit
-  // 与 FLS 决定，删除仍受 allowDelete 约束。门户不可见（04 §3.2）
-  sharingModel: 'public_read_write',
+  // 内部全部可读；品类经理、采购主管、SQE、质量经理要能改别人登记的和系统生成的事件，但不能删：OWD public_read +
+  // 按岗位授 edit 的共享规则（srm_risk_event_edit_*，objectstack#25470 的裁定写法）。门户不可见（04 §3.2）
+  sharingModel: 'public_read',
   enable: { trackHistory: true },
   stageField: 'status',
   nameField: 'event_no',

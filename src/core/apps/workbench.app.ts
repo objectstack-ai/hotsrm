@@ -42,11 +42,12 @@ export const Workbench = App.create({
       ],
     },
     {
-      id: 'group_performance_risk',
+      id: 'group_performance',
       type: 'group',
       label: '绩效与风险',
       icon: 'gauge',
       children: [
+        { id: 'nav_kpi', type: 'object', objectName: 'srm_kpi', label: '绩效指标', icon: 'gauge' },
         { id: 'nav_risk_event', type: 'object', objectName: 'srm_risk_event', label: '风险事件', icon: 'siren' },
       ],
     },

@@ -20,6 +20,7 @@ import { SrmSeedData } from './data/index.js';
 import { SrmPermissionSets } from './security/permission-sets.js';
 import { SrmPositions } from './security/positions.js';
 import { SrmCapabilities } from './security/capabilities.js';
+import { SrmSharingRules } from './security/sharing-rules.js';
 
 // 通用核心（type: app，命名空间 srm）。扩展包在 objectstack.config.ts 里与它合成一个应用。
 export default defineStack({
@@ -51,6 +52,7 @@ export default defineStack({
   capabilities: SrmCapabilities,
   permissions: SrmPermissionSets,
   positions: SrmPositions,
+  sharingRules: SrmSharingRules,
 
   i18n: {
     defaultLocale: 'zh-CN',

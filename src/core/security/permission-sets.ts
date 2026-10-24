@@ -39,6 +39,8 @@ export const InternalBasePermissionSet = {
     srm_supplier_audit_finding: read,
     // 风险事件内部只读（04 §2.3），品类经理与 SQE 登记和处理（v0.5）
     srm_risk_event: read,
+    // 绩效指标库内部只读（v0.5）：评分人按评分规则说明打分
+    srm_kpi: read,
   },
 };
 
@@ -182,6 +184,17 @@ export const ExecutivePermissionSet = {
     srm_supplier_audit: read,
     srm_supplier_audit_finding: read,
     srm_risk_event: read,
+    srm_kpi: read,
+  },
+};
+
+// 绩效管理（采购总监）：维护绩效指标库与权重（FR-701，04 §2.2）。不放进 srm_executive，否则总经理也能改指标；
+// 改别人建的指标由共享规则 srm_kpi_director_edit 放行；删除只给 srm_admin，不再使用的指标停用
+export const PerformancePermissionSet = {
+  name: 'srm_performance',
+  label: 'SRM 绩效管理',
+  objects: {
+    srm_kpi: write,
   },
 };
 
@@ -226,6 +239,8 @@ export const AdminPermissionSet = {
     // 删除只给系统管理员（04 §2.3）：导错的交付记录删掉后由 SQE 重导。删别人导入的记录要 modifyAllRecords，
     // 平台的 modifyAllRecords 同时放开了修改（objectstack#25470），管理员因此也能改交付记录
     srm_delivery_record: { ...read, allowDelete: true, modifyAllRecords: true },
+    // 指标库的配置与清理（04 §2.2）；删除自己没建的指标要 modifyAllRecords，同上
+    srm_kpi: { ...write, allowDelete: true, modifyAllRecords: true },
   },
   fields: {
     'srm_supplier.status': flowOwned,
@@ -269,6 +284,7 @@ export const AuditorPermissionSet = {
     srm_supplier_audit: read,
     srm_supplier_audit_finding: read,
     srm_risk_event: read,
+    srm_kpi: read,
   },
 };
 
@@ -279,6 +295,7 @@ export const SrmPermissionSets = [
   QualityPermissionSet,
   IqcPermissionSet,
   ExecutivePermissionSet,
+  PerformancePermissionSet,
   FinancePermissionSet,
   LegalPermissionSet,
   AuditorPermissionSet,

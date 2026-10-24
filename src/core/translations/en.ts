@@ -546,6 +546,45 @@ export const en: TranslationData = {
         late: { label: 'Late Deliveries' },
       },
     },
+    srm_kpi: {
+      label: 'Performance KPI',
+      pluralLabel: 'Performance KPIs',
+      _sections: { basic: { label: 'Basic Information' }, scoring: { label: 'Scoring Rule' } },
+      _validations: {
+        manual_without_auto_metric: { message: 'A manual KPI takes no automatic metric' },
+        score_values_differ: { message: 'The full-score value and the zero-score value cannot be the same' },
+        active_weight_positive: { message: 'An active KPI must have a weight above 0' },
+      },
+      fields: {
+        code: { label: 'KPI Code' },
+        name: { label: 'KPI Name' },
+        dimension: { label: 'Dimension' },
+        method: {
+          label: 'Scoring Method',
+          options: { auto: 'Automatic', manual: 'Manual' },
+        },
+        auto_metric: {
+          label: 'Automatic Metric',
+          options: { otd_rate: 'On-time Delivery (OTD)', lot_pass_rate: 'Lot Acceptance Rate', ppm: 'PPM', ack_on_time_rate: 'Order Acknowledgement On-time Rate' },
+        },
+        weight: { label: 'Weight' },
+        active: { label: 'Active' },
+        scoring_rule: { label: 'Scoring Rule Description' },
+        full_score_value: {
+          label: 'Full-score Value',
+          help: 'A raw value reaching this scores 100; enter rates in percentage points (98 means 98%) and PPM as PPM',
+        },
+        zero_score_value: {
+          label: 'Zero-score Value',
+          help: 'A raw value reaching this scores 0; values in between are scored proportionally',
+        },
+      },
+      _views: {
+        default: { label: 'All KPIs' },
+        active: { label: 'Active KPIs' },
+        inactive: { label: 'Inactive' },
+      },
+    },
     srm_quality_issue: {
       label: 'Corrective Action Request',
       pluralLabel: 'Corrective Action Requests',
@@ -726,6 +765,10 @@ export const en: TranslationData = {
       label: 'SCAR Source',
       options: { iqc: 'Incoming Inspection', production: 'In-process', customer: 'Customer Complaint', audit: 'Audit Finding', performance: 'Performance Improvement' },
     },
+    srm_kpi_dimension: {
+      label: 'Performance Dimension',
+      options: { quality: 'Quality', cost: 'Cost', delivery: 'Delivery', service: 'Service', hse: 'Health, Safety and Environment' },
+    },
     srm_material_class: {
       label: 'Material Class',
       options: { class_a: 'Class A (Strategic)', class_b: 'Class B (Important)', class_c: 'Class C (General)' },
@@ -868,7 +911,8 @@ export const en: TranslationData = {
         nav_delivery_record: { label: 'Delivery Records' },
         nav_quality_issue: { label: 'Corrective Action Requests' },
         nav_supplier_audit: { label: 'Supplier Audits' },
-        group_performance_risk: { label: 'Performance and Risk' },
+        group_performance: { label: 'Performance and Risk' },
+        nav_kpi: { label: 'Performance KPIs' },
         nav_risk_event: { label: 'Risk Events' },
         group_analytics: { label: 'Analytics' },
         nav_delivery_dashboard: { label: 'Delivery Dashboard' },
