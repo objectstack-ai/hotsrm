@@ -241,6 +241,7 @@ test/                            # 仓库根目录
 | PF11 | objectstack#25491 导入映射的 `transform`（转大写 / 小写）被忽略 | 信用代码、邮箱归一 | 导入前清洗（[导入说明 §6.2](../implementation/legacy-supplier-import.md#62-清洗清单)） |
 | PF12 | objectstack#25493 导入接受 `YYYY.MM.DD` / `YYYYMMDD`、选项别名与大小写、每行报全部错误 | 存量台账导入 | 导入前清洗 |
 | PF13 | objectstack#24817 多级审批的后续节点以原发起人为提交人（主干已修，18.0.0 未带上） | 信息变更单第 2 级退回修改 | 第 2 级只能通过或驳回（03 §5） |
+| PF14 | objectstack#25683 i18n 检查不把字段的 `inlineHelpText` 当作默认语言词条 | 带帮助文字的字段（绩效指标的满分值、零分值） | zh-CN 翻译包只放这两条帮助文字，引用源码同一份常量；修复后删除 |
 
 ---
 

@@ -9,8 +9,8 @@ const cel = (source: string) => ({ dialect: 'cel' as const, source });
 const has = (k: string) => `(has(record.${k}) && record.${k} != null)`;
 const filled = (k: string) => `(${has(k)} && !isBlank(record.${k}))`;
 const auto = P`record.method == 'auto'`;
-// 表单帮助文字。源语言的 inlineHelpText 不算 zh-CN 词条，英文给了 help 后 i18n 检查要 zh-CN 也有一份，
-// 所以 zh-CN 翻译包引用这里的同一份文字（translations/index.ts）
+// 表单帮助文字。临时：i18n 检查不把源语言的 inlineHelpText 算作 zh-CN 词条，英文给了 help 后要 zh-CN 也有一份
+// （objectstack#25683），所以 zh-CN 翻译包引用这里的同一份文字（translations/index.ts），平台修复后删掉 zh-CN 包
 export const KpiHelp = {
   full_score_value: '原始值达到此值得 100 分；比率按百分点填（98 即 98%），PPM 按 PPM 填',
   zero_score_value: '原始值达到此值得 0 分，与满分值之间按比例计分',
