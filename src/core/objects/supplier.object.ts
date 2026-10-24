@@ -171,7 +171,8 @@ export const Supplier = ObjectSchema.create({
       initialStates: ['potential', 'qualified'],
       transitions: {
         potential: ['qualifying', 'eliminated'],
-        qualifying: ['qualified', 'potential'],
+        // 淘汰后重新准入未通过时回到淘汰（03 §3 步骤 8）
+        qualifying: ['qualified', 'potential', 'eliminated'],
         qualified: ['frozen', 'eliminated', 'blacklisted'],
         frozen: ['qualified', 'eliminated', 'blacklisted'],
         eliminated: ['qualifying', 'blacklisted'],

@@ -6,6 +6,7 @@ const columns = [
   { field: 'supplier' },
   { field: 'applied_categories' },
   { field: 'status' },
+  { field: 'duplicate_check' },
   { field: 'reviewer' },
   { field: 'approval_status' },
 ];

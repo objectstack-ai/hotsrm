@@ -3,7 +3,8 @@ import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
 import { Category, Supplier, SupplierApplication, SupplierCategory } from '../src/core/objects';
 
-// P1 准入（03 §3）的 v0.1 版本：受理 → 资料审核 → 两级审批 → 合格 / 退回 / 未通过。
+// P1 准入（03 §3）的内部登记版本：受理（查重）→ 资料审核 → 两级审批 → 合格 / 退回 / 未通过；
+// 淘汰后重新准入与黑名单拦截（FR-208、BR-02）。
 describe('supplier admission', () => {
   let stack: VerifyStack;
   let admin: string;
@@ -34,15 +35,36 @@ describe('supplier admission', () => {
     expect(res.status, await res.clone().text()).toBe(200);
   };
 
-  const applyFor = async (categories: string[]) => {
-    const supplier = await newSupplier();
-    const app = await stack.hooks.run(
-      SupplierApplication.name,
-      'insert',
-      { supplier: supplier.id, applied_categories: categories, reviewer: adminId },
-      { as: admin },
+  const apply = async (supplier: string, categories: string[]) =>
+    String(
+      (
+        await stack.hooks.run(
+          SupplierApplication.name,
+          'insert',
+          { supplier, applied_categories: categories, reviewer: adminId },
+          { as: admin },
+        )
+      ).id,
     );
-    return { supplier: supplier.id as string, app: app.id as string };
+  const applyFor = async (categories: string[]) => {
+    const supplier = String((await newSupplier()).id);
+    return { supplier, app: await apply(supplier, categories) };
+  };
+  const approve = async (app: string) => {
+    await update(SupplierApplication.name, { id: app, status: 'admission_review' });
+    await decide(app, 'approve');
+    await decide(app, 'approve');
+  };
+
+  // 准入通过后淘汰：处置执行时品类资格全部暂停（见 disposition.test.ts），这里直接改状态模拟
+  const eliminatedSupplier = async (categories: string[]) => {
+    const { supplier, app } = await applyFor(categories);
+    await approve(app);
+    await update(Supplier.name, { id: supplier, status: 'eliminated' });
+    for (const grant of await stack.rows(SupplierCategory.name, { supplier }, { as: admin })) {
+      await update(SupplierCategory.name, { id: grant.id, status: 'suspended' });
+    }
+    return supplier;
   };
 
   beforeAll(async () => {
@@ -59,7 +81,7 @@ describe('supplier admission', () => {
   it('moves a new application to document review and the supplier to qualifying', async () => {
     const category = await newCategory();
     const { supplier, app } = await applyFor([category.id]);
-    expect((await read(SupplierApplication.name, app)).status).toBe('doc_review');
+    expect(await read(SupplierApplication.name, app)).toMatchObject({ status: 'doc_review', duplicate_check: 'pass' });
     expect((await read(Supplier.name, supplier)).status).toBe('qualifying');
   });
 
@@ -106,5 +128,44 @@ describe('supplier admission', () => {
     });
     await update(SupplierApplication.name, { id: app, status: 'rejected', reject_reason: '资质不全' });
     expect((await read(Supplier.name, supplier)).status).toBe('potential');
+  });
+
+  it('re-admits an eliminated supplier on its old record and restores the applied categories', async () => {
+    const [kept, dropped, added] = [await newCategory(), await newCategory(), await newCategory()];
+    const supplier = await eliminatedSupplier([kept.id, dropped.id]);
+
+    const app = await apply(supplier, [kept.id, added.id]);
+    expect(await read(SupplierApplication.name, app)).toMatchObject({ status: 'doc_review', duplicate_check: 'reapply', supplier });
+    expect((await read(Supplier.name, supplier)).status).toBe('qualifying');
+
+    await approve(app);
+    expect((await read(SupplierApplication.name, app)).status).toBe('approved');
+    expect((await read(Supplier.name, supplier)).status).toBe('qualified');
+    const grants = Object.fromEntries(
+      (await stack.rows(SupplierCategory.name, { supplier }, { as: admin })).map((g) => [g.category, g.status]),
+    );
+    // 只恢复这次申请的品类，没再申请的继续暂停
+    expect(grants).toEqual({ [kept.id]: 'qualified', [added.id]: 'qualified', [dropped.id]: 'suspended' });
+  });
+
+  it('sends a re-admitted supplier back to eliminated when the application is rejected', async () => {
+    const category = await newCategory();
+    const supplier = await eliminatedSupplier([category.id]);
+    const app = await apply(supplier, [category.id]);
+    await update(SupplierApplication.name, { id: app, status: 'rejected', reject_reason: '整改未完成' });
+    expect((await read(Supplier.name, supplier)).status).toBe('eliminated');
+  });
+
+  it('rejects the application of a blacklisted supplier at intake and tells the applicant', async () => {
+    const category = await newCategory();
+    const supplier = await eliminatedSupplier([category.id]);
+    await update(Supplier.name, { id: supplier, status: 'blacklisted' });
+
+    const app = await apply(supplier, [category.id]);
+    const application = await read(SupplierApplication.name, app);
+    expect(application).toMatchObject({ status: 'rejected', duplicate_check: 'blacklisted' });
+    expect(application.reject_reason).toContain('黑名单');
+    expect((await read(Supplier.name, supplier)).status).toBe('blacklisted');
+    await expect.poll(async () => (await stack.rows('sys_notification', { source_id: app })).length).toBe(1);
   });
 });
