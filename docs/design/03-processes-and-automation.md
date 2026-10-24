@@ -86,7 +86,7 @@
 v0.1 只有内部登记：品类经理在工作台新建准入申请（`source = internal`），下图中的公开
 表单、开通门户、门户补资料三步跳过，`reviewer` 默认取创建人所在品类的品类经理。v0.6 起
 受邀供应商在门户填申请（`source = invited`）；公开表单（`self_registered`）待平台
-（01 FR-201）。现场审核对象在 v0.4 才有，之前由 SQE 在申请上勾选 `audit_passed` 并上传报告。
+（01 FR-201），只收文字信息，附件在供应商注册账户、登录门户后上传。现场审核对象在 v0.4 才有，之前由 SQE 在申请上勾选 `audit_passed` 并上传报告。
 
 ```mermaid
 sequenceDiagram
