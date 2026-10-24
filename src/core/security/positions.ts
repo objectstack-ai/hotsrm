@@ -7,6 +7,9 @@ export const SrmPositions = [
   { name: 'srm_buyer', label: '采购员', permissionSets: ['srm_internal_base', 'srm_buyer'] },
   { name: 'srm_buyer_lead', label: '采购主管', permissionSets: ['srm_internal_base', 'srm_buyer', 'srm_supplier_admin'] },
   { name: 'srm_sqe', label: 'SQE', permissionSets: ['srm_internal_base', 'srm_quality'] },
+  // 质量经理：SQE 主管，权限同 SQE；A 类 / 高风险准入的会签由 flow 授予（03 §12），整改逾期升级随 v0.4 Q2 加入
+  { name: 'srm_quality_manager', label: '质量经理', permissionSets: ['srm_internal_base', 'srm_quality'] },
+  { name: 'srm_iqc_inspector', label: 'IQC 检验员', permissionSets: ['srm_internal_base', 'srm_iqc'] },
   { name: 'srm_ap_accountant', label: '应付会计', permissionSets: ['srm_internal_base', 'srm_finance'] },
   { name: 'srm_legal_counsel', label: '法务', permissionSets: ['srm_internal_base', 'srm_legal'] },
   { name: 'srm_general_manager', label: '总经理', permissionSets: ['srm_internal_base', 'srm_executive'] },

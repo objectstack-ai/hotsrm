@@ -135,7 +135,7 @@ sequenceDiagram
 | 3 开通门户 | 品类经理 / 管理员（v0.6） | 邀请主联系人加入组织并开通门户（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）；v0.1–v0.5 跳过 |
 | 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，通知联系人）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
 | 5 现场审核 | `risk_class == 'high'` | v0.4 起：SQE 建供应商审核记录（`audit_type = admission`），结果为通过或有条件通过时，flow 把申请的 `audit_passed` 置为 true；v0.4 前由 SQE 直接勾选并上传 `audit_report`。条件校验：`risk_class == 'high' && audit_passed == false` 时申请不得进入 `admission_review`（FR-204） |
-| 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'a'` 或 `risk_class == 'high'` 时第 2 级并行加 `srm_quality_manager`（`unanimous`）。校验规则拦截提交人 = 审批人（平台没有「不可自审」选项，objectstack#25446）。驳回 → 申请回 `doc_review` 并通知 |
+| 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'class_a'` 或 `risk_class == 'high'` 时第 2 级改为采购总监、`srm_quality_manager` 并行会签（`per_group`：两个岗位各一人通过，同岗位多人时任一人即可；任一人驳回即驳回）。校验规则拦截提交人 = 审批人（平台没有「不可自审」选项，objectstack#25446）。驳回 → 申请回 `doc_review` 并通知 |
 | 7 批准后 | 审批通过 | 申请→`approved`，写入 `cycle_days`；供应商 `qualifying → qualified`；按申请品类建 `srm_supplier_category`（审核结论为有条件通过时为 `trial`，否则 `qualified`）；通知供应商。ERP 建档与 `erp_vendor_code` 回写为预留集成点（06 §1） |
 | 8 未通过 | 终止 | 申请→`rejected`；供应商 `qualifying → potential`（`reapply` 的旧档回 `eliminated`）；v0.6 起回收门户账号 |
 
@@ -371,7 +371,7 @@ GL-02 附录 A 按本表编写，制度里的岗位称谓经 `governance/org.yam
 | 单据 | 条件 | 第 1 级 | 第 2 级 | 第 3 级 | 方式 |
 |---|---|---|---|---|---|
 | 准入申请 | 全部 | 品类经理（`field: reviewer`） | 采购总监 | — | 串行 |
-| 准入申请 | A 类物资（`material_class == 'a'`）或高风险品类（`risk_class == 'high'`） | 品类经理 | 采购总监 + 质量经理 | — | 第 2 级并行 `unanimous` |
+| 准入申请 | A 类物资（`material_class == 'class_a'`）或高风险品类（`risk_class == 'high'`） | 品类经理 | 采购总监 + 质量经理 | — | 第 2 级并行会签 `per_group` |
 | 单一来源寻源 | 预算 < `high` 档 | 品类经理 | 采购总监 | — | 串行 |
 | 单一来源寻源 | 预算 ≥ `high` 档 | 品类经理 | 采购总监 | 总经理 | 串行 |
 | 定标 | `awarded_amount < mid` 档（示例 10 万） | 品类经理 | — | — | — |

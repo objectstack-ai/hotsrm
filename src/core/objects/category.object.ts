@@ -20,6 +20,8 @@ export const Category = ObjectSchema.create({
     category_manager: Field.user({ label: '品类经理', group: 'basic' }),
     sqe: Field.user({ label: 'SQE', group: 'basic' }),
     is_direct: Field.boolean({ label: '直接物料', group: 'basic', defaultValue: true }),
+    // 物资 A / B / C 分类（P-D2）：A 类准入审批加质量经理会签（03 §12）
+    material_class: Field.select({ label: '物资类别', group: 'admission', required: true, defaultValue: 'class_c', picklist: 'srm_material_class' }),
     risk_class: Field.select({
       label: '风险等级',
       group: 'admission',

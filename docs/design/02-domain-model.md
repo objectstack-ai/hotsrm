@@ -262,8 +262,8 @@ flow 拒绝新建人核验自己建的账户（03 §13）。
 
 **`srm_category` 采购品类**（OWD `public_read`）：`code`、`name`、`parent`（`tree`，
 上级品类）、`category_manager`（user）、`sqe`（user）、`is_direct`（boolean，直接
-物料）、`material_class`（共享选项列表 `srm_material_class`：`a` 战略类 / `b` 重要类 /
-`c` 一般类，与体系文件的物资 A / B / C 分类同源，决定准入审批是否会签质量经理、
+物料）、`material_class`（共享选项列表 `srm_material_class`：`class_a` 战略类 / `class_b` 重要类 /
+`class_c` 一般类（选项值至少 2 个字符，所以不用单字母），与体系文件的物资 A / B / C 分类同源，决定准入审批是否会签质量经理、
 审核频次和绩效周期）、`risk_class`（`high` / `medium` / `low`，决定准入是否需要现场
 审核与样品；A 类默认 `high`，B 类中涉及危化品、特种设备的也设 `high`）、
 `mandatory_cert_types`（multiselect，必备资质类型）。

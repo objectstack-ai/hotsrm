@@ -157,6 +157,27 @@ describe('internal permissions', () => {
     `);
   });
 
+  // v0.4 Q0：质量经理权限同 SQE（会签由 flow 授予）；srm_iqc 的交付记录权限随 v0.4 Q1 补齐
+  it('gives the quality manager the same access as an SQE', () => {
+    expect(visibility('srm_quality_manager')).toEqual(visibility('srm_sqe'));
+  });
+
+  it('keeps what an IQC inspector can see', () => {
+    expect(visibility('srm_iqc_inspector')).toMatchInlineSnapshot(`
+      {
+        "srm_category": "R",
+        "srm_material": "R",
+        "srm_plant": "R",
+        "srm_supplier": "R",
+        "srm_supplier_bank_account": "R",
+        "srm_supplier_category": "R",
+        "srm_supplier_certificate": "R",
+        "srm_supplier_contact": "R",
+        "srm_supplier_disposition": "R",
+      }
+    `);
+  });
+
   it('lets legal, the general manager and compliance read suppliers but not edit or create one', async () => {
     const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { system: true });
     for (const position of ['srm_legal_counsel', 'srm_general_manager', 'srm_procurement_compliance']) {

@@ -11,9 +11,9 @@ const categories = defineSeed(Category, {
   mode: 'ignore',
   externalId: 'code',
   records: [
-    { code: 'ELEC', name: '电子元器件', risk_class: 'high', is_direct: true, mandatory_cert_types: ['business_license', 'iso9001'] },
-    { code: 'PACK', name: '包装材料', risk_class: 'low', is_direct: true, mandatory_cert_types: ['business_license'] },
-    { code: 'MRO', name: '工业品与备件', risk_class: 'medium', is_direct: false, mandatory_cert_types: ['business_license'] },
+    { code: 'ELEC', name: '电子元器件', material_class: 'class_a', risk_class: 'high', is_direct: true, mandatory_cert_types: ['business_license', 'iso9001'] },
+    { code: 'PACK', name: '包装材料', material_class: 'class_c', risk_class: 'low', is_direct: true, mandatory_cert_types: ['business_license'] },
+    { code: 'MRO', name: '工业品与备件', material_class: 'class_b', risk_class: 'medium', is_direct: false, mandatory_cert_types: ['business_license'] },
   ],
 });
 
