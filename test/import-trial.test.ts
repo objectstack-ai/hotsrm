@@ -6,7 +6,7 @@ import { Supplier, SupplierCertificate, SupplierContact } from '../src/core/obje
 
 // 存量导入试导（#10 出口条件）：data/samples/legacy-trial/ 是模拟的「脏」台账，覆盖重复行、格式错误的
 // 信用代码、混合日期格式、选项别名、缺字段、同表两位主联系人等常见问题。这里逐行钉住平台给出的结果，
-// 结论写在导入说明 §6。平台修复 objectstack#25476 / #25491 / #25493 后这里的预期会变，届时同步更新说明。
+// 结论写在导入说明 §6。平台修复 objectstack#25476 / #25491 / #25493 / #26133 后这里的预期会变，届时同步更新说明。
 describe('legacy import trial with a messy ledger', () => {
   let stack: VerifyStack;
   let importer: string;
@@ -60,13 +60,13 @@ describe('legacy import trial with a messy ledger', () => {
     expect(outcome(domestic)).toEqual([
       'created', // 1
       'UNIQUE_VIOLATION', // 2 同一家重复一行（名称带尾随空格）
-      'invalid_date', // 3 2011.07.01（小写信用代码要改完日期才报，每行只报第一个错误）
-      'invalid_date', // 4 20090615
+      'rule_violation', // 3 信用代码小写（日期 2011.07.01 从 18.1.0 起能识别）
+      'max_length', // 4 信用代码带连字符（日期 20090615 能识别）
       'invalid_date', // 5 2018-02-30
       'invalid_option', // 6 中国大陆
       'BLANK_MATCH_KEY', // 7 缺信用代码：两遍都被跳过，不报错（objectstack#25476）
       'invalid_option', // 8 物流（应为物流商）
-      'invalid_option', // 9 CN（应为中国）
+      'created', // 9 国家写 CN、存量导入写 Y：18.1.0 起按选项值、不分大小写接受
       'BLANK_MATCH_KEY', // 10–13 境外行，第二遍处理
       'BLANK_MATCH_KEY',
       'BLANK_MATCH_KEY',
@@ -81,8 +81,16 @@ describe('legacy import trial with a messy ledger', () => {
   });
 
   it('fails contacts and certificates of suppliers that did not import', () => {
-    expect(contacts.results.filter((r) => r.code === 'reference_not_found')).toHaveLength(8);
-    expect(certificates.results.find((r) => r.row === 3)!.code).toBe('invalid_option'); // ISO9001（应为 ISO 9001）
+    expect(contacts.results.filter((r) => r.code === 'reference_not_found')).toHaveLength(6);
+    expect(certificates.results.find((r) => r.row === 5)!.code).toBe('reference_not_found'); // 精工模具没导入
+  });
+
+  // ISO9001 从 18.1.0 起按选项值接受；它和上一行是同一张证书，同一文件里两行匹配键相同却建成两条（objectstack#26133）
+  it('writes a certificate listed twice in one sheet twice', async () => {
+    expect([2, 3].map((n) => certificates.results.find((r) => r.row === n)!.action)).toEqual(['created', 'created']);
+    const [supplier] = await stack.rows(Supplier.name, { credit_code: '91000000MA0TRIAL01' }, { as: importer });
+    const iso = await stack.rows(SupplierCertificate.name, { supplier: supplier!.id, cert_type: 'iso9001' }, { as: importer });
+    expect(iso.map((c) => c.cert_no)).toEqual(['EX-Q-1001', 'EX-Q-1001']);
   });
 
   it('keeps a certificate with no expiry date as never expiring', async () => {
@@ -92,8 +100,9 @@ describe('legacy import trial with a messy ledger', () => {
     expect(license!.valid_to ?? null).toBeNull();
   });
 
+  // 华东紧固：同表两位主联系人；新材料：同一人邮箱大小写不同写了两行，建成两个主联系人（匹配区分大小写）
   it('surfaces two primary contacts from the same sheet for review', async () => {
     const conflicts = await stack.rows(Supplier.name, { primary_contact_count: { $gt: 1 } }, { as: importer });
-    expect(conflicts.map((s) => s.name)).toEqual(['示例华东紧固件有限公司']);
+    expect(conflicts.map((s) => s.name).sort()).toEqual(['示例华东紧固件有限公司', '示例新材料科技有限公司'].sort());
   });
 });

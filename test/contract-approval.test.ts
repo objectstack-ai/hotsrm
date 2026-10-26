@@ -195,6 +195,35 @@ describe('contract approval', () => {
     expect(await contract(id)).toMatchObject({ status: 'signing', title: '示例采购合同（已补违约责任）' });
   });
 
+  // 法务之后的一级退回：提交人仍是本人（objectstack#24817 随 18.1.0 修复），重新提交后从法务重来并按新金额分档
+  it('lets a later level send it back; the submitter resubmits from legal and the new amount picks the levels', async () => {
+    const id = await draftAndSubmit(buyerLead, { amount: 2_000_000 }, null);
+    await decide(legal, id, 'approve');
+    await decide(manager, id, 'approve');
+    await decide(director, id, 'approve');
+    const returned = await decide(gm, id, 'revise', '金额超出年度预算，请拆分');
+    expect(returned.submitter_id).toBe(buyerLead.id);
+    expect(await contract(id)).toMatchObject({ status: 'in_review', approval_status: 'returned' });
+
+    await stack.hooks.run(Contract.name, 'update', { id, amount: 500_000, title: '示例采购合同（拆分后）' }, { as: buyerLead.token });
+    const res = await stack.apiAs(buyerLead.token, 'POST', `/approvals/requests/${returned.id}/resubmit`, {});
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(await pendingApprovers(id)).toContain(legal.id);
+
+    await decide(legal, id, 'approve');
+    // 上一轮后面几级的审批人作废
+    expect(await contract(id)).toMatchObject({ legal_approver: legal.id, category_approver: null, director_approver: null, gm_approver: null });
+    await decide(manager, id, 'approve');
+    expect((await pending(id))!.submitter_id).toBe(buyerLead.id);
+    await decide(director, id, 'approve');
+    // 改成 mid 档后不再经总经理
+    expect(await contract(id)).toMatchObject({ status: 'signing', director_approver: director.id, gm_approver: null });
+    // 通知里是改过的标题
+    await expect
+      .poll(async () => (await stack.rows('sys_inbox_message', { user_id: buyerLead.id })).some((m) => JSON.stringify(m).includes('示例采购合同（拆分后）')))
+      .toBe(true);
+  });
+
   it('puts a recalled contract back to draft', async () => {
     const id = await draftAndSubmit(manager, { amount: 50_000 });
     const req = await pending(id);

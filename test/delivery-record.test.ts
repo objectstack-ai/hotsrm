@@ -210,8 +210,8 @@ describe('delivery record', () => {
       const result = await importDeliveries(sample('delivery-trial/srm_delivery_record.csv'));
       const outcome = result.results.map((r) => (r.ok ? r.action : r.code));
       expect(outcome, JSON.stringify(result.results)).toEqual([
-        'invalid_date', // 1 需求日期 2026.10.08
-        'invalid_date', // 2 日期 20261008
+        'created', // 1 需求日期 2026.10.08（18.1.0 起能识别，objectstack#25493）
+        'created', // 2 日期 20261008
         'reference_not_found', // 3 供应商写简称
         'reference_not_found', // 4 物料号不存在
         'invalid_option', // 5 检验结论写 OK
@@ -229,6 +229,10 @@ describe('delivery record', () => {
         'created', // 17 检验结论带尾随空格
         'reference_not_found', // 18 物料号小写
       ]);
+      const [dotted] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090001' });
+      expect(dotted!.required_date).toBe('2026-10-08');
+      const [compact] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090002' });
+      expect([compact!.required_date, compact!.promised_date, compact!.receipt_date]).toEqual(['2026-10-08', '2026-10-08', '2026-10-09']);
       const [ignored] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090009' });
       expect([ignored!.period, ignored!.on_time]).toEqual(['2026-10', false]);
       const [thousands] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090011' });

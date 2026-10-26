@@ -355,7 +355,7 @@ SQE、质量经理经共享规则 `srm_supplier_audit_edit_*` 改所有审核（
 | `report` / `scoresheet` | file | 审核报告、审核评分表（QR-03） |
 | `serious_finding_count` / `veto_finding_count` | summary | 严重不符合项数、否决项数，校验结论用 |
 
-检查表原设计为 repeater（检查项、评分、备注）。平台的 repeater 不能声明子字段（列名、类型、选项与翻译都没处写，objectstack#25681），
+检查表原设计为 repeater（检查项、评分、备注）。平台的 repeater 不能声明子字段（列名、类型、选项与翻译都没处写；objectstack#25681 裁定有类型的列表用子对象），
 表单只能当无结构表格编辑，所以逐条评分留在评分表附件里，系统记总分和最低审核块得分；问题项改为子对象：
 
 **`srm_supplier_audit_finding` 审核问题项**（master_detail → 供应商审核，`controlled_by_parent`；v0.4）：`title` 问题项（必填）、
@@ -649,7 +649,7 @@ SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改�
 | `is_overdue` | boolean | 默认 false，逾期 flow 维护 |
 | `claim_amount` | currency | 索赔金额 |
 | `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计从「供应商已接受」手工标记，选项对其他人不可选；SRM 不生成扣款）；不是 `none` 时必须填索赔金额 |
-| `steps` | repeater | 8D 各步骤的完成日期、责任人、附件（D1–D8），供门户整改回复页分段显示；随门户（v0.6）加，之前状态即 8D 进度。repeater 要能声明子字段才可用（objectstack#25681） |
+| `steps` | repeater | 8D 各步骤的完成日期、责任人、附件（D1–D8），供门户整改回复页分段显示；随门户（v0.6）加，之前状态即 8D 进度。平台已裁定对象上的 repeater 不声明子字段、有类型的列表用子对象（objectstack#25681，2026-10-25），所以不按 repeater 做；是否改为 8D 步骤子对象随 v0.6 U5 定 |
 
 整改单上 8D 内容在关闭或撤销后只读。
 

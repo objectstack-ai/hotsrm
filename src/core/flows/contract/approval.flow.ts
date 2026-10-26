@@ -10,7 +10,8 @@ import type * as Automation from '@objectstack/spec/automation';
 // 金额按数值比较、不换算币种。
 const MID = 100_000;
 const HIGH = 1_000_000;
-const amount = `(has(record.amount) && record.amount != null ? double(record.amount) : 0.0)`;
+// 金额读每一轮开始时重新读出的合同（current）：record 是发起时的快照，退回修改后改过的金额要按新值分档
+const amount = `(has(current.amount) && current.amount != null ? double(current.amount) : 0.0)`;
 const atLeast = (tier: number) => ({ dialect: 'cel' as const, source: `${amount} >= ${tier}.0` });
 const below = (tier: number) => ({ dialect: 'cel' as const, source: `${amount} < ${tier}.0` });
 
@@ -23,7 +24,7 @@ const initiators = `[record.created_by, record.submitted_by]`;
 // 查岗位用：系统生成的续签草稿没有起草人，列表里不能有 null
 const initiatorIds = `has(record.created_by) && record.created_by != null ? [record.created_by, record.submitted_by] : [record.submitted_by]`;
 
-const approval = (label: string, approvers: Automation.ApprovalNodeApprover[], maxRevisions: number, extra: Record<string, unknown> = {}) => ({
+const approval = (label: string, approvers: Automation.ApprovalNodeApprover[], extra: Record<string, unknown> = {}) => ({
   type: 'approval' as const,
   label,
   config: {
@@ -33,7 +34,8 @@ const approval = (label: string, approvers: Automation.ApprovalNodeApprover[], m
     behavior: 'first_response' as const,
     lockRecord: true,
     approvalStatusField: 'approval_status',
-    maxRevisions,
+    // 每一级至多退回 3 次，再退回即自动驳回
+    maxRevisions: 3,
     ...extra,
   },
 });
@@ -64,13 +66,17 @@ const self = (id: string, label: string, actor: string, title: string, message: 
   },
 });
 
-// 记下这一级的审批人：写到合同上，同时留在变量里给后面几级比对
-const recordApprover = (id: string, label: string, field: string, actor: string, variable: string) => [
+// 记下这一级的审批人：写到合同上，同时留在变量里给后面几级比对。退回重审时后面几级上一轮的审批人作废，一并清空
+const recordApprover = (id: string, label: string, field: string, actor: string, variable: string, later: string[]) => [
   {
     id,
     type: 'update_record' as const,
     label,
-    config: { objectName: 'srm_contract', filter: { id: cel`record.id` }, fields: { [field]: cel$(`${actor}.actor_id`) } },
+    config: {
+      objectName: 'srm_contract',
+      filter: { id: cel`record.id` },
+      fields: { [field]: cel$(`${actor}.actor_id`), ...Object.fromEntries(later.map((f) => [f, null])) },
+    },
   },
   { id: `${id}_var`, type: 'assignment' as const, label: `${label}（变量）`, config: { assignments: { [variable]: cel$(`${actor}.actor_id`) } } },
 ];
@@ -103,11 +109,17 @@ export const ContractApprovalFlow: Automation.Flow = {
       },
     },
     { id: 'init', type: 'assignment', label: '初始化审批人变量', config: { assignments: { legalActor: '', categoryActor: '', directorActor: '' } } },
+    {
+      id: 'load_contract',
+      type: 'get_record',
+      label: '读取合同当前内容',
+      config: { objectName: 'srm_contract', filter: { id: cel`record.id` }, outputVariable: 'current' },
+    },
 
-    // 1. 法务。可以通过、驳回或退回修改，退回后提交人改完重新提交、从法务重新审批
+    // 1. 法务。各级都可以通过、驳回或退回修改，退回后提交人改完重新提交、从法务重新审批
     {
       id: 'legal_review',
-      ...approval('法务审核', [{ type: 'field', value: 'legal_reviewer' }], 3, {
+      ...approval('法务审核', [{ type: 'field', value: 'legal_reviewer' }], {
         onEmptyApprovers: 'fallback',
         fallbackApprovers: [{ type: 'position', value: 'srm_legal_counsel' }],
       }),
@@ -121,7 +133,7 @@ export const ContractApprovalFlow: Automation.Flow = {
       '合同 {{ record.contract_no }} 需由另一位法务审核',
       '你是这份合同的起草人或提交人，你的通过不计入审批，已重新提交给法务。',
     ),
-    ...recordApprover('record_legal', '记录法务审批人', 'legal_approver', 'legalAction', 'legalActor'),
+    ...recordApprover('record_legal', '记录法务审批人', 'legal_approver', 'legalAction', 'legalActor', ['category_approver', 'director_approver', 'gm_approver']),
 
     // 2. 品类经理；起草人或提交人是品类经理时改由采购总监审批
     {
@@ -135,10 +147,7 @@ export const ContractApprovalFlow: Automation.Flow = {
       },
     },
     { id: 'route_category', type: 'decision', label: '品类经理一级由谁审批？' },
-    // 临时做法：法务之后的各级只能通过或驳回、不能退回修改——平台把第 2 个起的审批节点的提交人记成恢复流程的人
-    // （上一级审批人），退回后提交人无法重新提交（objectstack#24817 已在主干修复、18.0.0 未带上）。
-    // 平台修复后给这几级加回 revise 边，退回到提交人
-    { id: 'category_review', ...approval('品类经理审批', [{ type: 'position', value: 'srm_category_manager' }], 0) },
+    { id: 'category_review', ...approval('品类经理审批', [{ type: 'position', value: 'srm_category_manager' }]) },
     actionOf('category_action', '读取品类经理审批记录', 'category_review', 'approve', 'categoryAction'),
     { id: 'category_sod', type: 'decision', label: '品类经理与起草人、提交人、法务不同？' },
     self(
@@ -148,11 +157,11 @@ export const ContractApprovalFlow: Automation.Flow = {
       '合同 {{ record.contract_no }} 需由另一位品类经理审批',
       '合同的起草人、提交人和各级审批人不能是同一人（BR-11），你的通过不计入审批，已重新提交给品类经理。',
     ),
-    ...recordApprover('record_category', '记录品类经理审批人', 'category_approver', 'categoryAction', 'categoryActor'),
+    ...recordApprover('record_category', '记录品类经理审批人', 'category_approver', 'categoryAction', 'categoryActor', ['director_approver', 'gm_approver']),
     { id: 'needs_director', type: 'decision', label: '达到 mid 档？' },
 
     // 3. 采购总监（mid 档及以上，或替起草的品类经理审批）
-    { id: 'director_review', ...approval('采购总监审批', [{ type: 'position', value: 'srm_procurement_director' }], 0) },
+    { id: 'director_review', ...approval('采购总监审批', [{ type: 'position', value: 'srm_procurement_director' }]) },
     actionOf('director_action', '读取采购总监审批记录', 'director_review', 'approve', 'directorAction'),
     { id: 'director_sod', type: 'decision', label: '采购总监与起草人、提交人、前几级不同？' },
     self(
@@ -162,11 +171,11 @@ export const ContractApprovalFlow: Automation.Flow = {
       '合同 {{ record.contract_no }} 需由另一位采购总监审批',
       '合同的起草人、提交人和各级审批人不能是同一人（BR-11），你的通过不计入审批，已重新提交给采购总监。',
     ),
-    ...recordApprover('record_director', '记录采购总监审批人', 'director_approver', 'directorAction', 'directorActor'),
+    ...recordApprover('record_director', '记录采购总监审批人', 'director_approver', 'directorAction', 'directorActor', ['gm_approver']),
     { id: 'needs_gm', type: 'decision', label: '达到 high 档？' },
 
     // 4. 总经理（high 档及以上）
-    { id: 'gm_review', ...approval('总经理审批', [{ type: 'position', value: 'srm_general_manager' }], 0) },
+    { id: 'gm_review', ...approval('总经理审批', [{ type: 'position', value: 'srm_general_manager' }]) },
     actionOf('gm_action', '读取总经理审批记录', 'gm_review', 'approve', 'gmAction'),
     { id: 'gm_sod', type: 'decision', label: '总经理与起草人、提交人、前几级不同？' },
     self(
@@ -197,7 +206,7 @@ export const ContractApprovalFlow: Automation.Flow = {
       config: {
         recipients: [cel`record.created_by`, cel`has(record.submitted_by) ? record.submitted_by : null`],
         title: '合同 {{ record.contract_no }} 已审批通过',
-        message: '合同「{{ record.title }}」已进入签署。请组织双方签署，上传盖章件、填写签署日期后确认生效。',
+        message: '合同「{{ current.title }}」已进入签署。请组织双方签署，上传盖章件、填写签署日期后确认生效。',
         sourceObject: 'srm_contract',
         sourceId: cel`record.id`,
       },
@@ -226,21 +235,23 @@ export const ContractApprovalFlow: Automation.Flow = {
       config: {
         recipients: [cel`record.created_by`, cel`has(record.submitted_by) ? record.submitted_by : null`],
         title: '合同 {{ record.contract_no }} 审批未通过',
-        message: '合同「{{ record.title }}」已被驳回，驳回原因见合同。需要继续合作的，请重新起草合同。',
+        message: '合同「{{ current.title }}」已被驳回，驳回原因见合同。需要继续合作的，请重新起草合同。',
         severity: 'warning',
         sourceObject: 'srm_contract',
         sourceId: cel`record.id`,
       },
     },
 
-    // 7. 退回修改：记录解锁，提交人改完后重新提交，从法务重新审批
+    // 7. 退回修改（任一级）：记录解锁，提交人改完后重新提交，从头（法务）重新审批：
+    // 审批人变量重置，金额改过时按新金额重新分档
     { id: 'revise_window', type: 'approval_revise', label: '退回修改' },
     { id: 'end', type: 'end', label: '结束' },
   ],
 
   edges: [
     { id: 'e_start', source: 'start', target: 'init', type: 'default' },
-    { id: 'e_init', source: 'init', target: 'legal_review', type: 'default' },
+    { id: 'e_init', source: 'init', target: 'load_contract', type: 'default' },
+    { id: 'e_load', source: 'load_contract', target: 'legal_review', type: 'default' },
 
     { id: 'e_l_approve', source: 'legal_review', target: 'legal_action', type: 'default', label: 'approve' },
     { id: 'e_l_reject', source: 'legal_review', target: 'legal_reject_action', type: 'default', label: 'reject' },
@@ -269,6 +280,7 @@ export const ContractApprovalFlow: Automation.Flow = {
 
     { id: 'e_c_approve', source: 'category_review', target: 'category_action', type: 'default', label: 'approve' },
     { id: 'e_c_reject', source: 'category_review', target: 'category_reject_action', type: 'default', label: 'reject' },
+    { id: 'e_c_revise', source: 'category_review', target: 'revise_window', type: 'default', label: 'revise' },
     { id: 'e_c_sod', source: 'category_action', target: 'category_sod', type: 'default' },
     ...sodEdges('c', 'category_sod', 'categoryAction', ['legalActor'], 'category_self', 'record_category', 'category_review'),
     { id: 'e_c_var', source: 'record_category', target: 'record_category_var', type: 'default' },
@@ -278,6 +290,7 @@ export const ContractApprovalFlow: Automation.Flow = {
 
     { id: 'e_d_approve', source: 'director_review', target: 'director_action', type: 'default', label: 'approve' },
     { id: 'e_d_reject', source: 'director_review', target: 'director_reject_action', type: 'default', label: 'reject' },
+    { id: 'e_d_revise', source: 'director_review', target: 'revise_window', type: 'default', label: 'revise' },
     { id: 'e_d_sod', source: 'director_action', target: 'director_sod', type: 'default' },
     ...sodEdges('d', 'director_sod', 'directorAction', ['legalActor', 'categoryActor'], 'director_self', 'record_director', 'director_review'),
     { id: 'e_d_var', source: 'record_director', target: 'record_director_var', type: 'default' },
@@ -287,6 +300,7 @@ export const ContractApprovalFlow: Automation.Flow = {
 
     { id: 'e_g_approve', source: 'gm_review', target: 'gm_action', type: 'default', label: 'approve' },
     { id: 'e_g_reject', source: 'gm_review', target: 'gm_reject_action', type: 'default', label: 'reject' },
+    { id: 'e_g_revise', source: 'gm_review', target: 'revise_window', type: 'default', label: 'revise' },
     { id: 'e_g_sod', source: 'gm_action', target: 'gm_sod', type: 'default' },
     ...sodEdges('g', 'gm_sod', 'gmAction', ['legalActor', 'categoryActor', 'directorActor'], 'gm_self', 'record_gm', 'gm_review'),
     { id: 'e_g_next', source: 'record_gm', target: 'mark_signing', type: 'default' },
@@ -303,6 +317,6 @@ export const ContractApprovalFlow: Automation.Flow = {
     { id: 'e_rejected_notify', source: 'mark_rejected', target: 'notify_rejected', type: 'default' },
     { id: 'e_rejected_end', source: 'notify_rejected', target: 'end', type: 'default' },
 
-    { id: 'e_resubmit', source: 'revise_window', target: 'legal_review', type: 'back', label: 'resubmit' },
+    { id: 'e_resubmit', source: 'revise_window', target: 'init', type: 'back', label: 'resubmit' },
   ],
 };

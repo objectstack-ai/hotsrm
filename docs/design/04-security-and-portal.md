@@ -162,7 +162,7 @@ flowchart LR
 | 方案 | 托管云今天可用 | 代价 | 结论 |
 |---|---|---|---|
 | A 每家供应商一个门户岗位 | 可用：只用到岗位、RLS、flow | 每家供应商首次开通时管理员要新建一个岗位定义；每张顶层单据冗余一个字段 | **推荐** |
-| B 应用自带 membership resolver 插件，RLS 写成 `supplier in current_user.portal_supplier_ids` | 不可用：托管云不执行应用包代码；自托管可用 | 需要代码；该扩展点在开源框架中已定义，使用前需验证 | 自托管时的可选增强（§3.5） |
+| B 成员键，RLS 写成 `supplier in current_user.portal_supplier_ids` | 18.1.0 起可用元数据声明（`ObjectSchema.membershipKeys`），不再需要代码；此前只能写 membership resolver 插件 | 声明式写法待 U2 实测 | 待评估（§3.5） |
 | C 记录所有者设为供应商用户 | 可用 | 一家供应商多个用户时只有所有者能看；破坏「所有者 = 内部经办人」的语义 | 不采用 |
 | D 每家供应商一个组织（多组织隔离） | 需要企业版多组织许可 | 一张寻源单要同时给多家供应商看，跨组织做不到 | 不采用 |
 
@@ -187,11 +187,24 @@ flowchart LR
 
 ### 3.3 门户账号的开通与回收
 
-托管云上，组织邀请是进入环境的唯一入口，供应商的门户用户就是被邀请进组织的成员。
+托管云上，组织邀请是进入环境的唯一入口，供应商的门户用户就是被邀请进组织的成员。门户用户一律按组织角色
+**`external`**（外部成员，平台 18.1.0 起提供，objectstack#25233）邀请，不按普通成员邀请。`external` 的行为：
+
+- **只读自己的身份行**：看不到成员目录，团队、邀请列表也只返回自己相关的（§3.6）；
+- **不受默认权限集作用**：持平台的 `org_external` 而不是 `everyone` 锚点，环境里任何 `isDefault` 权限集都到不了它；
+  它只有平台内置的 `external_default` 基线（读自己的身份行；只能改、删自己创建的行）；
+- **不放进业务单元**：门户岗位是组织级岗位，数据只经岗位和权限集授予；
+- **OWD 对它一律视为仅本人**：`public_read` / `public_read_write` 对它不开放，只读写自己拥有的和共享给它的行
+  （记录共享或共享规则，18.1.0 起公开对象上的共享也能到达 `external` 成员）；它持有的岗位或权限集上的行策略
+  （RLS）解除这个下限并限定行范围——门户权限集的 `portal_position in current_user.positions` 正是这样起作用的；
+  `controlled_by_parent` 子对象跟随主记录。
+
+所以门户用户能看到的数据只来自 §3.1 的门户岗位和门户权限集，内部权限集即使误设了 `isDefault` 也不会漏给他们
+（内部权限集仍一律不设 `isDefault`，R2 照常审查）。`org_external` 是平台保留名，岗位不能用它命名。
 
 **开通**（由 `srm_supplier_admin` 操作）：
 
-1. 在组织成员页按联系人邮箱发出邀请，角色为普通成员；
+1. 在组织成员页按联系人邮箱发出邀请，角色选 `external`；
 2. **该供应商第一次开通门户时**，由管理员在 Setup 新建岗位 `srm_vendor_<编号>`，并在
    岗位定义里挂上门户权限集。平台把岗位视为环境级的**定义**（元数据），不是数据行，
    所以这一步不能由 flow 完成，需要持有元数据编辑权限的管理员操作（已向平台提出
@@ -199,8 +212,9 @@ flowchart LR
    按清单批量建）；
 3. 运行「开通门户」screen flow：选择联系人、已加入的用户和刚建的岗位 → 写入供应商的
    `portal_position`，并把它回填到该供应商已有的单据上 → 把用户任命到该岗位（任命是
-   数据行，flow 以系统身份写入是否放行按 07 §6 V3 实测，objectstack#25251；不放行时
-   由管理员在成员页任命，flow 只做回填）→ 在联系人上写 `portal_user`；联系人
+   数据行，但 18.1.0 起 `runAs: 'system'` 的 flow 不得写岗位任命、权限集分配和邀请
+   （objectstack#25251），`runAs: 'user'` 能否写按 07 §6 V2 实测；不放行时由管理员在成员页任命，
+   flow 只做回填）→ 在联系人上写 `portal_user`；联系人
    `contact_function` 含 `admin` 时，再把门户管理员权限集**直接授予该用户**（同一家供应商
    的用户共用一个岗位，管理员能力只能按人授予）；
 4. 同一供应商以后再开通账号，只需第 1、3 步。
@@ -283,9 +297,15 @@ export const PortalSupplier = definePermissionSet({
 });
 ```
 
-### 3.5 自托管增强：membership resolver
+### 3.5 方案 B：成员键
 
-自托管部署可以运行应用代码，此时可以把方案 A 换成方案 B：应用注册一个
+18.1.0 起，对象可以用元数据声明**成员键**（`ObjectSchema.membershipKeys`：`userField`、`valueField`、可选的
+`filter`，objectstack#25234），平台据此解析 `current_user.<键>`，不再需要应用代码。若在联系人对象上声明
+`portal_supplier_ids`（门户用户 → 所属供应商），RLS 可以直接写 `supplier in current_user.portal_supplier_ids`，
+不用每家供应商建一个岗位。是否改用、对象上的 `portal_position` 冗余如何处理，由 v0.6 U2 实测后定（ADR-0003 的
+修订走新 ADR）；在定下来之前仍按方案 A 设计。
+
+此前只能由应用代码实现：自托管部署可以运行应用代码，此时可以把方案 A 换成方案 B：应用注册一个
 `rls-membership-resolver` 服务，声明键 `portal_supplier_ids`，按「当前用户作为
 `portal_user` 的在职联系人所属供应商」解析出供应商 id 集合；RLS 改写为
 `supplier in current_user.portal_supplier_ids`，单据不再需要 `portal_position` 冗余。
@@ -304,10 +324,10 @@ export const PortalSupplier = definePermissionSet({
 
 门户权限集只能放宽或收窄 SRM 自己的对象，用户目录由平台的成员权限决定。因此：
 
-1. 已实测：门户用户在界面和 REST 上能列出全组织用户（objectstack#25233，P1，已补充 SRM
-   场景）；纳入 §3.7 的验收用例，v0.6 开工前复测；
-2. 平台修复前不开门户；若必须在解决前上线，由业务方书面接受该风险，并把门户用户的
-   显示名统一为「公司简称-角色」，减少个人信息暴露。
+1. 18.0.0 实测：普通成员身份的门户用户在界面和 REST 上能列出全组织用户（objectstack#25233）；
+2. 18.1.0 以组织角色 `external` 修复：`external` 成员只读自己的身份行，团队、邀请列表也只返回自己相关的。
+   门户用户因此一律按 `external` 邀请（§3.3），07 §5 D8 不再需要；v0.6 U1 复测（07 §6 V1），§3.7 的「用户目录」
+   用例照常回归。
 
 ### 3.7 隔离验收测试
 

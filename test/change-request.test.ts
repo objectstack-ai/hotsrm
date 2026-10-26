@@ -221,8 +221,8 @@ describe('supplier change request', () => {
     expect(await stack.rows(SupplierBankAccount.name, { supplier: supplier.id })).toHaveLength(1);
   });
 
-  // 临时：第 2 级不能退回修改（objectstack#24817 已在主干修复、18.0.0 未带上），只能通过或驳回
-  it('does not let finance send a bank change back', async () => {
+  // 第 2 级退回：提交人仍是发起人（objectstack#24817 随 18.1.0 修复），改完从第 1 级重新审批
+  it('lets finance send a bank change back to the submitter, who resubmits it from the first level', async () => {
     const supplier = await qualifiedSupplier();
     const change = await submit(manager.token, {
       supplier: supplier.id,
@@ -233,10 +233,27 @@ describe('supplier change request', () => {
       new_account_no: '6228888800005555',
     });
     await decide(lead.token, change.id, 'approve');
-    const req = await pending(change.id);
-    const res = await stack.apiAs(accountant.token, 'POST', `/approvals/requests/${req!.id}/revise`, { comment: '请补支行' });
-    expect(res.status).not.toBe(200);
-    expect(await request(change.id)).toMatchObject({ status: 'in_review', approval_status: 'pending' });
+    const returned = await decide(accountant.token, change.id, 'revise', '请补支行');
+    expect(returned.submitter_id).toBe(manager.id);
+    expect(await request(change.id)).toMatchObject({ status: 'in_review', approval_status: 'returned' });
+
+    // 只有发起人能重新提交
+    const byLead = await stack.apiAs(lead.token, 'POST', `/approvals/requests/${returned.id}/resubmit`, {});
+    expect(byLead.status).not.toBe(200);
+    await stack.hooks.run(SupplierChangeRequest.name, 'update', { id: change.id, new_branch_name: '示例新支行' }, { as: manager.token });
+    const res = await stack.apiAs(manager.token, 'POST', `/approvals/requests/${returned.id}/resubmit`, {});
+    expect(res.status, await res.clone().text()).toBe(200);
+
+    // 从采购主管重新审批，上一轮的财务审批人清空
+    const again = await pending(change.id);
+    expect(again!.flow_node_id).toBe('purchase_review');
+    expect(again!.submitter_id).toBe(manager.id);
+    await decide(lead.token, change.id, 'approve');
+    expect((await pending(change.id))!.submitter_id).toBe(manager.id);
+    await decide(accountant.token, change.id, 'approve');
+    expect(await request(change.id)).toMatchObject({ status: 'applied', purchase_approver: lead.id, finance_approver: accountant.id });
+    const [created] = (await stack.rows(SupplierBankAccount.name, { supplier: supplier.id })).filter((a) => a.id !== supplier.account);
+    expect(created).toMatchObject({ bank_name: '示例新银行', branch_name: '示例新支行', status: 'active' });
   });
 
   it('does not count an approval by the same person on both levels (BR-11)', async () => {
