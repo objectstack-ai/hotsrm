@@ -95,6 +95,8 @@ export const Supplier = ObjectSchema.create({
       ],
     }),
     latest_score: Field.number({ label: '最近绩效总分', group: 'qualification', readonly: true, scale: 2 }),
+    // 优选（03 §10 第 6 步）：最近一期已发布等级为 A 时为 true，其他等级为 false，与 grade 同时写入；供 v0.7 寻源邀请参考
+    preferred: Field.boolean({ label: '优选供应商', group: 'qualification', defaultValue: false, readonly: true }),
     registered_capital: Field.currency({ label: '注册资本', group: 'registration' }),
     established_date: Field.date({ label: '成立日期', group: 'registration' }),
     legal_representative: Field.text({ label: '法定代表人', group: 'registration', maxLength: 50 }),

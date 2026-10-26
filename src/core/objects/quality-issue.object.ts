@@ -49,6 +49,13 @@ export const QualityIssue = ObjectSchema.create({
       readonly: true,
       relatedListColumns: ['issue_no', 'severity', 'status', 'final_due', 'sqe'],
     }),
+    // C 级绩效结果开的整改单（srm_performance_apply，v0.5 P4）
+    performance_review: Field.lookup('srm_performance_review', {
+      label: '来源考评单',
+      group: 'problem',
+      readonly: true,
+      relatedListColumns: ['issue_no', 'severity', 'status', 'final_due', 'sqe'],
+    }),
     source: Field.select({ label: '来源', group: 'problem', required: true, defaultValue: 'iqc', picklist: 'srm_quality_issue_source', readonlyWhen: ended }),
     severity: Field.select({
       label: '严重度',

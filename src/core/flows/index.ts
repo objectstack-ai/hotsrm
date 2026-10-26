@@ -35,3 +35,4 @@ export { ScoreOverdueSweepFlow } from './performance/score-overdue-sweep.flow.js
 export { AppealSubmitFlow } from './performance/appeal-submit.flow.js';
 export { AppealResolveFlow } from './performance/appeal-resolve.flow.js';
 export { PerformanceVoidFlow } from './performance/void.flow.js';
+export { PerformanceApplyFlow } from './performance/apply.flow.js';

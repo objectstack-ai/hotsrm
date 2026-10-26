@@ -4,12 +4,21 @@ import { gradeOf } from './params.js';
 
 // 处理绩效申诉（03 §10 第 7 步，FR-706）：采购总监在申诉中的考评单上写处理结果，选择维持原结果或调整总分；调整时
 // 等级按新总分取 perf_grade_min 重算（params.ts 的 GRADE_MIN），各评分明细与维度得分不变，处理结果里写明调整依据。
-// 处理后回到已发布，处理人、结论和结果留在考评单上；是该供应商最近一期时同步回写供应商等级与总分；通知申诉代录人。
+// 处理后回到已发布，处理人、结论和结果留在考评单上；是该供应商最近一期时同步回写供应商等级、总分与优选标志；通知申诉代录人。
+// 结果应用（srm_performance_apply）只在审定发布时触发，这里不重新应用：等级变了时通知供应商各品类的品类经理，核对按原等级
+// 开的整改单和生成的处置单草稿（来源考评单为本单），不需要的由品类经理作废，新等级需要处置的另行发起（03 §10 第 7 步）。
 // 处理人不能是本考评单的评分人（同审定发布的职责分离）。以系统身份运行，进门检查在 flow 里做。
 const c = (source: string) => ({ dialect: 'cel' as const, source });
 const round2 = (x: string) => `(double(round((${x}) * 100.0)) / 100.0)`;
 const director = `current_user != null && 'srm_procurement_director' in current_user.positions`;
 const appealed = `review != null && review.status == 'appealed'`;
+const regraded = `has(review.grade) && review.grade != null && review.grade != gradeValue`;
+// 供应商各品类的品类经理；一个都没有时通知全部品类经理（同 srm_performance_apply）
+const managers =
+  `size(categories.filter(c, has(c.category_manager) && c.category_manager != null)) > 0`
+  + ` ? categories.filter(c, has(c.category_manager) && c.category_manager != null).map(c, c.category_manager)`
+  + ` : allManagers.map(p, p.user_id)`;
+const letter = (g: string) => `(${g} == 'grade_a' ? 'A' : ${g} == 'grade_b' ? 'B' : ${g} == 'grade_c' ? 'C' : 'D')`;
 
 export const AppealResolveFlow: Automation.Flow = {
   name: 'srm_appeal_resolve',
@@ -86,6 +95,8 @@ export const AppealResolveFlow: Automation.Flow = {
         assignments: {
           totalScore: c(`outcome == 'adjusted' ? ${round2('double(adjusted_score)')} : double(review.total_score)`),
           gradeValue: c(gradeOf('totalScore')),
+          changed: c(regraded),
+          gradeChange: c(`(has(review.grade) && review.grade != null ? ${letter('review.grade')} : '-') + ' → ' + ${letter('gradeValue')}`),
         },
       },
     },
@@ -122,7 +133,11 @@ export const AppealResolveFlow: Automation.Flow = {
       id: 'write_supplier',
       type: 'update_record',
       label: '回写供应商等级与总分',
-      config: { objectName: 'srm_supplier', filter: { id: cel`review.supplier` }, fields: { grade: cel`gradeValue`, latest_score: cel`totalScore` } },
+      config: {
+        objectName: 'srm_supplier',
+        filter: { id: cel`review.supplier` },
+        fields: { grade: cel`gradeValue`, latest_score: cel`totalScore`, preferred: c(`gradeValue == 'grade_a'`) },
+      },
     },
     {
       id: 'notify',
@@ -134,6 +149,52 @@ export const AppealResolveFlow: Automation.Flow = {
         message: '采购总监已处理申诉，处理结果见考评单。请把结果告知供应商。',
         sourceObject: 'srm_performance_review',
         sourceId: cel`review.id`,
+      },
+    },
+    { id: 'is_regraded', type: 'decision', label: '等级变了？' },
+    {
+      id: 'load_qualifications',
+      type: 'get_record',
+      label: '读取品类资格',
+      config: { objectName: 'srm_supplier_category', filter: { supplier: cel`review.supplier` }, limit: 200, outputVariable: 'qualifications' },
+    },
+    {
+      id: 'load_categories',
+      type: 'get_record',
+      label: '读取品类',
+      config: { objectName: 'srm_category', filter: { id: { $in: cel`qualifications.map(q, q.category)` } }, limit: 200, outputVariable: 'categories' },
+    },
+    {
+      id: 'load_all_managers',
+      type: 'get_record',
+      label: '读取全部品类经理',
+      config: { objectName: 'sys_user_position', filter: { position: 'srm_category_manager' }, limit: 50, outputVariable: 'allManagers' },
+    },
+    {
+      id: 'notify_regraded_guard',
+      type: 'try_catch',
+      label: '通知品类经理：申诉改变了等级',
+      config: {
+        try: {
+          nodes: [
+            {
+              id: 'notify_regraded',
+              type: 'notify',
+              label: '通知品类经理：申诉改变了等级',
+              config: {
+                recipients: c(managers),
+                title: '考评单 {{ review.review_no }} 申诉后等级变为 {{ gradeChange }}',
+                message:
+                  '申诉处理调整了总分，等级 {{ gradeChange }}。请核对按原等级开的整改单和生成的处置单草稿（来源考评单为本单），'
+                  + '不需要的请作废；新等级需要改善或处置的请另行发起。',
+                severity: 'warning',
+                sourceObject: 'srm_performance_review',
+                sourceId: cel`review.id`,
+              },
+            },
+          ],
+        },
+        catch: { nodes: [{ id: 'notify_regraded_skip', type: 'assignment', label: '跳过通知' }] },
       },
     },
     { id: 'end', type: 'end', label: '结束' },
@@ -155,6 +216,12 @@ export const AppealResolveFlow: Automation.Flow = {
     { id: 'e_latest', source: 'is_latest', target: 'write_supplier', type: 'conditional', condition: c('later == null'), label: '是' },
     { id: 'e_older', source: 'is_latest', target: 'notify', type: 'conditional', condition: c('later != null'), label: '已有更晚的' },
     { id: 'e12', source: 'write_supplier', target: 'notify', type: 'default' },
-    { id: 'e13', source: 'notify', target: 'end', type: 'default' },
+    { id: 'e13', source: 'notify', target: 'is_regraded', type: 'default' },
+    { id: 'e_same', source: 'is_regraded', target: 'end', type: 'conditional', condition: c('!changed'), label: '没变' },
+    { id: 'e_regraded', source: 'is_regraded', target: 'load_qualifications', type: 'conditional', condition: c('changed'), label: '变了' },
+    { id: 'e14', source: 'load_qualifications', target: 'load_categories', type: 'default' },
+    { id: 'e15', source: 'load_categories', target: 'load_all_managers', type: 'default' },
+    { id: 'e16', source: 'load_all_managers', target: 'notify_regraded_guard', type: 'default' },
+    { id: 'e17', source: 'notify_regraded_guard', target: 'end', type: 'default' },
   ],
 };
