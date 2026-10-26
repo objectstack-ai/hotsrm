@@ -830,10 +830,18 @@ export const en: TranslationData = {
         comment: { label: 'Scoring Note' },
         scored: { label: 'Scored' },
         defaulted: { label: 'Not Scored (Default Score)' },
+        reassigned_from: { label: 'Original Scorer' },
+        reassigned_by: { label: 'Reassigned By' },
+        reassign_reason: { label: 'Recusal Reason' },
+        reassigned_date: { label: 'Reassigned On' },
+      },
+      _actions: {
+        srm_score_reassign: { label: 'Reassign Scorer' },
       },
       _views: {
         default: { label: 'All Score Lines' },
         mine: { label: 'Awaiting My Scores' },
+        reassigned: { label: 'Recusal Reassignments' },
       },
     },
   },
@@ -1014,6 +1022,27 @@ export const en: TranslationData = {
       refusals: {
         refuse_status: { message: 'Scores can be submitted only while the review is in manual scoring' },
         refuse_none: { message: 'No score lines of this review are assigned to you' },
+      },
+    },
+    srm_score_reassign: {
+      label: 'Reassign Scorer',
+      successMessage: 'Score line reassigned; the substitute scorer has been notified',
+      screens: {
+        pick: {
+          title: 'Reassign scorer: {{ kpi.name }}',
+          description:
+            'Review: {{ review.review_no }}  Supplier: {{ vendor.name }}  Period: {{ review.period }}\n'
+            + 'Original scorer: {{ scorerText }} ({{ scoredText }})  Scoring due: {{ review.score_due }}',
+          fields: { new_scorer: { label: 'Substitute Scorer' }, reason_text: { label: 'Recusal Reason' } },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only the procurement director can name a substitute scorer for a recusal' },
+        refuse_status: { message: 'Scorers can be reassigned only while the review is in manual scoring; send a review under review back for rescoring first' },
+        refuse_auto: { message: 'This line is scored automatically from delivery records and has no scorer' },
+        refuse_same: { message: 'The substitute scorer cannot be the original scorer' },
+        refuse_self: { message: 'You cannot reassign a score line to yourself; name someone else' },
+        refuse_target: { message: 'The substitute scorer must hold an internal SRM position' },
       },
     },
     srm_performance_void: {
