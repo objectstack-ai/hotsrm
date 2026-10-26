@@ -696,7 +696,9 @@ ERP 集成前为空）、`delivery_count`（number，本期交付行数）、`da
 `raw_value`（number，自动指标的原始值，与指标的满分值、零分值同一单位：比率按百分点，PPM 按 PPM）、`score`（number，0–100）、
 `weight`（percent，生成时从指标快照）、`scorer`（user，人工指标的评分人）、`comment`、`scored`（boolean，默认 false；
 自动指标算出得分时为 true，没有数据时为 false 并在 `comment` 写明）、`defaulted`（boolean，默认 false，「未评」：评分截止时
-还没有评分，由扫描任务按参数 `perf_missing_score` 取默认分，v0.5 P3）。
+还没有评分，由扫描任务按参数 `perf_missing_score` 取默认分，v0.5 P3）；回避改派（#65，03 §10 第 3 步）由 flow 写的只读字段
+`reassigned_from`（user，最近一次改派前的评分人，生成时未指派的为空）、`reassigned_by`（user，改派的采购总监）、`reassign_reason`
+（textarea，回避原因）、`reassigned_date`（date）。
 
 ### 4.8 结算（不做，留在 ERP）
 

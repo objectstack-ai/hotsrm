@@ -29,6 +29,7 @@ export { RiskEventApplyFlow } from './risk/risk-event-apply.flow.js';
 export { BlacklistExpiryNoticeFlow } from './risk/blacklist-expiry-notice.flow.js';
 export { PerformanceGenerateFlow } from './performance/generate.flow.js';
 export { ScoreSubmitFlow } from './performance/score-submit.flow.js';
+export { ScoreReassignFlow } from './performance/score-reassign.flow.js';
 export { PerformancePublishFlow } from './performance/publish.flow.js';
 export { ScoreDueNoticeFlow } from './performance/score-due-notice.flow.js';
 export { ScoreOverdueSweepFlow } from './performance/score-overdue-sweep.flow.js';
