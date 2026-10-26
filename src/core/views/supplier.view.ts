@@ -71,6 +71,15 @@ export const SupplierViews = defineView({
       columns: [{ field: 'supplier_no' }, { field: 'name' }, { field: 'status' }, { field: 'open_risk_event_count' }, { field: 'qualification_alert' }],
       filter: [{ field: 'open_risk_event_count', operator: 'greater_than', value: 0 }],
     },
+    // 优选供应商（03 §10 第 6 步，v0.5）：最近一期绩效 A 级，供寻源邀请参考（v0.7）
+    preferred: {
+      label: '优选供应商',
+      type: 'grid',
+      data,
+      columns: [{ field: 'supplier_no' }, { field: 'name' }, { field: 'status' }, { field: 'grade' }, { field: 'latest_score' }],
+      filter: [{ field: 'preferred', operator: 'equals', value: true }],
+      sort: [{ field: 'latest_score', order: 'desc' }],
+    },
     // 同一批导入里的两位主联系人校验规则拦不住（objectstack#25477），在这里人工处理
     primary_contact_conflict: {
       label: '主联系人重复',

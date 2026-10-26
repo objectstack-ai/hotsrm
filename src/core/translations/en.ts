@@ -102,6 +102,7 @@ export const en: TranslationData = {
         risk_level: { label: 'Risk Level', options: { low: 'Low', medium: 'Medium', high: 'High' } },
         grade: { label: 'Performance Grade', options: { grade_a: 'A', grade_b: 'B', grade_c: 'C', grade_d: 'D' } },
         latest_score: { label: 'Latest Performance Score' },
+        preferred: { label: 'Preferred Supplier' },
         registered_capital: { label: 'Registered Capital' },
         established_date: { label: 'Established Date' },
         legal_representative: { label: 'Legal Representative' },
@@ -135,6 +136,7 @@ export const en: TranslationData = {
         legacy_review: { label: 'Legacy Imports to Review' },
         blacklist: { label: 'Blacklist Register' },
         open_risk: { label: 'With Open Risks' },
+        preferred: { label: 'Preferred Suppliers' },
         primary_contact_conflict: { label: 'Duplicate Primary Contacts' },
       },
       _actions: {
@@ -346,6 +348,7 @@ export const en: TranslationData = {
           label: 'Status',
           options: { draft: 'Draft', in_review: 'In Review', applied: 'Applied', rejected: 'Rejected', cancelled: 'Cancelled' },
         },
+        performance_review: { label: 'Source Performance Review' },
         submitted_by: { label: 'Submitted By' },
         approval_status: {
           label: 'Approval Result',
@@ -616,6 +619,7 @@ export const en: TranslationData = {
         material: { label: 'Material' },
         delivery_record: { label: 'Source Delivery Record' },
         audit: { label: 'Source Audit' },
+        performance_review: { label: 'Source Performance Review' },
         source: { label: 'Source' },
         severity: { label: 'Severity', options: { critical: 'Critical', major: 'Major', minor: 'Minor' } },
         problem_description: { label: 'Problem Description (D2)' },

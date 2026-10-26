@@ -5,7 +5,7 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 // （srm_disposition_approval），通过后由 srm_disposition_apply 以系统身份改供应商状态和品类资格。
 // 动作与供应商当前状态的合法组合在新建时校验，与供应商状态机（02 §5.1）一致；同一家供应商同时
 // 只能有一张审批中的处置单，免得两张单子审完后互相覆盖。
-// 草稿（v0.5）：高风险事件（srm_risk_event_apply）和绩效结果应用由 flow 生成处置单草稿，品类经理或采购主管
+// 草稿（v0.5）：高风险事件（srm_risk_event_apply）和绩效结果应用（srm_performance_apply）由 flow 生成处置单草稿，品类经理或采购主管
 // 核对后经「提交审批」（srm_disposition_submit）进入审批，或经「作废」（srm_disposition_cancel）放弃。
 // 提交时同一套状态校验再跑一遍（供应商状态可能在草稿期间变了）。提交人记入 submitted_by 并接管记录所有权，
 // 审批 flow 以它为发起人（手工新建的处置单没有 submitted_by，发起人是新建人）。
@@ -97,6 +97,13 @@ export const SupplierDisposition = ObjectSchema.create({
         { label: '已驳回', value: 'rejected', kind: 'lost' },
         { label: '已作废', value: 'cancelled', kind: 'lost' },
       ],
+    }),
+    // D 级绩效结果生成的草稿（srm_performance_apply，v0.5 P4）；申诉改变等级时品类经理按它找到草稿核对
+    performance_review: Field.lookup('srm_performance_review', {
+      label: '来源考评单',
+      group: 'review',
+      readonly: true,
+      relatedListColumns: ['disposition_no', 'action', 'status', 'submitted_by', 'applied_at'],
     }),
     // 草稿的提交人（srm_disposition_submit 写入）；手工新建的处置单为空，发起人即新建人
     submitted_by: Field.user({ label: '提交人', group: 'review', readonly: true }),

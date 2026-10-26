@@ -144,6 +144,8 @@ erDiagram
   srm_supplier ||--o{ srm_supplier_audit : "审核"
   srm_supplier_audit ||--o{ srm_supplier_audit_finding : "问题项"
   srm_supplier_audit_finding |o--o| srm_quality_issue : "转整改"
+  srm_performance_review |o--o{ srm_quality_issue : "C 级改善"
+  srm_performance_review |o--o{ srm_supplier_disposition : "D 级处置草稿"
 
   srm_supplier ||--o{ srm_performance_review : ""
   srm_performance_review ||--o{ srm_performance_score : "评分"
@@ -192,6 +194,7 @@ erDiagram
 | `status` | select（stageField） | 见 §5.1 生命周期状态机 |
 | `grade` | select | `grade_a` / `grade_b` / `grade_c` / `grade_d`（同考评单），最近一期绩效发布时写入 |
 | `latest_score` | number | 最近一期绩效总分（存储字段，供看板使用） |
+| `preferred` | boolean（只读） | 优选供应商，默认 false；与 `grade` 同时写入（`srm_performance_publish` / `srm_appeal_resolve`）：最近一期已发布等级为 A 时为 true，其他等级为 false。列在「优选供应商」视图，供 v0.7 寻源邀请参考（03 §10 第 6 步，v0.5） |
 | `qualification_alert` | boolean | 默认 false；任一必备资质类型没有「有效且已核验」的证书时由 flow 置为 true（BR-04），补齐并经 SQE 核验后才恢复为 false |
 | `risk_level` | select | `low` / `medium` / `high` |
 | `registered_capital` | currency | 注册资本 |
@@ -393,6 +396,7 @@ upsert 写入，结构不变。
 `scope`（`all` 全部品类 / `category` 指定品类，只有冻结和解冻可以指定品类）、`categories`（多值 lookup 品类，
 指定品类时必填）、`reason`（必填）、`effective_date`（默认当天）、`status`（`draft` 草稿 / `in_review` 审批中 /
 `applied` 已执行 / `rejected` 已驳回 / `cancelled` 已作废；草稿与作废随 v0.5）、`submitted_by`（user，只读：草稿的提交人，v0.5）、
+`performance_review`（lookup → 考评单，只读：绩效结果应用生成的草稿指回来源考评单，v0.5）、
 `approval_status`（审批节点写入）、只读的 `category_approver`（发起人不是品类经理时才有
 这一级，[03 §5](./03-processes-and-automation.md#5-p2-信息变更与供应商处置)）/ `director_approver` / `gm_approver` /
 `compliance_approver`、`reject_reason`、`applied_at`。
@@ -631,6 +635,7 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `supplier` / `material` | lookup | |
 | `delivery_record` | lookup | 来源交付记录（可空） |
 | `audit` | lookup（只读） | 来源审核（可空）；审核问题项「转整改单」时写入 |
+| `performance_review` | lookup → 考评单（只读） | 来源考评单（可空）；C 级考评结果发布时由 `srm_performance_apply` 写入（v0.5） |
 | `source` | select（共享选项列表 `srm_quality_issue_source`） | `iqc` 来料 / `production` 制程 / `customer` 客户投诉 / `audit` 审核发现 / `performance` 绩效改善 |
 | `severity` | select | 同检验 |
 | `problem_description` | richtext | D2 问题描述，必填 |

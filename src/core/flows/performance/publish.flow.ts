@@ -7,7 +7,8 @@ import { SCORE_DAYS, gradeOf } from './params.js';
 // 汇总：total_score = Σ(score × weight)（启用指标权重合计 100%）；各维度得分为维度内按权重的加权平均（0–100，没有该维度
 // 的指标时为空）；都保留两位小数，等级按两位小数的总分取参数 perf_grade_min（params.ts 的 GRADE_MIN）。
 // 审定：position = srm_procurement_director（03 §12）。通过 → 已发布，写审定人、意见、发布日期，回写供应商 grade、
-// latest_score（同一供应商已有更晚期间的已发布考评单时不回写，补跑旧期间不会覆盖最新结果），通知评分人。
+// latest_score 与优选标志 preferred（A 级为 true，其他等级为 false；同一供应商已有更晚期间的已发布考评单时不回写，补跑旧
+// 期间不会覆盖最新结果），通知评分人。发布后的结果应用（C 级整改、D 级处置草稿）在 srm_performance_apply。
 // 驳回即「退回重评」：回到人工评分，审定意见写入 review_comment，截止日重新起算，通知评分人改分。只有一级审批，
 // 所以不用平台的「退回修改」（考评单没有发起人可以重新提交）。
 //
@@ -184,7 +185,11 @@ export const PerformancePublishFlow: Automation.Flow = {
       id: 'write_supplier',
       type: 'update_record',
       label: '回写供应商等级与总分',
-      config: { objectName: 'srm_supplier', filter: { id: cel`record.supplier` }, fields: { grade: cel`gradeValue`, latest_score: cel`totalScore` } },
+      config: {
+        objectName: 'srm_supplier',
+        filter: { id: cel`record.supplier` },
+        fields: { grade: cel`gradeValue`, latest_score: cel`totalScore`, preferred: c(`gradeValue == 'grade_a'`) },
+      },
     },
     { id: 'has_scorers', type: 'decision', label: '有评分人？' },
     {
