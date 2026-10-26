@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "objectstack dev",
+    "setup:local": "node scripts/setup-local.mjs",
     "start": "objectstack start",
     "build": "objectstack build",
     "validate": "objectstack validate",
