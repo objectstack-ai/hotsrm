@@ -1,6 +1,8 @@
 // 绩效评分、分级与申诉用到的参数（params/core.yaml，示例值）。flow 里不能读参数文件，客户改参数时同步这里；
 // 测试逐项核对与 params/core.yaml 一致（同 generate.flow.ts 的 CYCLE）。
 
+// perf_generate_day：每月从这一天起生成考评单（连续 7 天追赶），给 SQE 留出月初导入上月交付记录的时间（QP-03 6.5.1、GL-06 6.1.3）
+export const GENERATE_DAY = 6;
 // perf_grade_min：等级下限分，A ≥ 90、B ≥ 80、C ≥ 70，其余 D（03 §10 第 4 步）
 export const GRADE_MIN = { A: 90, B: 80, C: 70 } as const;
 // perf_score_days：转人工评分起的评分期限（日历日）

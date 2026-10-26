@@ -52,8 +52,15 @@ perf_cycle:
   label: 绩效评价周期（按物资类别）
   example: { A: 每月, B: 每季度, C: 每年 }
   display: A 类{A}，B 类{B}，C 类{C}
-  used_in: [QP-01 6.7.1, QP-01 附录 A]
+  used_in: [QP-01 6.7.1, QP-01 附录 A, GL-06 6.1.2]
   system: 考评生成 flow srm_performance_generate 按供应商所供最高物资类别（srm_category.material_class）取周期，flow 的 CYCLE 与本参数由测试核对一致（核心 03 §10，v0.5）
+
+perf_generate_day:
+  label: 绩效考评单生成日（每月）
+  unit: 日
+  example: 6
+  used_in: [QP-03 6.5.1, GL-06 6.1.3, GL-06 第 7 章]
+  system: 考评生成 flow srm_performance_generate 从每月这一天起连续 7 天运行（追赶式），之前留给 SQE 导入上月交付记录；flow 的 GENERATE_DAY 与本参数由测试核对一致（核心 03 §10 第 1 步）。取值不大于 22
 
 perf_kpi_weights:
   label: 绩效指标权重（按指标编码）
@@ -61,7 +68,7 @@ perf_kpi_weights:
   example: { LOT_PASS: 20, PPM: 10, OTD: 15, PLAN_FULFIL: 10, PRICE: 20, SERVICE: 10, SAFETY_ENV: 15 }
   format: "{}%"
   display: 批次合格率 {LOT_PASS}%，来料不良 PPM {PPM}%，交付准时率 {OTD}%，计划完成率 {PLAN_FULFIL}%，价格竞争力 {PRICE}%，响应与配合 {SERVICE}%，安全环保 {SAFETY_ENV}%
-  used_in: [QP-01 附录 D]
+  used_in: [QP-01 附录 D, GL-06 附录 A]
   system: 绩效指标库 srm_kpi 的示例数据（src/core/data）；客户环境由采购总监在指标库维护，启用指标权重合计 100%（核心 02 §4.7）
 
 perf_grade_min:
@@ -69,36 +76,36 @@ perf_grade_min:
   unit: 分
   example: { A: 90, B: 80, C: 70 }
   display: A 级 ≥ {A}，B 级 ≥ {B}，C 级 ≥ {C}
-  used_in: [QP-01 6.7.3]
+  used_in: [QP-01 6.7.3, GL-06 6.5.2, GL-06 附录 B]
   system: 考评单汇总分级 srm_performance_publish 与申诉调整总分 srm_appeal_resolve，flow 的 GRADE_MIN 与本参数由测试核对一致（核心 03 §10 第 4 步）
 
 perf_score_days:
   label: 绩效人工评分期限
   unit: 日历日（转人工评分起）
   example: 10
-  used_in: []
+  used_in: [GL-06 6.4.2, GL-06 第 7 章]
   system: 考评单转人工评分时写入评分截止日 score_due，截止前 3 天提醒未评项，截止后由 srm_score_overdue_sweep 按缺评处理；flow 的 SCORE_DAYS 与本参数由测试核对一致（核心 03 §10 第 3 步）
 
 perf_missing_score:
   label: 绩效评分缺评默认分
   unit: 分
   example: 60
-  used_in: []
+  used_in: [GL-06 6.4.4, GL-06 第 7 章]
   system: 评分截止后未评的评分项取本分值并标记「未评」（srm_score_overdue_sweep）；flow 的 MISSING_SCORE 与本参数由测试核对一致（核心 03 §10 第 3 步，FR-703）
 
 perf_appeal_days:
   label: 绩效结果申诉期限
   unit: 日历日（发布后）
   example: 7
-  used_in: [QP-01 6.7.5]
+  used_in: [QP-01 6.7.5, GL-06 6.7.1, GL-06 第 7 章]
   system: 申诉 screen flow srm_appeal_submit 的时限校验，flow 的 APPEAL_DAYS 与本参数由测试核对一致（核心 03 §10 第 7 步）
 
 perf_d_exit_periods:
   label: 启动淘汰的连续 D 级期数
   unit: 期
   example: 2
-  used_in: [QP-01 6.7.4, QP-01 6.9.1, GL-08 6.1.1]
-  system: 考评发布后触发的淘汰评审 flow（核心 01 BR-18）
+  used_in: [QP-01 6.7.4, QP-01 6.9.2, GL-06 6.6.7, GL-06 附录 B, GL-08 6.1.2]
+  system: 绩效结果应用 flow srm_performance_apply 按同一周期相邻期间的已发布考评单判定连续 D 级，生成淘汰处置单草稿（核心 03 §10 第 6 步，01 BR-18）
 
 scar_containment_hours:
   label: 整改临时措施提交时限
@@ -167,7 +174,7 @@ record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
   example: 3
-  used_in: [QP-01 第 8 章, QP-02 第 8 章, QP-03 第 8 章, QP-04 第 8 章, GL-01 第 8 章, GL-04 6.7.1, GL-07 第 8 章, WI-01 第 8 章]
+  used_in: [QP-01 第 8 章, QP-02 第 8 章, QP-03 第 8 章, QP-04 第 8 章, GL-01 第 8 章, GL-04 6.7.1, GL-06 第 8 章, GL-07 第 8 章, WI-01 第 8 章]
   system: 制度要求
 
 contract_reminder_days:

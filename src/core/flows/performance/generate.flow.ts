@@ -1,5 +1,5 @@
 import type * as Automation from '@objectstack/spec/automation';
-import { SCORE_DAYS } from './params.js';
+import { GENERATE_DAY, SCORE_DAYS } from './params.js';
 
 // P9 步骤 1–2（03 §10，FR-702）：生成考评单并自动算分。
 //
@@ -17,8 +17,9 @@ import { SCORE_DAYS } from './params.js';
 // 物资类别最高、设了这个人的品类优先，都没设时退回品类经理，仍没有则不指派（截止后按缺评处理）。转人工评分时写评分截止日
 // （当天 + perf_score_days）并通知各评分人。
 //
-// 追赶式（03 §2.3 R2）：每月 1–7 日每天 03:00 运行，同一供应商同一期间已有考评单的跳过，1 日漏跑后几天补上，跑两遍不
-// 重复建（考评单上 supplier + period 唯一索引兜底）。补跑更早的月份时传入运行日 asOf（如 2026-10-01）。
+// 追赶式（03 §2.3 R2）：每月 perf_generate_day（示例 6 日）起连续 7 天每天 03:00 运行——月初先留给 SQE 导入上月交付记录
+// （QP-03 6.5.1），1 日就生成会因交付记录还没导入而全部「数据不全」。同一供应商同一期间已有考评单的跳过，首日漏跑后几天
+// 补上，跑两遍不重复建（考评单上 supplier + period 唯一索引兜底）。补跑更早的月份时传入运行日 asOf（如 2026-10-01）。
 // 单家失败只跳过该家，不中断整次生成。
 //
 // 临时：CEL 没有对列表求和，flow 也没有汇总节点，Σ不良数、Σ实收数与权重合计只能逐行累加（07 §6.3 PF15，
@@ -354,7 +355,12 @@ export const PerformanceGenerateFlow: Automation.Flow = {
   variables: [{ name: 'asOf', type: 'text', isInput: true, isOutput: false, defaultValue: '' }],
 
   nodes: [
-    { id: 'start', type: 'start', label: '每月 1–7 日', config: { schedule: '0 3 1-7 * *' } },
+    {
+      id: 'start',
+      type: 'start',
+      label: `每月 ${GENERATE_DAY}–${GENERATE_DAY + 6} 日`,
+      config: { schedule: `0 3 ${GENERATE_DAY}-${GENERATE_DAY + 6} * *` },
+    },
     {
       id: 'set_dates',
       type: 'assignment',
