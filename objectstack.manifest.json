@@ -1,9 +1,9 @@
 {
   "$schema": "https://schemas.objectstack.dev/template-manifest.json",
   "name": "hotsrm",
-  "specVersion": "^18.0.0",
+  "specVersion": "^18.1.0",
   "engines": {
-    "protocol": "^18.0.0"
+    "protocol": "^18.1.0"
   },
   "manifestId": "app.objectstack.hotsrm",
   "displayName": "hotsrm",

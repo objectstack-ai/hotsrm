@@ -75,5 +75,4 @@ Windows PowerShell：`$env:HOTSRM_DEMO_PASSWORD="<自定密码>"; pnpm setup:loc
 | 现象 | 处理 | 跟踪 |
 |---|---|---|
 | 非管理员在人员选择框里输入文字搜索会报错 | 不输入，直接从下拉列表点选 | objectstack#25672 |
-| 多级审批第二级起，「提交人」显示为上一级审批人，真正的提交人看不到「撤回审批」 | 已知，验收时忽略 | objectstack#24817 |
 | 审批通知标题是英文模板 “Approval requested / A decision on …” | 已知，验收时忽略 | objectstack#23978 |

@@ -914,6 +914,51 @@ export const en: TranslationData = {
     },
   },
   flows: {
+    srm_admission_approval: {
+      label: 'Admission Review',
+      approvals: {
+        review_reviewer: { label: 'First Reviewer Approval' },
+        review_director: { label: 'Procurement Director Approval' },
+        review_director_quality: { label: 'Procurement Director + Quality Manager Countersign' },
+      },
+    },
+    srm_change_approval: {
+      label: 'Information Change Approval',
+      approvals: {
+        purchase_review: { label: 'Purchasing Lead Approval' },
+        finance_review: { label: 'AP Accountant Review' },
+      },
+    },
+    srm_contract_approval: {
+      label: 'Contract Approval',
+      approvals: {
+        legal_review: { label: 'Legal Review' },
+        category_review: { label: 'Category Manager Approval' },
+        director_review: { label: 'Procurement Director Approval' },
+        gm_review: { label: 'General Manager Approval' },
+      },
+    },
+    srm_disposition_approval: {
+      label: 'Supplier Disposition Approval',
+      approvals: {
+        category_review: { label: 'Category Manager Approval' },
+        director_review: { label: 'Procurement Director Approval' },
+        gm_review: { label: 'General Manager Approval' },
+        compliance_review: { label: 'Internal Control Countersign' },
+      },
+    },
+    srm_performance_publish: {
+      label: 'Performance Grading and Publication',
+      approvals: {
+        director_review: { label: 'Procurement Director Sign-off' },
+      },
+    },
+    srm_scar_review: {
+      label: 'Corrective Action Review',
+      approvals: {
+        sqe_review: { label: 'SQE Review of Corrective Actions' },
+      },
+    },
     srm_bank_verify: {
       label: 'Verify Bank Account',
       successMessage: 'Bank account verified and now active',

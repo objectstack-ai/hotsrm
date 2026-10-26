@@ -271,6 +271,38 @@ describe('supplier disposition', () => {
     expect(await supplierStatus(supplier.id)).toBe('qualified');
   });
 
+  // 后面几级退回：提交人仍是发起人（objectstack#24817 随 18.1.0 修复），重新提交后从第一级重来
+  it('lets a later level send a disposition back; the submitter resubmits it from the first level', async () => {
+    const supplier = await qualifiedSupplier();
+    const blacklist = await submit(buyerLead.token, { supplier: supplier.id, action: 'blacklist', reason: '提供虚假资质' });
+    await decide(manager.token, blacklist.id, 'approve');
+    await decide(director.token, blacklist.id, 'approve');
+    await decide(gm.token, blacklist.id, 'approve');
+    const returned = await decide(compliance.token, blacklist.id, 'revise', '请附核查记录');
+    expect(returned.submitter_id).toBe(buyerLead.id);
+    expect((await disposition(blacklist.id)).approval_status).toBe('returned');
+
+    await stack.hooks.run(SupplierDisposition.name, 'update', { id: blacklist.id, reason: '提供虚假资质，核查记录见附件' }, { as: buyerLead.token });
+    const res = await stack.apiAs(buyerLead.token, 'POST', `/approvals/requests/${returned.id}/resubmit`, {});
+    expect(res.status, await res.clone().text()).toBe(200);
+    expect(await pendingApprovers(blacklist.id)).toContain(manager.id);
+
+    await decide(manager.token, blacklist.id, 'approve');
+    // 上一轮后面几级的审批人作废
+    expect(await disposition(blacklist.id)).toMatchObject({
+      category_approver: manager.id,
+      director_approver: null,
+      gm_approver: null,
+      compliance_approver: null,
+    });
+    await decide(director.token, blacklist.id, 'approve');
+    expect((await pending(blacklist.id))!.submitter_id).toBe(buyerLead.id);
+    await decide(gm.token, blacklist.id, 'approve');
+    await decide(compliance.token, blacklist.id, 'approve');
+    expect(await disposition(blacklist.id)).toMatchObject({ status: 'applied', compliance_approver: compliance.id });
+    expect(await supplierStatus(supplier.id)).toBe('blacklisted');
+  });
+
   it('does not count the category manager approving again on a later level (BR-11)', async () => {
     const cmGm = await person('srm_category_manager', 'srm_general_manager');
     const supplier = await qualifiedSupplier();

@@ -31,7 +31,7 @@ export default defineStack({
     type: 'app',
     name: 'hotsrm',
     description: '供应商关系管理（SRM）',
-    engines: { protocol: '^18.0.0' },
+    engines: { protocol: '^18.1.0' },
   },
 
   // auth + ui：登录页和控制台；automation + triggers + job：记录触发与定时 flow；approvals：审批节点；

@@ -3,7 +3,7 @@ import type * as Automation from '@objectstack/spec/automation';
 
 // 信息变更审批（03 §5，FR-207，BR-11）：变更单新建即快照当前档案到 before_value，然后审批：
 // 第 1 级采购主管（srm_buyer_lead）；银行账户变更再加第 2 级应付会计（srm_ap_accountant）。
-// 第 1 级可以通过、驳回或退回修改，退回后发起人改完重新提交、重新审批；第 2 级只能通过或驳回（见下）。
+// 两级都可以通过、驳回或退回修改；退回后发起人改完重新提交，从第 1 级重新审批。
 // 通过后经 srm_change_apply 写回档案；驳回不改主记录，把驳回意见写进 reject_reason 并通知发起人。
 //
 // 职责分离：发起人不能审批本人的变更单，两级审批人不能是同一人。平台审批服务还没有「提交人不得
@@ -14,7 +14,7 @@ const snapshotOf = (v: string, keys: string[]) => ({
   source: `{${keys.map((k) => `'${k}': has(${v}.${k}) ? ${v}.${k} : null`).join(', ')}}`,
 });
 
-const approval = (label: string, position: string, maxRevisions: number) => ({
+const approval = (label: string, position: string) => ({
   type: 'approval' as const,
   label,
   config: {
@@ -24,7 +24,8 @@ const approval = (label: string, position: string, maxRevisions: number) => ({
     behavior: 'first_response' as const,
     lockRecord: true,
     approvalStatusField: 'approval_status',
-    maxRevisions,
+    // 每一级至多退回 3 次，再退回即自动驳回
+    maxRevisions: 3,
   },
 });
 
@@ -115,7 +116,7 @@ export const ChangeApprovalFlow: Automation.Flow = {
     },
 
     // 2. 第 1 级：采购主管
-    { id: 'purchase_review', ...approval('采购主管审批', 'srm_buyer_lead', 3) },
+    { id: 'purchase_review', ...approval('采购主管审批', 'srm_buyer_lead') },
     actionOf('purchase_action', '读取采购审批记录', 'purchase_review', 'approve', 'purchaseAction'),
     { id: 'purchase_sod', type: 'decision', label: '采购审批人是发起人？' },
     {
@@ -138,15 +139,14 @@ export const ChangeApprovalFlow: Automation.Flow = {
       config: {
         objectName: 'srm_supplier_change_request',
         filter: { id: cel`record.id` },
-        fields: { purchase_approver: cel`purchaseAction.actor_id` },
+        // 退回重审时清掉上一轮的财务审批人，这一轮重新记录
+        fields: { purchase_approver: cel`purchaseAction.actor_id`, finance_approver: null },
       },
     },
     { id: 'needs_finance', type: 'decision', label: '银行账户变更？' },
 
-    // 3. 第 2 级：应付会计（只有银行账户变更）。临时做法：这一级只能通过或驳回、不能退回修改——平台把
-    // 第 2 个审批节点的提交人记成恢复流程的人（第 1 级审批人），退回后只有他能重新提交，发起人反而不能
-    // （objectstack#24817 已在主干修复、18.0.0 未带上）。平台修复后加回 revise 边，退回到发起人
-    { id: 'finance_review', ...approval('应付会计复核', 'srm_ap_accountant', 0) },
+    // 3. 第 2 级：应付会计（只有银行账户变更）。退回修改后从第 1 级重新审批：账户信息改过，采购主管要再确认
+    { id: 'finance_review', ...approval('应付会计复核', 'srm_ap_accountant') },
     actionOf('finance_action', '读取财务审批记录', 'finance_review', 'approve', 'financeAction'),
     { id: 'finance_sod', type: 'decision', label: '财务审批人与发起人、采购审批人不同？' },
     {
@@ -223,7 +223,7 @@ export const ChangeApprovalFlow: Automation.Flow = {
       },
     },
 
-    // 6. 退回修改：记录解锁，发起人改完后重新提交，从第 1 级重新审批
+    // 6. 退回修改（任一级）：记录解锁，发起人改完后重新提交，从第 1 级重新审批
     { id: 'revise_window', type: 'approval_revise', label: '退回修改' },
     { id: 'end', type: 'end', label: '结束' },
   ],
@@ -302,6 +302,7 @@ export const ChangeApprovalFlow: Automation.Flow = {
 
     { id: 'e_f_approve', source: 'finance_review', target: 'finance_action', type: 'default', label: 'approve' },
     { id: 'e_f_reject', source: 'finance_review', target: 'finance_reject_action', type: 'default', label: 'reject' },
+    { id: 'e_f_revise', source: 'finance_review', target: 'revise_window', type: 'default', label: 'revise' },
     { id: 'e_f_sod', source: 'finance_action', target: 'finance_sod', type: 'default' },
     {
       id: 'e_f_self',
