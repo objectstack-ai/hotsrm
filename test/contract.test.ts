@@ -153,6 +153,31 @@ describe('contract', () => {
     await expect(draft(legal.token, { supplier: await supplier() })).rejects.toThrow();
   });
 
+  // OWD private：别人起草的合同靠共享规则 srm_contract_edit_* 能改，读靠 viewAllRecords；任何业务岗位都删不了（04 §2.3）
+  it('lets other contract roles work on a draft they did not create, but nobody deletes it', async () => {
+    const created = await draft(manager.token, { supplier: await supplier() });
+    const lead = await person('srm_buyer_lead');
+    const others = [otherManager.token, lead.token, (await person('srm_legal_counsel')).token];
+    for (const [i, token] of others.entries()) {
+      await stack.hooks.run(Contract.name, 'update', { id: created.id, title: `示例框架协议（修订 ${i + 1}）` }, { as: token });
+      expect((await contract(created.id)).title).toBe(`示例框架协议（修订 ${i + 1}）`);
+    }
+    const readers = [buyer.token, (await person('srm_ap_accountant')).token, (await person('srm_general_manager')).token];
+    for (const token of readers) expect(await stack.rows(Contract.name, { id: created.id }, { as: token })).toHaveLength(1);
+    for (const token of [manager.token, ...others, ...readers]) {
+      await expect(stack.hooks.run(Contract.name, 'delete', { id: created.id }, { as: token })).rejects.toBeTruthy();
+    }
+    expect(await stack.rows(Contract.name, { id: created.id })).toHaveLength(1);
+  });
+
+  // 采购主管同时持 srm_buyer（合同字段只读）与 srm_supplier_admin：仍能像品类经理一样起草合同（03 §6）
+  it('lets a buyer lead draft a contract with lines', async () => {
+    const lead = await person('srm_buyer_lead');
+    const created = await draft(lead.token, { supplier: await supplier() });
+    await line(lead.token, created.id, { line_no: 1, description: '示例紧固件 M6', quantity: 100, uom: '件', unit_price: 1 });
+    expect(await contract(created.id)).toMatchObject({ status: 'draft' });
+  });
+
   it('drafts a framework agreement with lines, signs it and makes it active', async () => {
     const legal = await person('srm_legal_counsel');
     const director = await person('srm_procurement_director');

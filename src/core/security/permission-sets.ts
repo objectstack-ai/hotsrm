@@ -49,6 +49,12 @@ export const InternalBasePermissionSet = {
 };
 
 const contractFieldsReadOnly = Object.fromEntries(Object.keys(Contract.fields).map((field) => [`srm_contract.${field}`, readOnly]));
+// 采购主管同时挂 srm_buyer 与 srm_supplier_admin：字段权限按「最宽」合并，但只在写了该字段的权限集之间合并，
+// srm_supplier_admin 不写就只剩 srm_buyer 的只读，采购主管就起草不了合同。这里显式写可改；字段本身的 readonly
+// 与 readonlyWhen 照常生效
+const contractFieldsEditable = Object.fromEntries(
+  Object.keys(Contract.fields).map((field) => [`srm_contract.${field}`, { readable: true, editable: true }]),
+);
 // 协议标志由 srm_contract_agreement_recalc 维护
 const agreementFlags = {
   'srm_supplier.quality_agreement_signed': flowOwned,
@@ -64,7 +70,7 @@ export const BuyerPermissionSet = {
     // 代供应商发起信息变更（v0.6 前）；改只限自己发起、被退回修改的变更单（对象上的 readonlyWhen）。
     // 采购员没有完整账号的读写能力，银行账户变更由品类经理或采购主管发起
     srm_supplier_change_request: { ...write },
-    // 合同只读，签署中上传签署件、填签署日期（04 §2.3）；合同 OWD 暂为 public_read_write（objectstack#25470），
+    // 合同只读，签署中上传签署件、填签署日期（04 §2.3）；改别人建的合同靠共享规则 srm_contract_edit_*，
     // 其余字段 FLS 只读
     srm_contract: { ...read, allowEdit: true },
     srm_contract_line: read,
@@ -107,6 +113,7 @@ export const SupplierAdminPermissionSet = {
   // 银行账号完整可读（BR-20，04 §4.2）
   systemPermissions: ['srm_view_bank_account_no'],
   fields: {
+    ...contractFieldsEditable,
     'srm_supplier.status': flowOwned,
     'srm_supplier.qualification_alert': flowOwned,
     'srm_supplier_certificate.status': flowOwned,
@@ -123,7 +130,7 @@ export const SupplierAdminPermissionSet = {
   },
 };
 
-// 供应商 OWD 暂为 public_read_write（objectstack#25470），有 allowEdit 就能改所有供应商：
+// 共享规则 srm_supplier_edit_* 让 SQE 能编辑所有供应商：
 // SQE 的编辑权只为写证书（controlled_by_parent 要求父记录可编辑，04 §2.3），供应商字段全部只读
 const supplierFieldsReadOnly = Object.fromEntries(Object.keys(Supplier.fields).map((field) => [`srm_supplier.${field}`, readOnly]));
 
@@ -221,7 +228,7 @@ export const FinancePermissionSet = {
     srm_contract: read,
     srm_contract_line: read,
     // 整改单只能改索赔状态：在 ERP 扣款后把「供应商已接受」的索赔标记为「已扣款」（03 §8 第 6 步）；
-    // 整改单 OWD 暂为 public_read_write（objectstack#25470），其余字段 FLS 只读
+    // 改别人建的整改单靠共享规则 srm_quality_issue_edit_ap_accountant，其余字段 FLS 只读
     srm_quality_issue: { ...read, allowEdit: true },
   },
   systemPermissions: ['srm_view_bank_account_no'],
@@ -241,7 +248,8 @@ export const AdminPermissionSet = {
   objects: {
     srm_category: { ...write, allowDelete: true },
     srm_plant: { ...write, allowDelete: true },
-    srm_material: { ...write, allowDelete: true },
+    // 删别人导入的物料要 modifyAllRecords，它同时放开修改（objectstack#25470），管理员本来就能改物料
+    srm_material: { ...write, allowDelete: true, modifyAllRecords: true },
     srm_supplier: write,
     srm_supplier_contact: write,
     srm_supplier_certificate: write,

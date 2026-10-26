@@ -180,7 +180,7 @@ erDiagram
 
 ### 4.1 供应商主数据
 
-**`srm_supplier` 供应商**（OWD `public_read`，暂用 `public_read_write`：品类经理要能改别人建的供应商，`modifyAllRecords` 会连删除一起放开，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)；能改哪些字段由 `allowEdit` 与 FLS 决定，删除仍受 `allowDelete` 约束；开启字段历史；表单分组：基本信息、工商与税务〔`credit_code`、`registration_no`、`taxpayer_type`、`registered_capital`、`legal_representative`〕、外部系统〔`erp_vendor_code`〕）
+**`srm_supplier` 供应商**（OWD `public_read`：品类经理、采购主管、系统管理员改别人建的和存量导入的供应商，SQE、质量经理为写证书编辑供应商，经按岗位授 `edit` 的共享规则 `srm_supplier_edit_*`（可改不可删，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470) 的裁定写法）；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：基本信息、工商与税务〔`credit_code`、`registration_no`、`taxpayer_type`、`registered_capital`、`legal_representative`〕、外部系统〔`erp_vendor_code`〕）
 
 | 字段 | 类型 | 说明 / 约束 |
 |---|---|---|
@@ -284,18 +284,16 @@ flow 拒绝新建人核验自己建的账户（03 §13）。
 `freeze_scope`（`all` / `category`，哪种范围的冻结暂停了它）、`freeze_disposition`（lookup 处置单）。
 解冻只恢复同一范围冻结的资格，原本就暂停的资格没有冻结记录，不会被解冻恢复。
 
-**`srm_material` 物料**（只读副本，OWD `public_read`，暂用 `public_read_write`，见下方说明；v0.2）：`erp_material_no`
+**`srm_material` 物料**（只读副本，OWD `public_read`，见下方说明；v0.2）：`erp_material_no`
 （组织内唯一，导入匹配键）、`material_code`、`name`、`specification`、`uom`、`category`（lookup）、
 `active`。用平台导入按 `erp_material_no` 从 ERP 导出表格导入，可重复执行；采购员只
 维护 `category` 关联，其他字段对采购员只读（FLS），新建、删除只有 `srm_admin`。ERP 集成后改为
 upsert 写入，结构不变。
 
-> **临时做法**：目标 OWD 是 `public_read`，现阶段先用 `public_read_write`。物料归执行导入的管理员
-> 所有，`public_read` 下采购员要改别人的记录只能授予 `modifyAllRecords`，而平台的
-> `modifyAllRecords` 同时放开删除（平台需求 [objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)）。
-> 用 `public_read_write` 时，能写哪些字段由权限集的 `allowEdit` 与 FLS 决定，删除仍受 `allowDelete`
-> 约束；代价是今后任何授予 `allowEdit` 的权限集都能改全部物料。平台支持「可改不可删」后改回
-> `public_read`。日常重复导入的表格**不带** `category` 列，以免覆盖采购员维护的关联；导入说明见
+> **可改不可删**：物料归执行导入的管理员所有。平台的 `modifyAllRecords` 同时放开删除
+> （[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)），所以持 `srm_buyer` 的岗位（采购员、采购主管、采购总监）不用它，而是经按岗位授
+> `edit` 的共享规则 `srm_material_edit_*` 改别人导入的物料，能写哪些字段由 `allowEdit` 与 FLS 决定；
+> `srm_admin` 本来就能删物料，直接用 `modifyAllRecords`。日常重复导入的表格**不带** `category` 列，以免覆盖采购员维护的关联；导入说明见
 > [`data/samples/README.md`](../../data/samples/README.md)。
 
 **`srm_plant` 工厂 / 收货地点**（手工维护或导入）：`erp_plant_id`（预留）、`code`、`name`、
@@ -336,8 +334,8 @@ upsert 写入，结构不变。
 > 可以读品类对象）；不含现场审核分支和公司资料等表单字段；`approval_status` 记录审批节点的结论。
 > 本表其余字段随 v0.4（供应商审核）和 v0.6（门户、邀请注册）补齐。
 
-**`srm_supplier_audit` 供应商审核**（OWD 暂为 `public_read_write`：年度计划由系统生成、SQE 之间要互相接手，
-目标是 `private` + 质量岗位改所有记录，等 objectstack#25470；只有质量岗位有 `allowEdit`，删除不开放；v0.4）
+**`srm_supplier_audit` 供应商审核**（OWD `private`，内部读靠权限集的 `viewAllRecords`：年度计划由系统生成、SQE 之间要互相接手，
+SQE、质量经理经共享规则 `srm_supplier_audit_edit_*` 改所有审核（可改不可删，objectstack#25470 的裁定写法）；只有质量岗位有 `allowEdit`，删除不开放；v0.4）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -511,7 +509,7 @@ upsert 写入，结构不变。
 
 ### 4.4 合同（v0.3）
 
-**`srm_contract` 合同 / 协议**（OWD `private`，暂用 `public_read_write`：采购员要给品类经理建的合同上传签署件，`modifyAllRecords` 会连删除一起放开，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：合同信息、审批、签署、外部系统）
+**`srm_contract` 合同 / 协议**（OWD `private`，内部读靠权限集的 `viewAllRecords`：品类经理、采购主管互相接手草稿，法务改条款，采购员、采购总监给别人建的合同上传签署件，经按岗位授 `edit` 的共享规则 `srm_contract_edit_*`（可改不可删，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470) 的裁定写法）；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：合同信息、审批、签署、外部系统）
 
 | 字段 | 类型 | 说明 / 约束 |
 |---|---|---|
@@ -626,8 +624,8 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `received_quantity_mn` | number | 存储表达式：实收数量 ÷ 1,000,000。PPM = Σ不良数 ÷ Σ`received_quantity_mn`，看板用两个合计之比得出（[05 §4.1](./05-experience-and-analytics.md#41-指标口径)） |
 | `portal_position` | text | v0.6 加；供应商在门户只能看本公司的交付记录 |
 
-**`srm_quality_issue` 质量整改单 SCAR**（OWD 暂为 `public_read_write`：自动开的单属于系统、SQE 之间要互相接手，
-目标是 `public_read` + 质量岗位改所有记录，等 objectstack#25470；能改哪些字段由权限集与 FLS 决定，删除只给 `srm_admin`）
+**`srm_quality_issue` 质量整改单 SCAR**（OWD `public_read`：自动开的单属于系统、SQE 之间要互相接手，
+SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改所有整改单（可改不可删，objectstack#25470 的裁定写法）；能改哪些字段由权限集与 FLS 决定，删除只给 `srm_admin`）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|

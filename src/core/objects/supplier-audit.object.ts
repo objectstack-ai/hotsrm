@@ -24,10 +24,10 @@ export const SupplierAudit = ObjectSchema.create({
   label: '供应商审核',
   pluralLabel: '供应商审核',
   icon: 'clipboard-list',
-  // 临时：目标是 private + 质量岗位「改所有记录」。年度计划由系统生成，SQE 之间要互相接手，平台的
-  // modifyAllRecords 会连删除一起放开（objectstack#25470），先同整改单一样放宽 OWD；只有质量岗位有 allowEdit，
-  // 删除仍受 allowDelete 约束。审核记录不对供应商开放，门户上线后也不加 portal_position
-  sharingModel: 'public_read_write',
+  // 读靠权限集的 viewAllRecords。年度计划由系统生成，SQE 之间要互相接手：质量岗位改别人建的审核靠按岗位授 edit 的
+  // 共享规则 srm_supplier_audit_edit_*（可改不可删，objectstack#25470 的裁定写法）；只有质量岗位有 allowEdit。
+  // 审核记录不对供应商开放，门户上线后也不加 portal_position
+  sharingModel: 'private',
   enable: { trackHistory: true },
   stageField: 'status',
   nameField: 'audit_no',

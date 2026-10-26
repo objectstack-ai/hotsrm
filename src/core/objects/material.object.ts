@@ -7,9 +7,8 @@ export const Material = ObjectSchema.create({
   label: '物料',
   pluralLabel: '物料',
   icon: 'package',
-  // 临时：目标是 public_read。平台的 modifyAllRecords 会连删除一起放开，采购员「可改不可删」
-  // 只能先放宽 OWD（objectstack#25470，02 §4.1）。
-  sharingModel: 'public_read_write',
+  // 采购员「可改不可删」靠按岗位授 edit 的共享规则 srm_material_edit_*（objectstack#25470 的裁定写法，02 §4.1）
+  sharingModel: 'public_read',
 
   fieldGroups: [
     { key: 'basic', label: '基本信息', icon: 'package' },

@@ -14,10 +14,10 @@ export const Contract = ObjectSchema.create({
   label: '合同',
   pluralLabel: '合同',
   icon: 'file-signature',
-  // 临时：目标是 private + 按权限集 viewAllRecords。采购员要给品类经理建的合同上传签署件，
-  // 平台的 modifyAllRecords 会连删除一起放开，只能先放宽 OWD；能改哪些字段由 allowEdit 与 FLS 决定
-  // （objectstack#25470，02 §4.4），删除仍受 allowDelete 约束
-  sharingModel: 'public_read_write',
+  // 读靠权限集的 viewAllRecords。品类经理、采购主管互相接手草稿，法务改条款，采购员给别人建的合同上传签署件，
+  // 靠按岗位授 edit 的共享规则 srm_contract_edit_*（可改不可删，objectstack#25470 的裁定写法，02 §4.4）；
+  // 能改哪些字段由 allowEdit 与 FLS 决定
+  sharingModel: 'private',
   enable: { trackHistory: true },
   stageField: 'status',
   nameField: 'title',
