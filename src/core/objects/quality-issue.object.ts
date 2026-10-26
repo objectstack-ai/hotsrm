@@ -16,10 +16,10 @@ export const QualityIssue = ObjectSchema.create({
   label: '整改单',
   pluralLabel: '整改单',
   icon: 'clipboard-x',
-  // 临时：目标是 public_read + 质量岗位「改所有记录」。自动开的整改单属于系统，SQE 之间要互相接手，
-  // 平台的 modifyAllRecords 会连删除一起放开（objectstack#25470），只能先放宽 OWD；能改哪些字段由 allowEdit
-  // 与 FLS 决定，删除仍受 allowDelete 约束。portal_position 与门户 RLS 在 v0.6 加（ADR-0003）
-  sharingModel: 'public_read_write',
+  // 自动开的整改单属于系统，SQE 之间要互相接手：质量岗位与应付会计改别人建的单靠按岗位授 edit 的共享规则
+  // srm_quality_issue_edit_*（可改不可删，objectstack#25470 的裁定写法）；能改哪些字段由 allowEdit 与 FLS 决定。
+  // portal_position 与门户 RLS 在 v0.6 加（ADR-0003）
+  sharingModel: 'public_read',
   enable: { trackHistory: true },
   stageField: 'status',
   nameField: 'issue_no',

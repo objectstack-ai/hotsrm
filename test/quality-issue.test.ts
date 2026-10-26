@@ -302,4 +302,24 @@ describe('quality issue (SCAR / 8D)', () => {
     await expect(update(buyer, manual.id, { sqe_comment: '采购员改' })).rejects.toBeTruthy();
     await expect(stack.hooks.run(QualityIssue.name, 'delete', { id: manual.id }, { as: sqe.token })).rejects.toBeTruthy();
   });
+
+  // OWD public_read：别人开的和系统自动开的整改单靠共享规则 srm_quality_issue_edit_* 能接手，谁都删不了（04 §2.3）
+  it('lets another SQE and the quality manager take over a SCAR, but nobody deletes it', async () => {
+    const otherSqe = await person('srm_sqe');
+    const manual = (await stack.hooks.run(
+      QualityIssue.name,
+      'insert',
+      { supplier: supplierId, source: 'customer', severity: 'minor', problem_description: '客户投诉：示例包装破损', sqe: sqe.id },
+      { as: sqe.token },
+    )) as { id: string };
+    for (const id of [manual.id, await autoIssue()]) {
+      await update(otherSqe, id, { sqe: otherSqe.id });
+      await update(qualityManager, id, { sqe_comment: '质量经理接手' });
+      expect(await issue(id)).toMatchObject({ sqe: otherSqe.id, sqe_comment: '质量经理接手' });
+      for (const as of [sqe, otherSqe, qualityManager, accountant]) {
+        await expect(stack.hooks.run(QualityIssue.name, 'delete', { id }, { as: as.token })).rejects.toBeTruthy();
+      }
+      expect(await stack.rows(QualityIssue.name, { id })).toHaveLength(1);
+    }
+  });
 });

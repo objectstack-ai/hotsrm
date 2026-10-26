@@ -77,9 +77,10 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 
 R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — 无权限。删除一律只给
 `srm_admin`，业务上用状态（取消、作废）代替删除。供应商主数据在集团内共享（§5），
-`supplier_admin` 和 `srm_admin` 对供应商的编辑不限于自己建的记录：目标是 OWD `public_read` + 只放开编辑的「改所有记录」，
-平台的 `modifyAllRecords` 会连删除一起放开（objectstack#25470），所以暂用 OWD `public_read_write`，
-`srm_quality` 为写证书保留对供应商的编辑权、供应商字段经 FLS 全部只读。
+`supplier_admin` 和 `srm_admin` 对供应商的编辑不限于自己建的记录。平台的 `modifyAllRecords` 会连删除一起放开
+（objectstack#25470），所以「改别人建的记录、不能删」一律用共享规则表达：OWD 保持目标值，权限集给 `allowEdit`、
+不给 `modifyAllRecords`，再按岗位加授 `edit` 的 `criteria` 共享规则（`src/core/security/sharing-rules.ts`，见下方各对象）。
+没有任何对象用 OWD `public_read_write`。`srm_quality` 为写证书保留对供应商的编辑权、供应商字段经 FLS 全部只读。
 
 | 对象 | base | sourcing | supplier_admin | buyer | quality | finance | portal |
 |---|---|---|---|---|---|---|---|
@@ -108,6 +109,20 @@ R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — �
 `srm_performance` 对绩效指标增改、`srm_admin` 对绩效指标增改删；`srm_legal` 对合同与明细读改（不新建）；`srm_iqc` 对检验增改；绩效评分只经「提交评分」screen flow。
 风险事件 OWD `public_read`，持 `srm_supplier_admin`、`srm_quality` 的岗位经共享规则改别人登记的和系统生成的事件（可改不可删）；
 来源、相关证书、处置单三个字段只经 F 写入（v0.5）。
+
+改别人建的记录靠的共享规则（可改不可删，每个岗位一条，规则名 `<对象>_edit_<岗位>`）：
+
+| 对象 | OWD | 经共享规则可改的岗位 |
+|---|---|---|
+| 供应商 | `public_read` | 品类经理、采购主管、SQE、质量经理（只为写证书）、SRM 系统管理员 |
+| 物料 | `public_read` | 采购员、采购主管、采购总监（只改品类）；SRM 系统管理员用 `modifyAllRecords`（本来就能删） |
+| 合同 | `private`（内部读靠 `viewAllRecords`） | 品类经理、采购主管、法务、采购员与采购总监（只改签署件、签署日期） |
+| 整改单 | `public_read` | SQE、质量经理、应付会计（只改索赔状态） |
+| 供应商审核 | `private`（内部读靠 `viewAllRecords`） | SQE、质量经理 |
+| 风险事件 | `public_read` | 品类经理、采购主管、SQE、质量经理 |
+| 绩效指标 | `public_read` | 采购总监（`srm_kpi_director_edit`） |
+
+门户上线（v0.6）后，门户 RLS 叠加在这些 OWD 与共享规则之上，共享规则只授给内部岗位（ADR-0003）。
 
 **`controlled_by_parent` 的写入规则**：子记录（联系人、证书、银行账户、合同明细、报价
 明细）的修改要求对父记录有编辑权。所以门户对供应商、报价单都授予编辑权，再用字段级

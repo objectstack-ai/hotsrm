@@ -13,9 +13,9 @@ export const Supplier = ObjectSchema.create({
   label: '供应商',
   pluralLabel: '供应商',
   icon: 'factory',
-  // 临时：目标是 public_read。品类经理要能改别人建的供应商（含存量导入的），平台的 modifyAllRecords
-  // 会连删除一起放开，只能先放宽 OWD；能改哪些字段由权限集的 allowEdit 与 FLS 决定（objectstack#25470，02 §4.1）。
-  sharingModel: 'public_read_write',
+  // 品类经理、采购主管、系统管理员改别人建的供应商（含存量导入的）、SQE 为写证书编辑供应商，靠按岗位授 edit 的
+  // 共享规则 srm_supplier_edit_*（可改不可删，objectstack#25470 的裁定写法，02 §4.1）；能改哪些字段由 allowEdit 与 FLS 决定
+  sharingModel: 'public_read',
   enable: { trackHistory: true },
   stageField: 'status',
 

@@ -206,6 +206,33 @@ describe('supplier audit', () => {
     });
   });
 
+  // OWD private：别人安排的审核靠共享规则 srm_supplier_audit_edit_* 能接手（问题项随审核），谁都删不了（04 §2.3）
+  describe('sharing', () => {
+    it('lets another SQE and the quality manager take over an audit and its findings, but nobody deletes them', async () => {
+      const audit = await insert(sqe, SupplierAudit.name, { supplier: await supplier(), audit_type: 'special', planned_date: today() });
+      const finding = await insert(sqe, SupplierAuditFinding.name, { audit: audit.id, title: '示例问题项', severity: 'observation' });
+      const otherSqe = await person('srm_sqe');
+      for (const [i, as] of [otherSqe, qualityManager].entries()) {
+        await update(as, SupplierAudit.name, { id: audit.id, planned_date: day(i + 1) });
+        await update(as, SupplierAuditFinding.name, { id: finding.id, title: `示例问题项（接手 ${i + 1}）` });
+      }
+      expect(await row(SupplierAudit.name, audit.id)).toMatchObject({ planned_date: day(2) });
+      expect(await row(SupplierAuditFinding.name, finding.id)).toMatchObject({ title: '示例问题项（接手 2）' });
+      for (const as of [sqe, otherSqe, qualityManager, manager]) {
+        await expect(stack.hooks.run(SupplierAudit.name, 'delete', { id: audit.id }, { as: as.token })).rejects.toBeTruthy();
+      }
+      expect(await stack.rows(SupplierAudit.name, { id: audit.id })).toHaveLength(1);
+    });
+
+    it('lets internal readers see audits but not change them', async () => {
+      const audit = await insert(sqe, SupplierAudit.name, { supplier: await supplier(), audit_type: 'special', planned_date: today() });
+      for (const as of [manager, director]) {
+        expect(await stack.rows(SupplierAudit.name, { id: audit.id }, { as: as.token })).toHaveLength(1);
+        await expect(update(as, SupplierAudit.name, { id: audit.id, planned_date: day(5) })).rejects.toBeTruthy();
+      }
+    });
+  });
+
   describe('findings to SCAR', () => {
     it('raises one SCAR per nonconformity, links it back, and never raises twice', async () => {
       const vendor = await supplier();

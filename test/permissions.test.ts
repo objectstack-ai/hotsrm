@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
+import * as objects from '../src/core/objects';
 import { Supplier, SupplierApplication, SupplierBankAccount } from '../src/core/objects';
 import { SrmPermissionSets } from '../src/core/security/permission-sets';
 import { SrmPositions } from '../src/core/security/positions';
+import { SrmSharingRules } from '../src/core/security/sharing-rules';
 
 type Access = { allowCreate: boolean; allowRead: boolean; allowEdit: boolean; allowDelete: boolean };
 
@@ -46,6 +48,19 @@ describe('internal permissions', () => {
 
   afterAll(async () => {
     await stack?.stop();
+  });
+
+  // 「可改不可删」一律用共享规则表达，不放宽 OWD（objectstack#25470 的裁定写法，工程规范 §1）
+  it('opens no object to public read-write', () => {
+    expect(Object.values(objects).filter((object) => object.sharingModel === 'public_read_write').map((object) => object.name)).toEqual([]);
+  });
+
+  it('only shares edit access with positions that hold edit permission on the object', () => {
+    for (const rule of SrmSharingRules) {
+      const position = SrmPositions.find((p) => p.name === rule.sharedWith.value);
+      expect(position, rule.name).toBeTruthy();
+      expect(visibility(position!.name)[rule.object] ?? '', rule.name).toContain('E');
+    }
   });
 
   it('sets no internal permission set as the default', () => {
@@ -336,10 +351,10 @@ describe('internal permissions', () => {
     expect(row!.status).toBe('potential');
   });
 
-  // 供应商 OWD 暂为 public_read_write（objectstack#25470）：维护者能改别人建的供应商，但删不了
+  // 供应商 OWD public_read：维护者经共享规则 srm_supplier_edit_* 能改别人建的供应商，但删不了（objectstack#25470 的裁定写法）
   it('lets supplier maintainers edit a supplier they do not own but not delete it', async () => {
     const supplier = await stack.hooks.run(Supplier.name, 'insert', supplierDoc(), { system: true });
-    for (const position of ['srm_category_manager', 'srm_buyer_lead']) {
+    for (const position of ['srm_category_manager', 'srm_buyer_lead', 'srm_admin']) {
       const maintainer = await person(position);
       await stack.hooks.run(Supplier.name, 'update', { id: supplier.id, short_name: `改名 ${position}` }, { as: maintainer });
       await expect(stack.hooks.run(Supplier.name, 'delete', { id: supplier.id }, { as: maintainer })).rejects.toBeTruthy();
