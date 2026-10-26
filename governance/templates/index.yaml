@@ -23,7 +23,7 @@ documents:
   GL-03: { title: 采购合同管理办法, level: 三级, pack: core, status: written }
   GL-04: { title: 供应商信息变更与收款账户管理规定, level: 三级, pack: core, status: written }
   GL-05: { title: 采购廉洁与利益冲突回避规定, level: 三级, pack: core, status: written }
-  GL-06: { title: 供应商绩效评价管理办法, level: 三级, pack: core, status: planned }
+  GL-06: { title: 供应商绩效评价管理办法, level: 三级, pack: core, status: written }
   GL-07: { title: 供应商质量问题整改管理办法, level: 三级, pack: core, status: written }
   GL-08: { title: 供应商处置管理办法, level: 三级, pack: core, status: written }
   GL-09: { title: 供应商对账与付款管理办法, level: 三级, pack: core, status: planned }

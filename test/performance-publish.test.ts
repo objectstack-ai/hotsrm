@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
 import { Category, DeliveryRecord, Kpi, Material, PerformanceReview, PerformanceScore, Supplier, SupplierCategory } from '../src/core/objects';
-import { APPEAL_DAYS, GRADE_MIN, MISSING_SCORE, SCORE_DAYS } from '../src/core/flows/performance/params';
+import { APPEAL_DAYS, GENERATE_DAY, GRADE_MIN, MISSING_SCORE, SCORE_DAYS } from '../src/core/flows/performance/params';
 
 // v0.5 P3 人工评分、汇总分级、审定发布与申诉（02 §4.7、§5.7，03 §10 第 3–5、7 步，FR-703、704、706）：
 // 生成时按指标的评分人类型从品类上指派评分人；评分人经「提交评分」只看到并填写自己的评分项；截止后缺评取默认分并标记未评；
@@ -162,10 +162,11 @@ describe('performance scoring, grading, publishing and appeals', () => {
     else process.env.OS_AUTOMATION_SCHEDULED_WORK_ENABLED = scheduledWork;
   });
 
-  it('takes the grade lines, scoring period, missing score and appeal period from the parameters', () => {
+  it('takes the generation day, grade lines, scoring period, missing score and appeal period from the parameters', () => {
     const yaml = readFileSync(new URL('../params/core.yaml', import.meta.url), 'utf8');
     const example = (key: string) => /example:\s*(.+)/.exec(yaml.split(/\n(?=\S)/).find((b) => b.startsWith(`${key}:`))!)![1]!.trim();
     expect(example('perf_grade_min')).toBe(`{ A: ${GRADE_MIN.A}, B: ${GRADE_MIN.B}, C: ${GRADE_MIN.C} }`);
+    expect(Number(example('perf_generate_day'))).toBe(GENERATE_DAY);
     expect(Number(example('perf_score_days'))).toBe(SCORE_DAYS);
     expect(Number(example('perf_missing_score'))).toBe(MISSING_SCORE);
     expect(Number(example('perf_appeal_days'))).toBe(APPEAL_DAYS);

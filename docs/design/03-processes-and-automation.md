@@ -381,7 +381,7 @@ stateDiagram-v2
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 生成 | `schedule`：每月 1–7 日每天 03:00（追赶式） | 活跃供应商（合格或冻结：冻结期间仍在交付在途订单，连续 D 级要能累计）按所供品类（不论品类资格状态）中最高的物资类别取周期参数 `perf_cycle`（示例 A 类每月、B 类每季、C 类每年），没有品类资格的不生成；每期的第一个月「到期」，建上一期的考评单（`calculating`，`cycle` / `period` / 起止日期写明），按指标库中启用的指标建评分明细并快照权重（FR-702）。启用指标的权重合计不是 100% 时本次不生成并通知采购总监。同一供应商同一期间已有考评单的跳过（`supplier` + `period` 唯一），1 日漏跑的后几天补上，跑两遍不重复建；上次中途失败留下的 `calculating` 考评单删掉重建。补跑更早的月份时传入运行日 `asOf` |
+| 1 生成 | `schedule`：每月 `perf_generate_day`（示例 6 日）起连续 7 天每天 03:00（追赶式；月初先留给 SQE 导入上月交付记录，QP-03 6.5.1，1 日就生成会因数据未导入而全部「数据不全」） | 活跃供应商（合格或冻结：冻结期间仍在交付在途订单，连续 D 级要能累计）按所供品类（不论品类资格状态）中最高的物资类别取周期参数 `perf_cycle`（示例 A 类每月、B 类每季、C 类每年），没有品类资格的不生成；每期的第一个月「到期」，建上一期的考评单（`calculating`，`cycle` / `period` / 起止日期写明），按指标库中启用的指标建评分明细并快照权重（FR-702）。启用指标的权重合计不是 100% 时本次不生成并通知采购总监。同一供应商同一期间已有考评单的跳过（`supplier` + `period` 唯一），首日漏跑的后几天补上，跑两遍不重复建；上次中途失败留下的 `calculating` 考评单删掉重建。补跑更早的月份时传入运行日 `asOf` |
 | 2 自动算分 | 同一次运行 | 按 [05 §4](./05-experience-and-analytics.md#4-仪表盘与指标口径) 的口径（同数据集 `srm_delivery_metrics`）从交付记录计算 OTD、批次合格率、PPM：flow 的查询节点按供应商和本期包含的月份（交付记录的 `period`）取交付记录，汇总 `on_time`、`inspection_result`、`defect_quantity`、`received_quantity`，写入考评单的比率字段与交付行数；每条自动指标的评分明细写入原始值与得分，得分按指标的满分值、零分值线性计算（02 §4.7），数字全在指标库里，flow 不写死。本期没有交付记录、某项指标没有数据（如没有已检批次）时该项不给分（`scored = false`，`comment` 写明），考评单标记「数据不全」，不给零分（07 R7），由人工评分环节处理。订单响应及时率在 ERP 集成前在指标库中不启用（不建评分明细），启用时由采购总监调整其余权重。算完转 `scoring`。不良数与实收数逐行累加：CEL 没有对列表求和、flow 没有汇总节点（07 §6.3 PF15）。性能（07 R9，2026-10-24 进程内 sqlite 实测）：200 家供应商、每家 6 行交付记录一次生成约 7.4 秒，每家 30 行约 8.6 秒，重跑（全部跳过）约 0.6 秒 |
 | 3 人工评分 | 生成 flow 转 `scoring` 时 | 评分人在生成评分明细时写入：人工指标和没有数据的自动指标按指标的 `scorer_type` 从供应商的品类上取（品类经理 `category_manager`、采购员 `buyer`、SQE `sqe`、需求部门评分人 `evaluator`）；供应商有多个品类时取物资类别最高的、设了这个人的品类，都没设时退回品类经理，仍没有则不指派（截止后按缺评处理）。转 `scoring` 时写评分截止日 `score_due`（当天 + `perf_score_days`，示例 10 天）并通知各评分人（「待你评分」）。评分人在考评单上点「提交评分」（screen flow `srm_score_submit`）：flow 只列出指派给本人的评分项，逐项显示指标、评分规则和原始值，填 0–100 分和说明，已评的可以在截止前改；全部评分项都已评分时考评单转 `reviewing`。`srm_score_due_notice` 在截止前 3 天提醒还有未评项的评分人；扫描任务 `srm_score_overdue_sweep`（每日，追赶式）把已过截止日的考评单上未评项取参数 `perf_missing_score`（示例 60 分，客户可改）、标记「未评」（`defaulted`），转 `reviewing` |
 | 4 汇总分级 | 状态→`reviewing`（`srm_performance_publish`） | `total_score = Σ(score × weight)`，各维度得分为维度内按权重的加权平均；等级线取参数 `perf_grade_min`（示例 A ≥ 90、B ≥ 80、C ≥ 70，其余 D），写入考评单 |
@@ -496,7 +496,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_scar_overdue_sweep` | schedule：每小时（api 心跳等 objectstack#25675） | 整改单 | v0.4 |
 | `srm_audit_admission_apply` | record_change：准入审核完成或改结论 | 供应商审核 → 准入申请 | v0.4 |
 | `srm_audit_plan_generate` | schedule：每月 1 日 02:30（追赶式；年初那次生成全年计划） | 供应商审核 | v0.4 |
-| `srm_performance_generate` | schedule：每月 1–7 日 03:00（追赶式，按类别周期） | 考评单、评分明细 | v0.5 |
+| `srm_performance_generate` | schedule：每月 `perf_generate_day`（示例 6 日）起连续 7 天 03:00（追赶式，按类别周期） | 考评单、评分明细 | v0.5 |
 | `srm_performance_publish` | record_change：状态→`reviewing`（汇总分级 + 采购总监审定） | 考评单 → 供应商 | v0.5 |
 | `srm_score_due_notice` | time_relative：考评单 `score_due` −3 天 | 考评单 → 评分人 | v0.5 |
 | `srm_score_overdue_sweep` | schedule：每日 04:00（追赶式） | 考评单、评分明细 | v0.5 |
