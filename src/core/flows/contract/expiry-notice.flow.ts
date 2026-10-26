@@ -2,8 +2,8 @@ import { cel } from '@objectstack/spec';
 import type * as Automation from '@objectstack/spec/automation';
 
 // P4 到期提醒（03 §6 第 5 步）：生效中的合同在到期前 60 / 30 / 7 天（params/core.yaml 的 contract_reminder_days，
-// 客户改参数时同步这里）各提醒一次，通知合同所有者和主要品类的品类经理。平台按天扫描、每份合同每个提醒日
-// 只发一次（time_relative 触发）。
+// 客户改参数时同步这里）各提醒一次，通知合同所有者和主要品类的品类经理、采购员（采购员跟进续签或终止，07 §2.1 第 9 步）。
+// 平台按天扫描、每份合同每个提醒日只发一次（time_relative 触发）。
 export const ContractExpiryNoticeFlow: Automation.Flow = {
   name: 'srm_contract_expiry_notice',
   label: '合同到期提醒',
@@ -33,11 +33,12 @@ export const ContractExpiryNoticeFlow: Automation.Flow = {
     {
       id: 'notify',
       type: 'notify',
-      label: '通知所有者和品类经理',
+      label: '通知所有者、品类经理和采购员',
       config: {
         recipients: [
           cel`has(record.owner_id) && record.owner_id != null ? record.owner_id : record.created_by`,
           cel`category != null && has(category.category_manager) ? category.category_manager : null`,
+          cel`category != null && has(category.buyer) ? category.buyer : null`,
         ],
         title: '合同 {{ record.contract_no }} 将于 {{ record.end_date }} 到期',
         message: '「{{ record.title }}」将于 {{ record.end_date }} 到期，请安排续签或终止。',
