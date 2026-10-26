@@ -5,12 +5,17 @@ import type * as Automation from '@objectstack/spec/automation';
 // 第 1 级是申请上的初审人，第 2 级是采购总监岗位；A 类物资或高风险品类的申请第 2 级并行加质量经理会签
 // （03 §12）：采购总监、质量经理各一人通过才算通过（per_group，同岗位多人时任一人即可），任一人驳回即驳回。
 // 任一级驳回，申请退回「资料审核」。
+// 职责分离（07 §2.1 第 4 步，03 §12）：初审人就是申请的新建人或把申请推进到准入评审的人时，品类经理一级
+// 上提给采购总监、与第 2 级合并（同合同、处置单的做法），申请上 review_escalated 记为 true。不要求「另一位
+// 品类经理」：只有一位品类经理的品类会卡住。平台审批服务没有「提交人不得审批」的开关（objectstack#25446）。
 // 批准后：申请→准入通过，供应商→合格，按申请品类建供货品类资格：现场审核结论为有条件通过时为「试供」，
 // 否则为「合格」（03 §3 第 7 步，WI-01 6.6.2）。
 
 const cel$ = (source: string) => ({ dialect: 'cel' as const, source });
 // v0.4 之前受理的申请没有这两个字段，按不会签处理
 const grantStatus = cel`has(record.audit_result) && record.audit_result == 'conditional' ? 'trial' : 'qualified'`;
+// 推进到准入评审的人：触发这次 flow 的更新写入的 updated_by
+const selfReview = `has(record.reviewer) && record.reviewer != null && ((has(record.created_by) && record.reviewer == record.created_by) || (has(record.updated_by) && record.reviewer == record.updated_by))`;
 const needsQuality = `(has(record.material_class) && record.material_class == 'class_a') || (has(record.risk_class) && record.risk_class == 'high')`;
 
 export const AdmissionApprovalFlow: Automation.Flow = {
@@ -31,6 +36,14 @@ export const AdmissionApprovalFlow: Automation.Flow = {
         condition: P`record.status == 'admission_review' && has(previous.status) && previous.status != 'admission_review'`,
       },
     },
+    { id: 'check_self', type: 'assignment', label: '初审人是发起人？', config: { assignments: { selfReview: cel$(selfReview) } } },
+    {
+      id: 'mark_escalation',
+      type: 'update_record',
+      label: '记录品类经理一级是否上提',
+      config: { objectName: 'srm_supplier_application', filter: { id: cel`record.id` }, fields: { review_escalated: cel`selfReview` } },
+    },
+    { id: 'route_reviewer', type: 'decision', label: '品类经理一级由谁审批？' },
     {
       id: 'review_reviewer',
       type: 'approval',
@@ -154,7 +167,18 @@ export const AdmissionApprovalFlow: Automation.Flow = {
   ],
 
   edges: [
-    { id: 'e1', source: 'start', target: 'review_reviewer', type: 'default' },
+    { id: 'e1', source: 'start', target: 'check_self', type: 'default' },
+    { id: 'e_check', source: 'check_self', target: 'mark_escalation', type: 'default' },
+    { id: 'e_route', source: 'mark_escalation', target: 'route_reviewer', type: 'default' },
+    { id: 'e_reviewer', source: 'route_reviewer', target: 'review_reviewer', type: 'conditional', condition: P`selfReview != true`, label: '初审人审批' },
+    {
+      id: 'e_escalate',
+      source: 'route_reviewer',
+      target: 'needs_quality',
+      type: 'conditional',
+      condition: P`selfReview == true`,
+      label: '初审人是发起人：上提采购总监',
+    },
     { id: 'e2', source: 'review_reviewer', target: 'needs_quality', type: 'default', label: 'approve' },
     {
       id: 'e_quality',

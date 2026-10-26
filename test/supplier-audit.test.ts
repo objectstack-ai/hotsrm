@@ -84,6 +84,8 @@ describe('supplier audit', () => {
 
   let sqe: Person;
   let manager: Person;
+  // 初审人另设一位品类经理：初审人是发起人时品类经理一级上提采购总监（admission-countersign.test.ts）
+  let reviewer: Person;
   let director: Person;
   let qualityManager: Person;
 
@@ -92,6 +94,7 @@ describe('supplier audit', () => {
     stack = await bootStack(config);
     sqe = await person('srm_sqe');
     manager = await person('srm_category_manager');
+    reviewer = await person('srm_category_manager');
     director = await person('srm_procurement_director');
     qualityManager = await person('srm_quality_manager');
   });
@@ -105,7 +108,7 @@ describe('supplier audit', () => {
   describe('admission', () => {
     const apply = async (categories: string[]) => {
       const vendor = await supplier();
-      const app = await insert(manager, SupplierApplication.name, { supplier: vendor, applied_categories: categories, reviewer: manager.id });
+      const app = await insert(manager, SupplierApplication.name, { supplier: vendor, applied_categories: categories, reviewer: reviewer.id });
       return { vendor, app: app.id };
     };
     const toReview = (app: string) => update(manager, SupplierApplication.name, { id: app, status: 'admission_review' });
@@ -126,7 +129,7 @@ describe('supplier audit', () => {
       expect(await row(SupplierApplication.name, app)).toMatchObject({ audit_passed: true, audit_result: 'conditional' });
 
       await toReview(app);
-      await decide(manager, app, 'approve');
+      await decide(reviewer, app, 'approve');
       await decide(director, app, 'approve');
       await decide(qualityManager, app, 'approve');
       expect((await row(SupplierApplication.name, app)).status).toBe('approved');
@@ -144,7 +147,7 @@ describe('supplier audit', () => {
     it('does not require an audit for a medium-risk application and grants qualified after a pass', async () => {
       const { vendor, app } = await apply([await category({ risk_class: 'medium' })]);
       await toReview(app);
-      await decide(manager, app, 'approve');
+      await decide(reviewer, app, 'approve');
       await decide(director, app, 'approve');
       const [grant] = await stack.rows(SupplierCategory.name, { supplier: vendor });
       expect(grant!.status).toBe('qualified');

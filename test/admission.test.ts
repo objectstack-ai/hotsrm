@@ -8,7 +8,8 @@ import { Category, Supplier, SupplierApplication, SupplierCategory } from '../sr
 describe('supplier admission', () => {
   let stack: VerifyStack;
   let admin: string;
-  let adminId: string;
+  // 初审人：另一位品类经理。初审人就是发起人时品类经理一级上提采购总监，见 admission-countersign.test.ts
+  let reviewer: { token: string; id: string };
   let seq = 0;
 
   const newSupplier = () =>
@@ -28,10 +29,11 @@ describe('supplier admission', () => {
     const rows = await stack.rows('sys_approval_request', { record_id: recordId });
     return rows.find((r) => r.status === 'pending');
   };
-  const decide = async (recordId: string, verdict: 'approve' | 'reject') => {
+  // 第 1 级由初审人决定；采购总监岗位没人，第 2 级由管理员兜底
+  const decide = async (recordId: string, verdict: 'approve' | 'reject', as = admin) => {
     const request = await pendingRequest(recordId);
     expect(request, 'no pending approval request').toBeTruthy();
-    const res = await stack.apiAs(admin, 'POST', `/approvals/requests/${request!.id}/${verdict}`, { comment: verdict });
+    const res = await stack.apiAs(as, 'POST', `/approvals/requests/${request!.id}/${verdict}`, { comment: verdict });
     expect(res.status, await res.clone().text()).toBe(200);
   };
 
@@ -41,7 +43,7 @@ describe('supplier admission', () => {
         await stack.hooks.run(
           SupplierApplication.name,
           'insert',
-          { supplier, applied_categories: categories, reviewer: adminId },
+          { supplier, applied_categories: categories, reviewer: reviewer.id },
           { as: admin },
         )
       ).id,
@@ -52,7 +54,7 @@ describe('supplier admission', () => {
   };
   const approve = async (app: string) => {
     await update(SupplierApplication.name, { id: app, status: 'admission_review' });
-    await decide(app, 'approve');
+    await decide(app, 'approve', reviewer.token);
     await decide(app, 'approve');
   };
 
@@ -70,8 +72,11 @@ describe('supplier admission', () => {
   beforeAll(async () => {
     stack = await bootStack(config);
     admin = await stack.signIn();
-    const [me] = await stack.rows('sys_user', {});
-    adminId = String(me!.id);
+    const token = await stack.signUp('admission-reviewer@example.com');
+    const context = await stack.contextFor(token);
+    const org = context.tenantId ? { organization_id: String(context.tenantId) } : {};
+    await stack.seed('sys_user_position', [{ user_id: String(context.userId), position: 'srm_category_manager', ...org }]);
+    reviewer = { token, id: String(context.userId) };
   });
 
   afterAll(async () => {
@@ -98,7 +103,7 @@ describe('supplier admission', () => {
     const { supplier, app } = await applyFor([a.id, b.id]);
     await update(SupplierApplication.name, { id: app, status: 'admission_review' });
 
-    await decide(app, 'approve');
+    await decide(app, 'approve', reviewer.token);
     expect((await read(SupplierApplication.name, app)).status).toBe('admission_review');
     await decide(app, 'approve');
 
@@ -115,7 +120,7 @@ describe('supplier admission', () => {
     const category = await newCategory();
     const { supplier, app } = await applyFor([category.id]);
     await update(SupplierApplication.name, { id: app, status: 'admission_review' });
-    await decide(app, 'reject');
+    await decide(app, 'reject', reviewer.token);
     expect((await read(SupplierApplication.name, app)).status).toBe('doc_review');
     expect((await read(Supplier.name, supplier)).status).toBe('qualifying');
   });

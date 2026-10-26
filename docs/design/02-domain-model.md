@@ -324,6 +324,7 @@ upsert 写入，结构不变。
 | `audit_result` | select（只读） | 准入审核结论 `pass` / `conditional` / `fail`，同一 flow 写入；有条件通过的申请批准后品类资格为 `trial`（WI-01 6.6.2） |
 | `audit_report` | file | 不建：v0.4 前的过渡设计，审核报告在 `srm_supplier_audit.report` 上 |
 | `reviewer` | user | 初审人（品类经理） |
+| `review_escalated` | boolean | 只读，默认 false；初审人就是新建人或推进到准入评审的人时，`srm_admission_approval` 把品类经理一级上提给采购总监并写 true（03 §3 第 6 步） |
 | `sqe` | user | 负责审核的 SQE |
 | `supplier` | lookup → 供应商 | 品类经理把申请推进到「资料审核」时新建（或 `reapply` 时关联旧档）的供应商；`submitted` 阶段只有申请记录，不建主数据 |
 | `reject_reason` | textarea | |

@@ -83,6 +83,8 @@ export const SupplierApplication = ObjectSchema.create({
       ],
     }),
     reviewer: Field.user({ label: '初审人', group: 'review' }),
+    // 初审人就是发起人时，品类经理一级上提给采购总监（srm_admission_approval 写入，03 §3 第 6 步），只读
+    review_escalated: Field.boolean({ label: '初审上提采购总监', group: 'review', defaultValue: false, readonly: true }),
     // 审批节点写入的审批结论，只读
     approval_status: Field.select({
       label: '审批结论',
