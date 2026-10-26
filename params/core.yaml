@@ -110,7 +110,7 @@ perf_d_exit_periods:
 perf_auto_apply:
   label: 绩效结果自动应用
   example: 开启
-  used_in: []
+  used_in: [GL-06 6.6.2, GL-06 第 7 章]
   system: 考评审定发布后的结果应用 flow srm_performance_apply：开启时 C 级自动开整改单、D 级生成冻结处置单草稿、连续 perf_d_exit_periods 期 D 级生成淘汰处置单草稿；关闭时只通知品类经理（07 D9「首年可以只发布不自动处置」）。flow 的 AUTO_APPLY 与本参数由测试核对一致（核心 03 §10 第 6 步）
 
 scar_containment_hours:
