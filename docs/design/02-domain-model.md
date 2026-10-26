@@ -649,9 +649,15 @@ SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改�
 | `is_overdue` | boolean | 默认 false，逾期 flow 维护 |
 | `claim_amount` | currency | 索赔金额 |
 | `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计从「供应商已接受」手工标记，选项对其他人不可选；SRM 不生成扣款）；不是 `none` 时必须填索赔金额 |
-| `steps` | repeater | 8D 各步骤的完成日期、责任人、附件（D1–D8），供门户整改回复页分段显示；随门户（v0.6）加，之前状态即 8D 进度。平台已裁定对象上的 repeater 不声明子字段、有类型的列表用子对象（objectstack#25681，2026-10-25），所以不按 repeater 做；是否改为 8D 步骤子对象随 v0.6 U5 定 |
 
 整改单上 8D 内容在关闭或撤销后只读。
+
+8D 不设分步记录（原设计的 `steps` repeater 取消，2026-10-26 裁定）：门户整改回复页按上表现有字段分段显示
+（D2 `problem_description`、D3 `containment_action`、D4 `root_cause`、D5–D7 `corrective_action` / `preventive_action`、
+`evidence`、`sqe_comment`），`status` 即 8D 进度，QP-04 的控制点都由这些字段覆盖。平台已裁定对象上的 repeater 不声明
+子字段、有类型的列表要用子对象（objectstack#25681），核心不为此增加对象（对象数按 07 §1 不变）。页面需要时间点的，
+v0.6 U5 可以加两个由现有状态流转 flow 写入的日期时间字段（临时措施提交时间、根因与措施提交时间）。客户要求逐步记录
+责任人和日期的（如汽车行业），放客户层，或在门槛 2 之前以新增字段的方式加。
 
 ### 4.7 绩效（v0.5）
 

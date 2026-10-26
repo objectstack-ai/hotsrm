@@ -272,7 +272,7 @@ test/                            # 仓库根目录
 | objectstack#25652 岗位、权限集标签没有翻译词条 | 岗位、权限集标签只有中文 | 主干已修，18.1.0 的翻译包还没有 `positions` / `permissions`；保留 |
 | objectstack#25672 非管理员在人员选择框里输入文字搜索报 403 | 不输入，直接从下拉列表点选（[本地运行说明](../implementation/local-demo.md)） | 主干已修，18.1.0 实测仍 403；保留 |
 | objectstack#25675 应用包里的 `api` flow 只能写死密钥 | 逾期扫描只用定时触发，不加 api 心跳 | 主干已修（`config.secretRef`），18.1.0 未带上；保留 |
-| objectstack#25681 repeater 不能声明子字段 | 审核检查表、8D `steps` 不用 repeater | 平台裁定：对象上的 repeater / composite 就是无类型 JSON，有类型的列表用子对象；8D 步骤是否改为子对象随 U5 定（[02 §4.6](./02-domain-model.md#46-质量v04)） |
+| objectstack#25681 repeater 不能声明子字段 | 审核检查表、8D `steps` 不用 repeater | 平台裁定：对象上的 repeater / composite 就是无类型 JSON，有类型的列表用子对象；8D 不设分步记录、不增对象（2026-10-26 裁定，[02 §4.6](./02-domain-model.md#46-质量v04)） |
 | objectui#13470 报表的内联多语言标签让报表页白屏 | 交付报表标签只写中文 | 主干已修，18.1.0 的控制台未带上；保留 |
 | objectui#13471 日历把 lookup 标题渲染成「[object Object]」 | 审核日历用审核编号作标题 | 主干已修，18.1.0 的控制台未带上；保留 |
 
