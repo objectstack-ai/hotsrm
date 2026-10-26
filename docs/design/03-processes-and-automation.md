@@ -252,7 +252,7 @@ ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预�
 | 2 审批 | 「提交审批」screen flow `srm_contract_submit`（品类经理、采购主管）：`draft` → `in_review`，写入 `submitted_by`；合同金额必填，法务审核人不能是提交人 | `srm_contract_approval`：法务（`field = legal_reviewer`，没填时由法务岗位审批）→ 按金额分档的采购审批（§12）→ `signing`，通知起草人和提交人；审批中合同只读（平台审批锁记录）。细节见下 |
 | 3 签署 | 状态→`signing` | 采购员上传双方盖章扫描件、填写 `signed_date`（这两个字段只在签署中可改）；电子签（`http` 发起 + `api` 回调写回 `esign_request_id`）为客户驱动主题，字段已预留 |
 | 4 生效 | 「确认生效」screen flow `srm_contract_activate`（采购员、采购主管、品类经理） | 签署件与签署日期齐全、供应商仍为合格时状态→`active`；质量协议 / 廉洁协议进入或离开生效时，`srm_contract_agreement_recalc` 重算供应商对应的布尔字段 |
-| 5 到期提醒 | `time_relative`：`end_date`，提前 60 / 30 / 7 天（`contract_reminder_days`），只看生效中的合同 | `srm_contract_expiry_notice` 通知合同所有者和主要品类的品类经理；平台按天扫描，每份合同每个提醒日只发一次 |
+| 5 到期提醒 | `time_relative`：`end_date`，提前 60 / 30 / 7 天（`contract_reminder_days`），只看生效中的合同 | `srm_contract_expiry_notice` 通知合同所有者和主要品类的品类经理、采购员（采购员跟进续签或终止，07 §2.1 第 9 步）；平台按天扫描，每份合同每个提醒日只发一次 |
 | 6 到期 | 追赶式扫描 `srm_contract_expire_sweep`：`end_date < today` 且仍为 `active` | 状态→`expired`；`auto_renew == true` 的合同再经 `srm_contract_renew` 生成续签草稿（期限紧接原合同、长度相同，复制明细，`renewed_from` 指回原合同）；供应商已不合格时不生成续签，通知所有者 |
 
 合同审批（v0.3 C2，flow `srm_contract_approval` / `srm_contract_recalled`）：
@@ -426,7 +426,7 @@ stateDiagram-v2
 | 到期提醒 | `time_relative`：证书 `valid_to`，提前 30 / 15 / 7 天 | 证书 `status → expiring`；通知 SQE 与供应商联系人（FR-901） |
 | 到期生效 | 追赶式扫描：`valid_to < today` 且不是 `expired`（定时 flow 在云上默认关闭，部署时打开，objectstack#25442） | 证书→`expired`；`is_mandatory` 的证书过期时供应商 `qualification_alert = true`（FR-902）；v0.5 起同时新建 `qualification` 类风险事件 |
 | 供应商修改证书 | 证书的编号、有效期或附件被门户修改 | flow 把 `verified` 重置为 false，通知 SQE 重新核验 |
-| 资质恢复 | 证书或品类资格写入后的记录触发（`srm_supplier_qualification_recalc`） | 先按该供应商全部品类的 `mandatory_cert_types` 重算每张证书的 `is_mandatory`；再重新计算：每一种必备资质类型都有 `status == 'valid'` 且 `verified == true` 的证书时，`qualification_alert = false`（v0.5 起关闭对应风险事件）。只上传新证书而未经 SQE 核验，不会解除异常 |
+| 资质恢复 | 证书或品类资格写入后的记录触发（`srm_supplier_qualification_recalc`） | 先按该供应商全部品类的 `mandatory_cert_types` 标记每张证书的 `is_mandatory`（`srm_certificate_mandatory_mark`：新建证书或改了类型时看这张证书；`srm_grant_mandatory_mark`：新增品类资格时看该供应商的全部证书。只置为必备、不取消，存量导入和手工标记的保留）；再重新计算：每一种必备资质类型都有 `status == 'valid'` 且 `verified == true` 的证书时，`qualification_alert = false`（v0.5 起关闭对应风险事件）。只上传新证书而未经 SQE 核验，不会解除异常 |
 | 风险事件处理 | 手工登记或系统生成（v0.5） | `high` 级事件通知品类经理并生成处置单草稿（冻结）；关闭时填写处理结论 |
 | 资质风险事件 | `srm_supplier_qualification_recalc`（证书状态或「必备」标志变化后） | 这张证书是必备证书且变为已过期时，新建 `qualification` 类、`source = system`、中风险的风险事件，`certificate` 指回证书；这张证书已有未关闭的事件时不再建。资质异常解除时关闭该供应商未关闭的系统资质事件，写处理结论；手工登记的事件不动 |
 | 外部风险 | `schedule`：每周一 04:00（客户驱动主题） | flow 按批 `loop` 合格供应商，`http` 节点调用企业信息服务；新出现的经营异常、失信、重大诉讼、股权变更按 `external_ref` 去重后建风险事件（FR-903）。有客户要求时立项 |
@@ -439,7 +439,7 @@ stateDiagram-v2
 
 > v0.1 先实现其中的一部分：`srm_certificate_expire_sweep` 每日一次，把证书状态对齐到已过期 / 即将到期（30 天内）/
 > 有效（有效期被延长时恢复）；`srm_supplier_qualification_recalc` 在证书状态或「必备」标志变化后重算
-> `qualification_alert`。到期提醒通知随 v0.1 收尾加入；`is_mandatory` 按品类必备资质自动写入随 v0.2；「经 SQE 核验才解除」
+> `qualification_alert`。到期提醒通知随 v0.1 收尾加入；`is_mandatory` 按品类必备资质自动标记原定随 v0.2，门槛 1 验收（2026-10-26）时发现未实现后补上（`srm_certificate_mandatory_mark`、`srm_grant_mandatory_mark`）；「经 SQE 核验才解除」
 > 随门户（v0.6）加入：门户上线前证书由 SQE 自己录入，录入即核验，要求再勾一次「已核验」没有意义；门户上线后证书由供应商上传，
 > 改证书时 `verified` 复位，经 `srm_certificate_verify` 核验后才解除（2026-10-24 随 v0.4 Q3 核对后改期）。
 
@@ -491,6 +491,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_certificate_expiry_notice` | time_relative：`valid_to` −30 / −15 / −7 天 | 资质证书 | v0.1 |
 | `srm_certificate_expire_sweep` | schedule：每日 01:00（追赶式） | 资质证书 | v0.1 |
 | `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商（v0.5 起 → 风险事件） | v0.1 |
+| `srm_certificate_mandatory_mark` / `srm_grant_mandatory_mark` | record_change：证书新建或改类型 / 品类资格新增 | 品类 → 资质证书（必备资质标记） | v0.5（门槛 1 补） |
 | `srm_change_approval` / `srm_change_apply` | record_change：变更单新建 / 子 flow | 变更单 → 供应商、银行账户、联系人 | v0.2 |
 | `srm_contract_approval` | record_change：状态→`in_review` | 合同 | v0.3 |
 | `srm_contract_recalled` | record_change：审批中的合同审批结论→`recalled` | 合同 | v0.3 |

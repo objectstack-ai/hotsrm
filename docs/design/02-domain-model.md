@@ -260,7 +260,7 @@ flow 拒绝新建人核验自己建的账户（03 §13）。
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `cert_type` | select | `business_license` 营业执照 / `iso9001` / `iatf16949` / `iso14001` / `iso45001` / `production_license` 生产许可 / `ccc` 3C 认证 / `other` |
-| `is_mandatory` | boolean | 默认 false；由 `srm_supplier_qualification_recalc` 在证书或品类资格写入时按该供应商全部品类的 `mandatory_cert_types` 重算，门户只读 |
+| `is_mandatory` | boolean | 默认 false；证书新建（或改类型）和品类资格新增时，由 flow 按该供应商全部品类的 `mandatory_cert_types` 标记为 true（`srm_certificate_mandatory_mark`、`srm_grant_mandatory_mark`，03 §11），只标记、不取消；存量导入时按表格填写（导入时还没有品类资格）；门户只读 |
 | `cert_no` / `issuer` | text | 存量导入的证书 `cert_no` 必填（`requiredWhen: record.legacy_imported == true`），导入按「供应商 + 资质类型 + 证书编号」匹配 |
 | `valid_from` / `valid_to` | date | `valid_to >= valid_from`（跨字段校验） |
 | `attachment` | file | 扫描件；`requiredWhen: record.legacy_imported != true`——表格导入带不了文件，存量证书复核时补传 |

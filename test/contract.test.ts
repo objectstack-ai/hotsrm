@@ -116,7 +116,7 @@ describe('contract', () => {
       ((await stack.hooks.run(
         Category.name,
         'insert',
-        { code: `CT-CAT-${++seq}`, name: '示例品类（合同）', category_manager: otherManager.id },
+        { code: `CT-CAT-${++seq}`, name: '示例品类（合同）', category_manager: otherManager.id, buyer: buyer.id },
         { system: true },
       )) as { id: string }).id,
     );
@@ -312,7 +312,7 @@ describe('contract', () => {
     await expect.poll(async () => (await inbox(manager.id, id)).length).toBe(1);
   });
 
-  it('reminds the owner and the category manager 60, 30 and 7 days before expiry', async () => {
+  it('reminds the owner, the category manager and the buyer 60, 30 and 7 days before expiry', async () => {
     const due = await activeContract({ supplier: await supplier(), category, start_date: day(-300), end_date: day(30) });
     const notDue = await activeContract({ supplier: await supplier(), category, start_date: day(-300), end_date: day(31) });
     // 没填主要品类的只通知所有者
@@ -321,6 +321,7 @@ describe('contract', () => {
     await job.trigger('flow-time-relative:srm_contract_expiry_notice');
     await expect.poll(async () => (await inbox(manager.id, due)).length).toBeGreaterThan(0);
     await expect.poll(async () => (await inbox(otherManager.id, due)).length).toBe(1);
+    await expect.poll(async () => (await inbox(buyer.id, due)).length).toBe(1);
     expect(await stack.rows('sys_notification', { source_id: notDue })).toHaveLength(0);
     await expect.poll(async () => (await inbox(manager.id, noCategory)).length).toBe(1);
     // 同一提醒日再扫一次不重复发
