@@ -79,9 +79,11 @@ hotsrm/
 
 ```bash
 pnpm install
-pnpm dev          # 本地启动（内存库）
+pnpm dev          # 本地启动（sqlite，库文件在 .objectstack/data/）
 pnpm validate     # 每次改元数据后跑；其余检查见 AGENTS.md §6
 ```
+
+按岗位建测试账号、导入样例数据做验收或演示，见 [本地演示环境](./docs/implementation/local-demo.md)。
 
 定时 flow（证书到期扫描）受部署开关 `OS_AUTOMATION_SCHEDULED_WORK_ENABLED` 控制，平台默认关闭，本地和
 托管云都要显式打开才会运行；托管云上如何为本应用打开，待与平台确认。

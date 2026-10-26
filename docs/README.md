@@ -8,7 +8,7 @@
 | [packs/](./packs/README.md) | 行业扩展包（设计保留，未排期）：大宗物料包、危化品包、国企采购合规包，以及扩展包的组合与接入方式 | 产品、开发、实施 |
 | [engineering/](./engineering/README.md) | 建模规范、分支与 PR、CI 门禁、测试策略、版本与升级 | 开发者、AI agent |
 | [adr/](./adr/README.md) | 决策记录 | 全体 |
-| [implementation/](./implementation/legacy-supplier-import.md) | 实施文档：存量供应商导入说明（v0.2）、[交付记录导入说明](./implementation/delivery-import.md)（v0.4）；实施手册与上线检查清单随 v0.5 补充 | 实施顾问、管理员 |
+| [implementation/](./implementation/legacy-supplier-import.md) | 实施文档：存量供应商导入说明（v0.2）、[交付记录导入说明](./implementation/delivery-import.md)（v0.4）、[本地演示环境](./implementation/local-demo.md)；实施手册与上线检查清单随 v0.5 补充 | 实施顾问、管理员 |
 | [../governance/](../governance/README.md) | 体系文件（管理制度）模板的结构、参数与生成方式 | 实施顾问、客户体系工程师 |
 | [../AGENTS.md](../AGENTS.md) | 开发规则与红线 | 开发者、AI agent |
 
