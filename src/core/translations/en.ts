@@ -403,6 +403,7 @@ export const en: TranslationData = {
         audit_passed: { label: 'On-site Audit Passed' },
         audit_result: { label: 'On-site Audit Result', options: { pass: 'Pass', conditional: 'Conditional Pass', fail: 'Fail' } },
         reviewer: { label: 'Reviewer' },
+        review_escalated: { label: 'Review Escalated to Director' },
         approval_status: { label: 'Approval Result', options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' } },
         approved_date: { label: 'Approved Date' },
         reject_reason: { label: 'Rejection Reason' },
