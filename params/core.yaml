@@ -162,6 +162,13 @@ blacklist_years:
   used_in: [QP-01 6.9.3, GL-08 6.5.3, GL-08 6.6.2]
   system: 制度要求；黑名单状态由处置单设置，解除需单独审批（核心 03 §5）
 
+coc_resign_months:
+  label: 现有供应商补签行为准则的期限
+  unit: 个月
+  example: 12
+  used_in: [ZC-01 4.4.1, ZC-01 第 6 节, SP-01 前言]
+  system: 制度要求；签署状态记录在供应商协议中，签署率按季度统计
+
 disposition_appeal_days:
   label: 处置结果申诉期限
   unit: 日历日（收到通知后）
