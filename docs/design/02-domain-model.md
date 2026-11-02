@@ -263,7 +263,8 @@ flow 拒绝新建人核验自己建的账户（03 §13）。
 | `valid_from` / `valid_to` | date | `valid_to >= valid_from`（跨字段校验） |
 | `attachment` | file | 扫描件；`requiredWhen: record.legacy_imported != true`——表格导入带不了文件，存量证书复核时补传 |
 | `status` | select | `valid` 有效 / `expiring` 即将到期 / `expired` 已过期，由 flow 按 `valid_to` 维护，门户只读 |
-| `verified` | boolean | 默认 false；SQE 经「核验证书」screen flow 置为 true；供应商修改编号、有效期或附件后由 flow 重置为 false，门户只读 |
+| `verified` | boolean（只读） | 默认 false，只由 flow 写入（v0.6）：内部人员录入或修改证书即视为核验（门户上线前证书一直由内部录入）；门户新建证书或改了类型、编号、发证机构、有效期、扫描件时复位为 false 并通知 SQE（`srm_certificate_change_check`）；SQE、质量经理经「核验证书」screen flow（`srm_certificate_verify`）置为 true。资质异常只认已核验的证书（03 §11） |
+| `verified_by` | user（只读） | 核验人：内部录入时为录入人，经「核验证书」时为 SQE / 质量经理；门户改动复位时清空（v0.6） |
 | `legacy_imported` | boolean | 默认 false；存量导入的证书为 true，同供应商的同名字段（只在新建时可置为 true，只有 `srm_admin` 可写）（v0.2） |
 
 **`srm_category` 采购品类**（OWD `public_read`）：`code`、`name`、`parent`（`tree`，
@@ -326,6 +327,7 @@ upsert 写入，结构不变。
 | `sqe` | user | 负责审核的 SQE |
 | `supplier` | lookup → 供应商 | 品类经理把申请推进到「资料审核」时新建（或 `reapply` 时关联旧档）的供应商；`submitted` 阶段只有申请记录，不建主数据 |
 | `reject_reason` | textarea | |
+| `supplement_note` | textarea（只读） | 补充说明：「退回补充」后供应商在门户经「补充完成，重新提交」（`srm_application_resubmit`）写入（v0.6） |
 | `cycle_days` | number | 从提交到批准的天数，批准时由 flow 写入（准入周期指标） |
 
 > v0.1（内部代录，见 [07 §1](./07-delivery-plan.md#1-分期路线图)）先实现一个子集：申请由内部人员为已登记的

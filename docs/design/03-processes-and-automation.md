@@ -133,7 +133,7 @@ sequenceDiagram
 | 1 受理 | 申请创建（v0.1 内部登记；v0.6 受邀供应商在门户提交） | flow `srm_application_intake`（record_change，after-create）：按身份标识查供应商（`country == 'cn'` 用 `credit_code`，其他国家 / 地区用 `country` + `registration_no`，BR-01）；命中 `blacklisted` → 申请置 `rejected`、`duplicate_check = blacklisted`，通知申请人；命中 `eliminated` → `reapply`，申请的 `supplier` 指向旧档并允许继续（淘汰后重新准入的唯一路径，FR-208）；命中 `qualified` / `qualifying` / `frozen` / `potential` → `duplicate`，通知品类经理人工判断；未命中 → `pass`。同一 flow 按申请品类找到品类经理和 SQE，写入 `reviewer` / `sqe`，把这些品类中最高的 `risk_class` 和 `material_class` 复制到申请 |
 | 2 建档 | 品类经理把申请推进到 `doc_review`（人工确认后，防止灌水污染主数据） | flow `srm_application_accept`：`duplicate_check == 'pass'` 时新建 `potential` 供应商与主联系人并回填 `supplier`；`reapply` 时沿用旧档；供应商 `potential / eliminated → qualifying`；`submitted` 阶段只有申请记录，不建主数据 |
 | 3 开通门户 | 品类经理 / 管理员（v0.6） | 邀请主联系人加入组织并开通门户（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）；v0.1–v0.5 跳过 |
-| 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，通知联系人）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
+| 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，通知联系人随 v0.6 U6）。供应商补齐后在申请上点「补充完成，重新提交」（screen flow `srm_application_resubmit`，v0.6）：写补充说明 `supplement_note`，申请回到 `doc_review`，通知初审人；只有申请所属供应商的门户用户能提交（flow 按门户名册检查）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
 | 5 现场审核 | `risk_class == 'high'` | SQE 建供应商审核记录（`audit_type = admission`，关联本次申请），审核后录入总分、最低审核块得分、结论与问题项（结论按 `audit_score_thresholds` 校验，02 §4.2）。审核完成或改了结论时，flow `srm_audit_admission_apply` 把结论写回申请：`audit_result` 记结论，通过或有条件通过时 `audit_passed = true`，否则为 false，并通知初审人；已批准或已驳回的申请不再写。校验规则 `audit_before_review`：`risk_class == 'high' && audit_passed != true` 时申请不得进入 `admission_review`（FR-204）。申请上的勾选框只由 flow 写，品类经理改不了 |
 | 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'class_a'` 或 `risk_class == 'high'` 时第 2 级改为采购总监、`srm_quality_manager` 并行会签（`per_group`：两个岗位各一人通过，同岗位多人时任一人即可；任一人驳回即驳回）。初审人就是申请的新建人或把申请推进到准入评审的人时，品类经理一级上提给采购总监、与第 2 级合并（标准申请由采购总监审批，A 类或高风险由采购总监 + 质量经理会签），申请上 `review_escalated` 记为 true；不要求另一位品类经理，免得只有一位品类经理的品类卡住（平台没有「不可自审」选项，objectstack#25446；同合同、处置单的做法）。驳回 → 申请回 `doc_review` 并通知 |
 | 7 批准后 | 审批通过 | 申请→`approved`，写入 `cycle_days`；供应商 `qualifying → qualified`；按申请品类建 `srm_supplier_category`（申请的 `audit_result` 为有条件通过时为 `trial`，否则 `qualified`，WI-01 6.6.2）；通知供应商。ERP 建档与 `erp_vendor_code` 回写为预留集成点（06 §1） |
@@ -191,14 +191,16 @@ flowchart TD
 
 ## 5. P2 信息变更与供应商处置
 
-**新增银行账户**（v0.2，BR-20）：采购侧（`srm_supplier_admin`）在供应商档案下新建银行账户，
-记录为 `pending_verify` 并锁定 → 应付会计在账户上点「核验」，经 screen flow `srm_bank_verify`
+**新增银行账户**（v0.2，BR-20）：采购侧（`srm_supplier_admin`）在供应商档案下新建银行账户（v0.6 起本公司门户管理员也可以在门户新建），
+记录为 `pending_verify` 并锁定，`srm_bank_pending_notice` 通知全部应付会计（v0.6，通知不含账号）→ 应付会计在账户上点「核验」，经 screen flow `srm_bank_verify`
 按 `params/core.yaml` 的 `bank_change_verification` 核实后确认 → 账户置为 `active`，写入
 `verified_by`。flow 拒绝三种情况：启动人不是应付会计、账户不是待核验、启动人就是新建人
 （双人原则）。已有账户的修改不直接编辑，走下面的信息变更单。
 
 **信息变更**（v0.2，FR-207）：门户上线前由采购侧代供应商在供应商档案下新建变更单（v0.6 起供应商在门户经
-「提交变更申请」screen flow 提交），填写变更后的值 → 审批 flow `srm_change_approval` 新建即触发，先把当前档案
+「提交变更申请」screen flow `srm_change_submit` 提交：本公司门户管理员在供应商档案上选变更类型、填写新值，flow 以系统身份代建变更单，
+发起人记为门户管理员本人；flow 进门检查启动人持 `srm_portal_admin` 并且是这家供应商在职联系人上登记的门户账号，
+银行账户、联系人的归属再由变更单的校验规则把关），填写变更后的值 → 审批 flow `srm_change_approval` 新建即触发，先把当前档案
 快照到 `before_value` → 第 1 级 `position = srm_buyer_lead`（采购确认）；`change_type == 'bank_account'` 时
 增加第 2 级 `position = srm_ap_accountant`（财务复核，核实方式按 `params/core.yaml` 的 `bank_change_verification`）
 → 通过后子 flow `srm_change_apply` 以系统身份写回：基本信息、地址写回供应商（同时写 `last_change_request`，
@@ -207,7 +209,8 @@ flowchart TD
 变更单为 `applied`，通知发起人。
 
 - **驳回**：不改主记录，审批意见写入 `reject_reason`，通知发起人。
-- **退回修改**：两级都可以退回（`revise` → `approval_revise`，每级至多 3 次），记录解锁，发起人改完重新提交，
+- **退回修改**：两级都可以退回（`revise` → `approval_revise`，每级至多 3 次），记录解锁，发起人改完重新提交（门户提交的变更单由
+  门户管理员在门户改：门户权限集只放行本公司、被退回的单，变更单是 `private`，`external` 成员本来只能改自己发起的），
   从第 1 级重新审批（第 2 级退回时账户信息改过，采购要再确认）；第 1 级通过时清掉上一轮的财务审批人。
   18.0.0 时第 2 级不能退回（平台把第 2 个审批节点的提交人记成第 1 级审批人，objectstack#24817），18.1.0 修复后加回（2026-10-26）。
 - **职责分离（BR-11）**：发起人不能审批本人的变更单，两级审批人不能是同一人。平台没有「提交人不得审批」开关
@@ -427,8 +430,8 @@ stateDiagram-v2
 |---|---|---|
 | 到期提醒 | `time_relative`：证书 `valid_to`，提前 30 / 15 / 7 天 | 证书 `status → expiring`；通知 SQE 与供应商联系人（FR-901） |
 | 到期生效 | 追赶式扫描：`valid_to < today` 且不是 `expired`（定时 flow 在云上默认关闭，部署时打开，objectstack#25442） | 证书→`expired`；`is_mandatory` 的证书过期时供应商 `qualification_alert = true`（FR-902）；v0.5 起同时新建 `qualification` 类风险事件 |
-| 供应商修改证书 | 证书的编号、有效期或附件被门户修改 | flow 把 `verified` 重置为 false，通知 SQE 重新核验 |
-| 资质恢复 | 证书或品类资格写入后的记录触发（`srm_supplier_qualification_recalc`） | 先按该供应商全部品类的 `mandatory_cert_types` 标记每张证书的 `is_mandatory`（`srm_certificate_mandatory_mark`：新建证书或改了类型时看这张证书；`srm_grant_mandatory_mark`：新增品类资格时看该供应商的全部证书。只置为必备、不取消，存量导入和手工标记的保留）；再重新计算：每一种必备资质类型都有 `status == 'valid'` 且 `verified == true` 的证书时，`qualification_alert = false`（v0.5 起关闭对应风险事件）。只上传新证书而未经 SQE 核验，不会解除异常 |
+| 证书改动核验（v0.6） | 证书新建，或类型、编号、发证机构、有效期、扫描件被修改（`srm_certificate_change_check`） | 改动人持门户岗位：`verified` 复位为 false、清空核验人，通知该供应商各品类的 SQE（品类都没有 SQE 时通知质量经理）经「核验证书」（`srm_certificate_verify`，SQE / 质量经理；已核验、已过期的不核验）核对原件；改动人是内部人员或系统：录入即核验，`verified = true`、核验人记为改动人 |
+| 资质恢复 | 证书或品类资格写入后的记录触发（`srm_supplier_qualification_recalc`） | 先按该供应商全部品类的 `mandatory_cert_types` 标记每张证书的 `is_mandatory`（`srm_certificate_mandatory_mark`：新建证书或改了类型时看这张证书；`srm_grant_mandatory_mark`：新增品类资格时看该供应商的全部证书。只置为必备、不取消，存量导入和手工标记的保留）；再重新计算（证书状态、「必备」标志或 `verified` 变化后）：同类型里有未过期（有效或即将到期）且已核验的证书，称这一类「顶得住」。有一张过期的必备证书而同类型顶不住时标记 `qualification_alert = true`；每一张过期或未核验的必备证书同类型都顶得住（即每一种必备资质类型都有未过期且已核验的证书）时解除（v0.5 起关闭对应风险事件）；两样都不满足时保持原值——门户改了一张有效证书只复位核验，不新标异常，已有的异常要等 SQE 核验后才解除。只上传新证书或把过期证书的有效期改长而未经 SQE 核验，不会解除异常（v0.6） |
 | 风险事件处理 | 手工登记或系统生成（v0.5） | `high` 级事件通知品类经理并生成处置单草稿（冻结）；关闭时填写处理结论 |
 | 资质风险事件 | `srm_supplier_qualification_recalc`（证书状态或「必备」标志变化后） | 这张证书是必备证书且变为已过期时，新建 `qualification` 类、`source = system`、中风险的风险事件，`certificate` 指回证书；这张证书已有未关闭的事件时不再建。资质异常解除时关闭该供应商未关闭的系统资质事件，写处理结论；手工登记的事件不动 |
 | 外部风险 | `schedule`：每周一 04:00（客户驱动主题） | flow 按批 `loop` 合格供应商，`http` 节点调用企业信息服务；新出现的经营异常、失信、重大诉讼、股权变更按 `external_ref` 去重后建风险事件（FR-903）。有客户要求时立项 |
@@ -492,7 +495,9 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_admission_approval` | record_change：状态→`admission_review` | 准入申请 | v0.1 |
 | `srm_certificate_expiry_notice` | time_relative：`valid_to` −30 / −15 / −7 天 | 资质证书 | v0.1 |
 | `srm_certificate_expire_sweep` | schedule：每日 01:00（追赶式） | 资质证书 | v0.1 |
-| `srm_supplier_qualification_recalc` | record_change：证书、品类资格写入 | 资质证书 → 供应商（v0.5 起 → 风险事件） | v0.1 |
+| `srm_supplier_qualification_recalc` | record_change：证书状态、「必备」标志、`verified` 变化 | 资质证书 → 供应商（v0.5 起 → 风险事件；v0.6 起只认已核验的证书） | v0.1 |
+| `srm_certificate_change_check` | record_change：证书新建或改了内容 | 资质证书（门户改动复位核验并通知 SQE，内部录入即核验） | v0.6 |
+| `srm_bank_pending_notice` | record_change：银行账户以「待核验」新建 | 银行账户 → 应付会计通知 | v0.6 |
 | `srm_certificate_mandatory_mark` / `srm_grant_mandatory_mark` | record_change：证书新建或改类型 / 品类资格新增 | 品类 → 资质证书（必备资质标记） | v0.5（门槛 1 补） |
 | `srm_change_approval` / `srm_change_apply` | record_change：变更单新建 / 子 flow | 变更单 → 供应商、银行账户、联系人 | v0.2 |
 | `srm_contract_approval` | record_change：状态→`in_review` | 合同 | v0.3 |
@@ -529,12 +534,13 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 
 | screen flow | 入口 | 使用者 | 版本 |
 |---|---|---|---|
-| `srm_certificate_verify` 核验证书 | 资质证书 | SQE | v0.1 |
+| `srm_certificate_verify` 核验证书 | 资质证书（未核验、未过期） | SQE、质量经理 | v0.6（门户上线前内部录入即核验） |
 | `srm_primary_contact_set` 设为主联系人 | 供应商联系人 | `srm_supplier_admin` | v0.1 |
 | `srm_bank_verify` 核验银行账户 | 银行账户 | 应付会计 | v0.2 |
 | `srm_contract_submit` 提交审批 | 合同（草稿） | 品类经理、采购主管 | v0.3 |
 | `srm_contract_activate` 确认生效 | 合同（签署中） | 采购员、采购主管、品类经理 | v0.3 |
-| `srm_change_submit` 提交变更申请 | 门户：公司资料（v0.6 前内部在供应商档案下直接新建变更单） | 门户管理员 | v0.6 |
+| `srm_change_submit` 提交变更申请 | 门户：供应商档案（内部员工照旧在变更单列表直接新建） | 门户管理员（按门户名册检查） | v0.6 |
+| `srm_application_resubmit` 补充完成，重新提交 | 门户：准入申请（退回补充） | 申请所属供应商的门户用户 | v0.6 |
 | `srm_audit_finding_to_scar` 转整改单 | 供应商审核（已完成） | SQE、质量经理 | v0.4 |
 | `srm_disposition_submit` 提交审批 / `srm_disposition_cancel` 作废 | 处置单（草稿） | 品类经理、采购主管 | v0.5 |
 | `srm_score_submit` 提交评分 | 考评单（人工评分） | 评分人 | v0.5 |

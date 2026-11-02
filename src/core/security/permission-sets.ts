@@ -153,6 +153,8 @@ export const QualityPermissionSet = {
     // 登记与处理风险事件（04 §2.3，v0.5）：资质、质量类风险由 SQE 跟进
     srm_risk_event: write,
   },
+  // 证书上的「核验证书」按钮（v0.6）；谁能核验由 srm_certificate_verify 检查岗位
+  systemPermissions: ['srm_verify_certificate'],
   fields: {
     ...supplierFieldsReadOnly,
     // 计划年度由 srm_audit_plan_generate 写入，问题项的整改单由「转整改单」回填

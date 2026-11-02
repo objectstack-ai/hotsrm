@@ -42,8 +42,9 @@ const supplierFields = Object.fromEntries(
     .map((field) => [`srm_supplier.${field}`, supplierHidden.has(field) ? hidden : readOnly]),
 );
 
-// 证书：门户上传新证书；状态、强制标志、核验结论只由 flow 与「核验证书」写入（防止自解资质异常，04 §3.7）
-const certificateFlowOwned = ['status', 'is_mandatory', 'verified', 'legacy_imported'];
+// 证书：门户上传和修改证书（v0.6 U4）；状态、强制标志、核验结论只由 flow 与「核验证书」写入（防止自解资质异常，04 §3.7）。
+// 门户改了证书内容，srm_certificate_change_check 把「已核验」复位并通知 SQE，核验前不能解除资质异常（03 §11）
+const certificateFlowOwned = ['status', 'is_mandatory', 'verified', 'verified_by', 'legacy_imported'];
 const certificateFields = Object.fromEntries(certificateFlowOwned.map((field) => [`srm_supplier_certificate.${field}`, readOnly]));
 
 export const PortalSupplierPermissionSet = {
@@ -53,7 +54,7 @@ export const PortalSupplierPermissionSet = {
     // 授予编辑权是为了资料字段和证书（controlled_by_parent 要求主记录可编辑）；其余字段 FLS 只读
     srm_supplier: { ...none, allowEdit: true },
     srm_supplier_contact: none,
-    srm_supplier_certificate: { ...none, allowCreate: true },
+    srm_supplier_certificate: { ...none, allowCreate: true, allowEdit: true },
     srm_supplier_category: none,
     srm_supplier_bank_account: none,
     srm_supplier_application: none,
@@ -65,6 +66,8 @@ export const PortalSupplierPermissionSet = {
     srm_performance_review: none,
     srm_performance_score: none,
   },
+  // 门户应用和门户按钮的显示（体验，不是数据边界）
+  systemPermissions: ['srm_portal_access'],
   fields: {
     ...supplierFields,
     ...certificateFields,
@@ -102,8 +105,9 @@ export const PortalSupplierPermissionSet = {
   ],
 };
 
-// 门户管理员（按人授予，04 §3.3）：在本公司下新增联系人与银行账户，看完整银行账号（04 §4.2）。
-// 与 srm_portal_supplier 同时持有；本身不授任何行，行范围仍由上面的 RLS 和主记录决定
+// 门户管理员（按人授予，04 §3.3）：在本公司下新增、修改联系人，新增银行账户，看完整银行账号（04 §4.2）；
+// 关键信息只经「提交变更申请」（srm_change_submit）提交，被退回修改的本人变更单可以改完重新提交（v0.6 U4）。
+// 与 srm_portal_supplier 同时持有；本身不授读，行范围仍由门户 RLS 和主记录决定
 const bankFlowOwned = Object.fromEntries(
   Object.entries(SupplierBankAccount.fields)
     .filter(([, field]) => (field as { readonly?: boolean }).readonly)
@@ -116,8 +120,20 @@ export const PortalAdminPermissionSet = {
   objects: {
     srm_supplier_contact: { ...none, allowCreate: true, allowEdit: true },
     srm_supplier_bank_account: { ...none, allowCreate: true },
+    // 只为退回修改：变更单是 private，external 成员只能改自己发起（拥有）的行；下面的写策略再限定到本公司、被退回的单。
+    // 变更内容字段的 readonlyWhen 让它们只在退回期间可改，供应商、类型、状态与审批字段对谁都只读（对象定义）
+    srm_supplier_change_request: { ...none, allowEdit: true },
   },
-  systemPermissions: ['srm_view_bank_account_no'],
+  systemPermissions: ['srm_view_bank_account_no', 'srm_portal_manage'],
+  rowLevelSecurity: [
+    {
+      name: 'srm_portal_change_request_revise',
+      object: 'srm_supplier_change_request',
+      operation: 'update' as const,
+      using: `${OWN} && approval_status == 'returned'`,
+      check: OWN,
+    },
+  ],
   fields: {
     'srm_supplier_contact.mobile': { readable: true, editable: true },
     'srm_supplier_contact.active': readOnly,

@@ -2,6 +2,8 @@ import { P } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 资质证书（02 §4.1）。status 与 verified 由 flow 维护（资质扫描、核验证书）。
+// v0.6 起门户可以上传和修改证书：门户新建或改了证书内容时 verified 复位、通知 SQE，经「核验证书」才算数；
+// 内部人员录入或修改即视为核验（srm_certificate_change_check，03 §11）。
 export const SupplierCertificate = ObjectSchema.create({
   name: 'srm_supplier_certificate',
   label: '资质证书',
@@ -45,7 +47,9 @@ export const SupplierCertificate = ObjectSchema.create({
         { label: '已过期', value: 'expired' },
       ],
     }),
-    verified: Field.boolean({ label: '已核验', group: 'review', defaultValue: false }),
+    // 只由 flow 写入：内部录入即核验、门户改动复位、SQE 经「核验证书」确认（03 §11）
+    verified: Field.boolean({ label: '已核验', group: 'review', defaultValue: false, readonly: true }),
+    verified_by: Field.user({ label: '核验人', group: 'review', readonly: true }),
     legacy_imported: Field.boolean({
       label: '存量导入',
       group: 'review',

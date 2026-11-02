@@ -420,6 +420,8 @@ describe('portal platform checks (v0.6 U1, V1–V5)', () => {
     });
 
     it('refuses the certificate’s flow-owned fields, a move to another supplier, a delete, and another supplier’s certificate', async () => {
+      // 「已核验」由 srm_certificate_change_check 维护（v0.6 U4）：探针岗位不是门户岗位，按内部录入处理；这里只断言拒绝的写入没改动它
+      const before = (await stack.rows(SupplierCertificate.name, { id: certificate.a }))[0]!.verified;
       await expect(
         stack.hooks.run(SupplierCertificate.name, 'update', { id: certificate.a, status: 'valid', verified: true }, asA()),
       ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
@@ -432,7 +434,7 @@ describe('portal platform checks (v0.6 U1, V1–V5)', () => {
       await expect(
         stack.hooks.run(SupplierCertificate.name, 'update', { id: certificate.b, valid_to: '2030-01-01' }, asA()),
       ).rejects.toMatchObject({ code: 'RECORD_NOT_FOUND' });
-      expect((await stack.rows(SupplierCertificate.name, { id: certificate.a }))[0]).toMatchObject({ supplier: supplier.a, verified: false });
+      expect((await stack.rows(SupplierCertificate.name, { id: certificate.a }))[0]).toMatchObject({ supplier: supplier.a, verified: before });
     });
 
     it('needs edit on the parent: with read-only access to its supplier it can neither add nor edit a certificate', async () => {

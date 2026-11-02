@@ -98,6 +98,8 @@ export const SupplierApplication = ObjectSchema.create({
     }),
     approved_date: Field.date({ label: '批准日期', group: 'review', readonly: true }),
     reject_reason: Field.textarea({ label: '未通过原因', group: 'review' }),
+    // 「退回补充」后供应商在门户重新提交时写的补充说明（srm_application_resubmit，v0.6），只读
+    supplement_note: Field.textarea({ label: '补充说明', group: 'review', readonly: true }),
   },
 
   validations: [

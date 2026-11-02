@@ -121,7 +121,7 @@ src/core/
 │   ├── positions.ts             # 内部岗位
 │   ├── permission-sets.ts       # 内部权限集
 │   └── portal.ts                # 门户权限集与 RLS（见 04 §3.4）
-├── apps/                        # srm_workbench、srm_portal 两个应用外壳（导航按分组）
+├── apps/                        # srm_workbench 一个应用（ADR-0019 D3），内部工作台与「供应商门户」导航组（导航按分组）
 ├── views/                       # 列表、看板、日历、甘特
 ├── reports/                     # 比价矩阵等（v0.7）
 ├── dashboards/
@@ -135,6 +135,7 @@ test/                            # 仓库根目录
 ├── approval-matrix.test.ts      # 03 §12 每一行（v0.1 起）
 ├── portal-platform.test.ts      # 门户平台实测 V1–V5（§6.2，v0.6 U1）
 ├── portal-isolation.test.ts     # 04 §3.7 的交叉越权用例（v0.6）
+├── portal-self-service.test.ts  # 门户自助维护：补证书与核验、变更申请、退回补充（v0.6 U4）
 ├── sealed-bid.test.ts           # 封标与截止锁价（v0.7）
 └── flows/*.test.ts              # 每条 flow 的正向与异常路径
 ```
