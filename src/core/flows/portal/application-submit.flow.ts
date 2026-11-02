@@ -5,7 +5,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // 以系统身份运行：门户不授准入申请的新建权，也看不到品类表。系统身份读得到任何记录，而任何成员都能经 trigger 入口直接
 // 启动系统身份的 screen flow（objectstack#25481），所以隔离只能靠 flow 自己查名册：调用者必须是页面这家供应商的在职联系人
 // （与成员键 portal_supplier_ids 同一条件：portal_user = 调用者、active），否则直接结束；申请品类取门户邀请上品类经理填的品类，
-// 来源记为「邀请」，申请回填到邀请。邀请要是发给调用者本人（联系人 = 调用者的名册行）、已开通、还没提交过申请的。之后受理照常由 srm_application_intake 处理（黑名单驳回、淘汰重新准入）。
+// 来源记为「邀请」，申请联系人记为调用者的名册行（进展通知发给他，v0.6 U6），申请回填到邀请。邀请要是发给调用者本人（联系人 = 调用者的名册行）、已开通、还没提交过申请的。之后受理照常由 srm_application_intake 处理（黑名单驳回、淘汰重新准入）。
 const c = (source: string) => ({ dialect: 'cel' as const, source });
 const portal = `current_user != null && membership != null`;
 const invited = `invite != null && has(invite.categories) && invite.categories != null && size(invite.categories) > 0`;
@@ -84,7 +84,7 @@ export const ApplicationSubmitFlow: Automation.Flow = {
       label: '新建准入申请',
       config: {
         objectName: 'srm_supplier_application',
-        fields: { supplier: cel`vendor.id`, applied_categories: cel`invite.categories`, source: 'invited' },
+        fields: { supplier: cel`vendor.id`, applied_categories: cel`invite.categories`, source: 'invited', contact: cel`membership.id` },
         outputVariable: 'app',
       },
     },

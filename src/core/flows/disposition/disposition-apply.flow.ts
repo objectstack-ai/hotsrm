@@ -2,6 +2,7 @@ import { P, cel } from '@objectstack/spec';
 import type * as Automation from '@objectstack/spec/automation';
 import { loadOrgAdmins, notifyOrgAdmins } from '../portal/org-admins.js';
 import { clearPortalUsers, revokeInvitations } from '../portal/revoke.js';
+import { byFunction, loadRoster, notifySupplier } from '../portal/supplier-notice.js';
 
 // 执行供应商处置（02 §5.1，03 §5）：审批全部通过后由 srm_disposition_approval 调用，以系统身份改供应商
 // 状态和品类资格，处置单置为「已执行」。
@@ -10,6 +11,7 @@ import { clearPortalUsers, revokeInvitations } from '../portal/revoke.js';
 //   「指定品类」冻结的），原本就暂停的资格不动；全部品类时供应商→合格；
 // - 淘汰 / 拉入黑名单：供应商→淘汰 / 黑名单，品类资格全部暂停并清掉冻结记录，重新准入时按申请品类恢复；
 //   同时清掉该供应商联系人上的门户账号，门户访问在下一个请求就失效（ADR-0010，04 §3.3）；重新准入后要再开通门户；
+//   回收前先通知供应商主账号联系人（v0.6 U6，回收后名册就空了；冻结、解冻的通知在 srm_disposition_supplier_notice）；
 // - 解除黑名单：供应商→淘汰，之后只能重新走准入（FR-208）。
 // 拉入黑名单同时写供应商的黑名单名录字段（拉黑日期、禁入期满日、处置单、原因，v0.5）。禁入期限取
 // params/core.yaml 的 blacklist_years（示例 5 年），客户改参数时同步 BLACKLIST_YEARS。
@@ -104,6 +106,23 @@ export const DispositionApplyFlow: Automation.Flow = {
       blacklist_reason: cel`disp.reason`,
     }),
     suspendAll('suspend_all'),
+    loadRoster('disp.supplier'),
+    {
+      id: 'load_notice_vendor',
+      type: 'get_record',
+      label: '读取供应商名称',
+      config: { objectName: 'srm_supplier', filter: { id: cel`disp.supplier` }, fields: ['name'], outputVariable: 'vendor' },
+    },
+    { id: 'by_exit', type: 'decision', label: '淘汰还是黑名单？' },
+    ...(['eliminate', 'blacklist'] as const).map((action) =>
+      notifySupplier(`notify_${action}`, `通知供应商主账号：${action === 'eliminate' ? '已淘汰' : '已拉入黑名单'}`, {
+        recipients: byFunction('admin'),
+        template: action === 'eliminate' ? 'srm_supplier_eliminated' : 'srm_supplier_blacklisted',
+        data: { supplier: `vendor != null ? vendor.name : '-'`, path: `'/srm_supplier/' + disp.supplier` },
+        sourceObject: 'srm_supplier',
+        sourceId: 'disp.supplier',
+      }),
+    ),
     // 撤销门户访问（ADR-0010，04 §3.3）：清掉该供应商全部联系人上的 portal_user，门户邀请一并撤销，通知组织管理员
     // 撤销门户岗位任命并把门户用户移出组织（系统身份写不了任命，objectstack#25251）
     {
@@ -195,7 +214,13 @@ export const DispositionApplyFlow: Automation.Flow = {
     { id: 'e_el1', source: 'eliminate_supplier', target: 'suspend_all', type: 'default' },
     { id: 'e_blacklist', source: 'by_action', target: 'blacklist_supplier', type: 'conditional', condition: P`disp.action == 'blacklist'`, label: '拉入黑名单' },
     { id: 'e_bl1', source: 'blacklist_supplier', target: 'suspend_all', type: 'default' },
-    { id: 'e_suspended', source: 'suspend_all', target: 'load_portal', type: 'default' },
+    { id: 'e_suspended', source: 'suspend_all', target: 'load_roster', type: 'default' },
+    { id: 'e_nt1', source: 'load_roster', target: 'load_notice_vendor', type: 'default' },
+    { id: 'e_nt2', source: 'load_notice_vendor', target: 'by_exit', type: 'default' },
+    { id: 'e_nt3', source: 'by_exit', target: 'notify_eliminate_guard', type: 'conditional', condition: P`disp.action == 'eliminate'`, label: '淘汰' },
+    { id: 'e_nt4', source: 'by_exit', target: 'notify_blacklist_guard', type: 'conditional', condition: P`disp.action == 'blacklist'`, label: '拉入黑名单' },
+    { id: 'e_nt5', source: 'notify_eliminate_guard', target: 'load_portal', type: 'default' },
+    { id: 'e_nt6', source: 'notify_blacklist_guard', target: 'load_portal', type: 'default' },
     { id: 'e_portal', source: 'load_portal', target: 'revoke_portal', type: 'default' },
     { id: 'e_revoked', source: 'revoke_portal', target: 'revoke_invitations', type: 'default' },
     { id: 'e_rv0', source: 'revoke_invitations', target: 'had_portal', type: 'default' },

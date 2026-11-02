@@ -42,6 +42,9 @@ export const SupplierApplication = ObjectSchema.create({
         { label: '邀请', value: 'invited' },
       ],
     }),
+    // 申请联系人（v0.6 U6）：门户提交时由「提交准入申请」flow 写入提交人在名册上的联系人，申请进展通知发给他的门户账号
+    // （srm_application_supplier_notice）。内部登记的申请为空；只由 flow 写入，任何岗位都不能改
+    contact: Field.lookup('srm_supplier_contact', { label: '申请联系人', group: 'application', readonly: true }),
     status: Field.select({
       label: '状态',
       group: 'review',
