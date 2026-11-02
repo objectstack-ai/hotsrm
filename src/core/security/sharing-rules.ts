@@ -66,6 +66,14 @@ export const ContractEditRules = editRules('srm_contract', P`record.title != ''`
   'srm_legal_counsel',
 ]);
 
+// 准入申请（02 §4.2，03 §3）：OWD private，读靠权限集的 viewAllRecords。门户提交的申请由系统身份 flow 代建，属于提交的
+// 门户用户（v0.6）；品类经理、采购主管要能受理、退回补充、指定初审人，也要能接手同事登记的申请。门户写不了申请（门户
+// 权限集不授编辑），这里只放给持 srm_supplier_admin 的两个岗位。供应商必填
+export const ApplicationEditRules = editRules('srm_supplier_application', P`record.supplier != ''`, '处理准入申请', [
+  'srm_category_manager',
+  'srm_buyer_lead',
+]);
+
 // 整改单（02 §4.6，03 §8）：自动开的单属于系统，SQE 之间要互相接手；应付会计只改索赔状态（FLS）。来源必填
 export const QualityIssueEditRules = editRules('srm_quality_issue', P`record.source != ''`, '处理整改单', [
   'srm_sqe',
@@ -119,6 +127,7 @@ export const SrmSharingRules = [
   ...SupplierEditRules,
   ...MaterialEditRules,
   ...ContractEditRules,
+  ...ApplicationEditRules,
   ...QualityIssueEditRules,
   ...SupplierAuditEditRules,
   ...RiskEventEditRules,

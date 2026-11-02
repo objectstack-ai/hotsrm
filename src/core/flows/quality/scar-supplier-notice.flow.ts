@@ -3,7 +3,7 @@ import { byFunction, loadRoster, loadVendor, notifySupplier, pathOf, vendorName 
 
 // 整改单通知供应商（05 §5「新整改单、整改退回、整改重开、整改逾期」加供应商 quality 联系人，v0.6 U6）：
 // 不论整改单从哪里来（来料不合格自动开单、审核问题项转单、SQE 手工新建），新建、SQE 退回根因与措施、关闭后重新打开、
-// 被逾期扫描标记逾期，都发给该供应商名册上的质量联系人（没有质量联系人时发主账号联系人）。内部 SQE / 质量经理的通知
+// SQE 提出索赔（v0.6 出口验收补上）、被逾期扫描标记逾期，都发给该供应商名册上的质量联系人（没有质量联系人时发主账号联系人）。内部 SQE / 质量经理的通知
 // 仍在 srm_scar_create、srm_scar_review、srm_scar_reopen、srm_scar_overdue_sweep 里，不变。
 const SOURCE = 'srm_quality_issue';
 const events: Array<[key: string, condition: string, template: string, label: string]> = [
@@ -15,6 +15,13 @@ const events: Array<[key: string, condition: string, template: string, label: st
     '整改退回',
   ],
   ['reopened', `previous != null && record.status == 'open' && has(previous.status) && previous.status == 'closed'`, 'srm_scar_reopened', '整改重开'],
+  // SQE 提出索赔（03 §8 第 6 步）：供应商要在门户「确认索赔」，不通知就只能等他自己点开整改单。金额不写进通知（R5）
+  [
+    'claim',
+    `previous != null && has(record.claim_status) && record.claim_status == 'proposed' && !(has(previous.claim_status) && previous.claim_status == 'proposed')`,
+    'srm_scar_claim_proposed',
+    '提出索赔',
+  ],
   [
     'overdue',
     `previous != null && record.is_overdue == true && !(has(previous.is_overdue) && previous.is_overdue == true)`,
@@ -34,7 +41,7 @@ export const ScarSupplierNoticeFlow: Automation.Flow = {
     {
       id: 'start',
       type: 'start',
-      label: '整改单新建、退回、重开或逾期',
+      label: '整改单新建、退回、重开、提出索赔或逾期',
       config: {
         objectName: SOURCE,
         triggerType: 'record-after-write',

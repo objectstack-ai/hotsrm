@@ -3,6 +3,7 @@ import { bootStack, type VerifyStack } from '@objectstack/verify';
 import config from '../objectstack.config';
 import * as objects from '../src/core/objects';
 import { Supplier, SupplierApplication, SupplierBankAccount } from '../src/core/objects';
+import { Workbench } from '../src/core/apps/workbench.app';
 import { SrmPermissionSets } from '../src/core/security/permission-sets';
 import { SrmPositions } from '../src/core/security/positions';
 import { SrmSharingRules } from '../src/core/security/sharing-rules';
@@ -66,6 +67,24 @@ describe('internal permissions', () => {
 
   it('sets no internal permission set as the default', () => {
     expect(SrmPermissionSets.filter((set) => 'isDefault' in set)).toEqual([]);
+  });
+
+  // 内部菜单和内部经办动作只给内部岗位（05 §1）：门户岗位不持 srm_internal_access，内部岗位都持有
+  it('keeps the internal workbench capability on internal positions only', () => {
+    const holds = (position: (typeof SrmPositions)[number]) =>
+      position.permissionSets.some((name) =>
+        ((SrmPermissionSets.find((set) => set.name === name) as { systemPermissions?: string[] }).systemPermissions ?? []).includes('srm_internal_access'),
+      );
+    const portal = SrmPositions.filter((p) => p.name.startsWith('srm_portal_'));
+    expect(portal.length).toBeGreaterThan(0);
+    expect(portal.filter(holds).map((p) => p.name)).toEqual([]);
+    expect(SrmPositions.filter((p) => !p.name.startsWith('srm_portal_') && !holds(p)).map((p) => p.name)).toEqual([]);
+  });
+
+  it('shows every navigation group to either internal users or portal users, never both', () => {
+    const groups = (Workbench.navigation ?? []) as { id: string; type?: string; requiredPermissions?: string[] }[];
+    const ungated = groups.filter((g) => g.type === 'group' && !g.requiredPermissions?.some((p) => ['srm_internal_access', 'srm_portal_access'].includes(p)));
+    expect(ungated.map((g) => g.id)).toEqual([]);
   });
 
   it('mounts only permission sets that exist', () => {

@@ -31,4 +31,13 @@ export const VerifyCertificate = defineCapability({
   scope: 'org',
 });
 
-export const SrmCapabilities = [ViewBankAccountNo, PortalAccess, PortalManage, VerifyCertificate];
+// 内部工作台（v0.6）：内部菜单和内部专用按钮只显示给内部员工，门户用户看不到（05 §1）。只是体验：门户用户点进内部对象，
+// 能看到的行仍由门户 RLS 决定，权限集没授的对象答「无权访问」。平台管理员不持应用能力，同样看不到内部菜单，验收用 SRM 岗位账号
+export const InternalAccess = defineCapability({
+  name: 'srm_internal_access',
+  label: '使用内部工作台',
+  description: '看到 SRM 工作台的内部菜单与内部按钮（如银行账户「核验」）；内部岗位都持有，门户用户不持有',
+  scope: 'org',
+});
+
+export const SrmCapabilities = [ViewBankAccountNo, PortalAccess, PortalManage, VerifyCertificate, InternalAccess];

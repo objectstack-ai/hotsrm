@@ -15,13 +15,14 @@
 git clone https://github.com/objectstack-ai/hotsrm.git
 cd hotsrm
 pnpm install
-OS_AUTOMATION_SCHEDULED_WORK_ENABLED=true pnpm dev
+OS_AUTH_MEMBERSHIP_POLICY=invite-only OS_AUTOMATION_SCHEDULED_WORK_ENABLED=true pnpm dev
 ```
 
-Windows PowerShell：`$env:OS_AUTOMATION_SCHEDULED_WORK_ENABLED="true"; pnpm dev`
+Windows PowerShell：`$env:OS_AUTH_MEMBERSHIP_POLICY="invite-only"; $env:OS_AUTOMATION_SCHEDULED_WORK_ENABLED="true"; pnpm dev`
 
 看到 `Server is ready` 后保持这个窗口。数据库是 `.objectstack/data/objectstack.db`（sqlite），重启后数据还在。
 开关 `OS_AUTOMATION_SCHEDULED_WORK_ENABLED` 让证书到期扫描、整改逾期提醒等定时 flow 运行，不开也能用，只是定时任务不执行。
+`OS_AUTH_MEMBERSHIP_POLICY=invite-only` 是门户（v0.6）的前提：注册不自动入组织，供应商只能凭邀请进来（[04 §3.3](../design/04-security-and-portal.md#33-门户账号的开通与回收)）。不演示门户可以不设。
 
 ## 3. 建账号、导入样例数据
 
@@ -35,7 +36,7 @@ Windows PowerShell：`$env:HOTSRM_DEMO_PASSWORD="<自定密码>"; pnpm setup:loc
 
 脚本 [`scripts/setup-local.mjs`](../../scripts/setup-local.mjs) 用平台开发管理员（`objectstack dev` 在空库上种的账号，启动日志里会打印）调用接口：
 
-1. 每个岗位建一个账号 `<账号>@hotsrm.local`，见下表；
+1. 每个岗位建一个账号 `<账号>@hotsrm.local`，见下表，并加入组织（`invite-only` 下管理员建的账号不会自动入组织）；`srmadmin` 同时设为组织管理员，负责门户开通；
 2. 给三个演示品类（电子元器件、包装材料、工业品与备件）指派品类经理、SQE、采购员、评分人，审批和自动整改单按品类找人；
 3. 按 [样例导入表格](../../data/samples/README.md) 的顺序和匹配字段导入物料、存量供应商、联系人、证书、合同与明细、2026-09 交付记录（导入后自动开出 2 张整改单）；物料按物料号前缀关联到演示品类。
 
@@ -64,13 +65,21 @@ Windows PowerShell：`$env:HOTSRM_DEMO_PASSWORD="<自定密码>"; pnpm setup:loc
 
 平台开发管理员只用于 Setup，没有 SRM 岗位，看不到 SRM 菜单，验收不要用它。
 
-## 5. 常用操作
+## 5. 演示供应商门户（v0.6）
+
+1. 品类经理在「门户邀请」新建邀请（选已登记的供应商和联系人，门户管理员要附授权书），组织管理员 `srmadmin` 收到待办；
+2. `srmadmin` 打开组织成员页 http://localhost:3000/_console/organizations/default/members ，按邀请邮箱邀请为 `external`；
+3. 本地不发邮件：在组织的邀请页（`/_console/organizations/default/invitations`）查到邀请 ID，在无痕窗口打开
+   `http://localhost:3000/_console/register?redirect=%2Faccept-invitation%2F<邀请ID>`，用该邮箱注册并接受邀请（平台邀请 48 小时内有效）；
+4. `srmadmin` 回到门户邀请记录点「开通门户」，选刚接受邀请的用户；之后该用户登录只看到「供应商门户」导航组和本公司数据。
+
+## 6. 常用操作
 
 - 同时用两个岗位：一个普通窗口、一个无痕窗口各登一个账号
 - 从头再来：停掉 `pnpm dev`，删除 `.objectstack` 目录，重新启动后再运行一次 `pnpm setup:local`
 - 更新代码：`git pull && pnpm install`，已有数据保留
 
-## 6. 已知平台问题
+## 7. 已知平台问题
 
 | 现象 | 处理 | 跟踪 |
 |---|---|---|

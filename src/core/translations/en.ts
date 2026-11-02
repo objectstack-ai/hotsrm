@@ -422,6 +422,7 @@ export const en: TranslationData = {
         supplier_admissible: { message: 'Only a Potential or Eliminated supplier can apply for admission' },
         reviewer_before_review: { message: 'Assign a reviewer before the admission review' },
         audit_before_review: { message: 'A high-risk application needs an on-site audit that passed or conditionally passed before the admission review' },
+        return_reason_required: { message: 'Enter what the supplier needs to supplement when returning the application' },
         reject_reason_required: { message: 'Enter a reason when rejecting' },
       },
       fields: {
@@ -454,6 +455,7 @@ export const en: TranslationData = {
         approval_status: { label: 'Approval Result', options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' } },
         approved_date: { label: 'Approved Date' },
         reject_reason: { label: 'Rejection Reason' },
+        return_reason: { label: 'Return Reason' },
         supplement_note: { label: 'Supplement Note' },
       },
       _actions: { srm_application_resubmit: { label: 'Supplemented, Resubmit' } },

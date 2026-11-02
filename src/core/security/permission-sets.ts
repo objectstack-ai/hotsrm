@@ -47,6 +47,8 @@ export const InternalBasePermissionSet = {
     srm_performance_review: read,
     srm_performance_score: read,
   },
+  // 内部工作台的导航（体验，不是数据边界）：门户用户不持这项能力，看不到内部菜单
+  systemPermissions: ['srm_internal_access'],
 };
 
 const contractFieldsReadOnly = Object.fromEntries(Object.keys(Contract.fields).map((field) => [`srm_contract.${field}`, readOnly]));
@@ -320,6 +322,8 @@ export const AuditorPermissionSet = {
     srm_performance_review: read,
     srm_performance_score: read,
   },
+  // 内控 / 监标只挂这一个权限集，内部菜单也从这里授予
+  systemPermissions: ['srm_internal_access'],
 };
 
 export const SrmPermissionSets = [

@@ -55,6 +55,7 @@ export const PortalEnableAction = defineAction({
   target: 'srm_portal_enable',
   locations: ['record_header', 'list_item'],
   visible: P`record.status == 'sent'`,
+  requiredPermissions: ['srm_internal_access'],
   refreshAfter: true,
 });
 

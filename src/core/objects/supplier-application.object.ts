@@ -112,6 +112,8 @@ export const SupplierApplication = ObjectSchema.create({
     }),
     approved_date: Field.date({ label: '批准日期', group: 'review', readonly: true }),
     reject_reason: Field.textarea({ label: '未通过原因', group: 'review' }),
+    // 「退回补充」时品类经理写给供应商的退回意见：要补什么（v0.6）。门户可读，退回通知请供应商到门户查看
+    return_reason: Field.textarea({ label: '退回意见', group: 'review' }),
     // 「退回补充」后供应商在门户重新提交时写的补充说明（srm_application_resubmit，v0.6），只读
     supplement_note: Field.textarea({ label: '补充说明', group: 'review', readonly: true }),
   },
@@ -156,6 +158,14 @@ export const SupplierApplication = ObjectSchema.create({
       events: ['update'],
       message: '高风险品类的申请要有通过或有条件通过的现场审核，才能进入准入评审',
       condition: P`record.status == 'admission_review' && has(previous.status) && previous.status != 'admission_review' && has(record.risk_class) && record.risk_class == 'high' && record.audit_passed != true`,
+    },
+    {
+      // 退回补充要写明补什么：供应商看不到内部的讨论区，只能在申请上看到退回意见（v0.6）
+      name: 'return_reason_required',
+      type: 'script',
+      severity: 'error',
+      message: '退回补充时需要填写退回意见',
+      condition: P`record.status == 'returned' && (!has(record.return_reason) || record.return_reason == null || isBlank(record.return_reason))`,
     },
     {
       name: 'reject_reason_required',
