@@ -424,7 +424,7 @@ SQE、质量经理经共享规则 `srm_supplier_audit_edit_*` 改所有审核（
 可空：存量供应商批量邀请时填）、`company_name`、`contact_name`、`contact_email`、
 `token`（text，只读，flow 生成）、`expires_at`、`status`（`sent` / `accepted` / `expired` /
 `revoked`）、`application`（lookup，供应商接受邀请并提交申请后回填）、`invited_by`（user）。
-邀请注册是 v0.6 的默认注册方式（01 FR-202）；实现方式按 07 §6 V5 的结论。
+邀请注册是 v0.6 的默认注册方式（01 FR-202）；组织邀请本身由组织管理员在成员页发（flow 发不了，07 §6 V3），本对象记录邀请的业务信息和进度（04 §3.3）。
 
 ### 4.3 寻源（v0.7）
 
