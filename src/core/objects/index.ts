@@ -8,6 +8,7 @@ export { SupplierApplication } from './supplier-application.object.js';
 export { SupplierBankAccount } from './supplier-bank-account.object.js';
 export { SupplierChangeRequest } from './supplier-change-request.object.js';
 export { SupplierDisposition } from './supplier-disposition.object.js';
+export { SupplierInvitation } from './supplier-invitation.object.js';
 export { Material } from './material.object.js';
 export { Contract } from './contract.object.js';
 export { ContractLine } from './contract-line.object.js';

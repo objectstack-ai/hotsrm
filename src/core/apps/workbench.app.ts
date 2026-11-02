@@ -80,6 +80,8 @@ export const Workbench = App.create({
         { id: 'nav_bank_account', type: 'object', objectName: 'srm_supplier_bank_account', label: '银行账户', icon: 'landmark' },
         { id: 'nav_change_request', type: 'object', objectName: 'srm_supplier_change_request', label: '变更单', icon: 'file-pen' },
         { id: 'nav_disposition', type: 'object', objectName: 'srm_supplier_disposition', label: '处置单', icon: 'ban' },
+        { id: 'nav_invitation', type: 'object', objectName: 'srm_supplier_invitation', label: '门户邀请', icon: 'mail-plus' },
+        { id: 'nav_portal_accounts', type: 'object', objectName: 'srm_supplier_contact', viewName: 'portal_accounts', label: '门户账号', icon: 'key-round' },
       ],
     },
     {

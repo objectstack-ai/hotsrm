@@ -126,6 +126,7 @@ describe('internal permissions', () => {
         "srm_supplier_change_request": "RCE",
         "srm_supplier_contact": "RCED",
         "srm_supplier_disposition": "RCE",
+        "srm_supplier_invitation": "RCE",
       }
     `);
   });
@@ -181,6 +182,7 @@ describe('internal permissions', () => {
         "srm_supplier_change_request": "R",
         "srm_supplier_contact": "R",
         "srm_supplier_disposition": "R",
+        "srm_supplier_invitation": "R",
       }
     `);
   });
@@ -209,6 +211,7 @@ describe('internal permissions', () => {
         "srm_supplier_change_request": "R",
         "srm_supplier_contact": "R",
         "srm_supplier_disposition": "R",
+        "srm_supplier_invitation": "R",
       }
     `);
   });
@@ -238,6 +241,7 @@ describe('internal permissions', () => {
         "srm_supplier_change_request": "RCE",
         "srm_supplier_contact": "R",
         "srm_supplier_disposition": "R",
+        "srm_supplier_invitation": "RC",
       }
     `);
   });

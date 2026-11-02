@@ -29,6 +29,7 @@ const NOT_FOR_PORTAL: Record<string, string> = {
   srm_supplier_audit_finding: '跟随审核',
   srm_risk_event: '内部风险评估',
   srm_supplier_disposition: '内部处置决定，结果体现在供应商状态上',
+  srm_supplier_invitation: '内部的门户开通需求，门户经名册而不是邀请看到数据',
 };
 
 // controlled_by_parent 子对象的主记录字段
@@ -131,7 +132,7 @@ describe('portal isolation metadata (ADR-0010)', () => {
   it('makes every portal-facing system flow check the contact roster like the membership key', () => {
     const key = SupplierContact.membershipKeys!.portal_supplier_ids as { userField: string; valueField: string; filter: string };
     expect(key.filter).toBe('active == true');
-    for (const name of ['srm_claim_respond', 'srm_appeal_submit', 'srm_change_submit', 'srm_application_resubmit']) {
+    for (const name of ['srm_claim_respond', 'srm_appeal_submit', 'srm_change_submit', 'srm_application_resubmit', 'srm_application_submit']) {
       const flow = (config.flows ?? []).find((f) => f.name === name)!;
       expect(flow.runAs, name).toBe('system');
       const roster = flow.nodes.find((n) => n.id === 'load_membership') as { config: { objectName: string; filter: Row } } | undefined;
@@ -457,9 +458,11 @@ describe('portal isolation (04 §3.7)', () => {
     await stack.hooks.run('srm_performance_review', 'update', { id: own, published_date: today }, { system: true });
     await stack.hooks.run('srm_supplier_contact', 'update', { id: aAdmin.contact, active: false }, { system: true });
     expect((await run(aAdmin, 'srm_performance_review', 'srm_appeal_submit', own, { appeal_text: '停用后申诉' }))).toEqual(REFUSED);
+    // 停用同时清掉了 portal_user（srm_portal_contact_revoke），恢复在职后要重新登记名册（实际经「开通门户」，这里直接以系统身份写）
     await stack.hooks.run('srm_supplier_contact', 'update', { id: aAdmin.contact, active: true }, { system: true });
+    await stack.hooks.run('srm_supplier_contact', 'update', { id: aAdmin.contact, portal_user: aAdmin.id }, { system: true });
     expect((await stack.rows('srm_performance_review', { id: own }))[0]!.status).toBe('published');
-    // 对照：恢复在职后，本公司的考评单经按钮能申诉，说明上面的拒绝来自隔离检查而不是入口本身不通
+    // 对照：恢复在职并重新登记后，本公司的考评单经按钮能申诉，说明上面的拒绝来自隔离检查而不是入口本身不通
     expect((await run(aAdmin, 'srm_performance_review', 'srm_appeal_submit', own, { appeal_text: '示例申诉' })).status[0]).toBe('completed');
     expect((await stack.rows('srm_performance_review', { id: own }))[0]!).toMatchObject({ status: 'appealed', appeal_recorded_by: aAdmin.id });
   });
@@ -587,7 +590,11 @@ describe('portal isolation (04 §3.7)', () => {
     expect(idsOf(await list(c.token, 'srm_supplier'))).toEqual([B.supplier]);
     await stack.hooks.run('srm_supplier_contact', 'update', { id: c.contact, active: false }, { system: true });
     await expectNothing(c.token);
+    // 停用时 srm_portal_contact_revoke 同时清掉 portal_user：改回在职也不恢复门户访问，重新开通要走「开通门户」（04 §3.3）
+    expect((await stack.rows('srm_supplier_contact', { id: c.contact }))[0]!.portal_user ?? null).toBeNull();
     await stack.hooks.run('srm_supplier_contact', 'update', { id: c.contact, active: true }, { system: true });
+    await expectNothing(c.token);
+    await stack.hooks.run('srm_supplier_contact', 'update', { id: c.contact, portal_user: c.id }, { system: true });
     expect(idsOf(await list(c.token, 'srm_supplier'))).toEqual([B.supplier]);
     await stack.hooks.updateWhere('sys_user_position', { user_id: c.id, position: 'srm_portal_user' }, { active: false }, { system: true }).catch(() => 0);
     const [assignment] = await stack.rows('sys_user_position', { user_id: c.id, position: 'srm_portal_user' });

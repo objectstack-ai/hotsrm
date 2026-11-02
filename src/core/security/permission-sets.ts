@@ -75,6 +75,8 @@ export const BuyerPermissionSet = {
     // 其余字段 FLS 只读
     srm_contract: { ...read, allowEdit: true },
     srm_contract_line: read,
+    // 提出门户开通需求（04 §2.3、§3.3）：新建门户邀请，状态与开通结果只由 flow 写
+    srm_supplier_invitation: { ...write, allowEdit: false },
   },
   fields: {
     ...contractFieldsReadOnly,
@@ -110,6 +112,8 @@ export const SupplierAdminPermissionSet = {
     srm_supplier_disposition: write,
     // 登记与处理风险事件（04 §2.3，v0.5）；来源、相关证书、处置单只由 flow 写入（对象上的 readonly）
     srm_risk_event: write,
+    // 提出门户开通需求（04 §3.3）：开通本身由组织管理员运行「开通门户」；状态与开通结果只由 flow 写（对象上的 readonly）
+    srm_supplier_invitation: write,
   },
   // 银行账号完整可读（BR-20，04 §4.2）
   systemPermissions: ['srm_view_bank_account_no'],
@@ -193,6 +197,7 @@ export const ExecutivePermissionSet = {
     srm_contract: read,
     srm_contract_line: read,
     srm_supplier_disposition: read,
+    srm_supplier_invitation: read,
     srm_delivery_record: read,
     srm_quality_issue: read,
     srm_supplier_audit: read,
@@ -264,6 +269,8 @@ export const AdminPermissionSet = {
     // 删除错误生成的考评单（评分明细随之删除）后可补跑生成；删系统生成的记录要 modifyAllRecords，同交付记录
     srm_performance_review: { ...read, allowDelete: true, modifyAllRecords: true },
     srm_performance_score: { ...read, allowDelete: true },
+    // 组织管理员通常兼任 SRM 系统管理员：「开通门户」以操作人身份读门户邀请（04 §3.3）
+    srm_supplier_invitation: read,
   },
   fields: {
     'srm_supplier.status': flowOwned,
@@ -303,6 +310,7 @@ export const AuditorPermissionSet = {
     srm_contract: read,
     srm_contract_line: read,
     srm_supplier_disposition: read,
+    srm_supplier_invitation: read,
     srm_delivery_record: read,
     srm_quality_issue: read,
     srm_supplier_audit: read,

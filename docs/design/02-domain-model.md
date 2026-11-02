@@ -305,7 +305,7 @@ upsert 写入，结构不变。
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `application_no` | autonumber | `APP{YYYY}{00000}`，按年重置 |
-| `source` | select | `internal` 内部登记（v0.1 默认）/ `invited` 邀请（v0.6）/ `self_registered` 自助注册（待平台） |
+| `source` | select（只读） | `internal` 内部登记（默认）/ `invited` 邀请（v0.6，由「提交准入申请」写入）/ `self_registered` 自助注册（待平台，随公开表单加入） |
 | `company_name` | text | 必填 |
 | `country` | select | 必填，默认 `cn`，选项同供应商的 `srm_country` |
 | `credit_code` / `registration_no` | text | 规则同供应商：中国供应商填统一社会信用代码，境外供应商填当地注册号或税号 |
@@ -325,7 +325,7 @@ upsert 写入，结构不变。
 | `reviewer` | user | 初审人（品类经理） |
 | `review_escalated` | boolean | 只读，默认 false；初审人就是新建人或推进到准入评审的人时，`srm_admission_approval` 把品类经理一级上提给采购总监并写 true（03 §3 第 6 步） |
 | `sqe` | user | 负责审核的 SQE |
-| `supplier` | lookup → 供应商 | 品类经理把申请推进到「资料审核」时新建（或 `reapply` 时关联旧档）的供应商；`submitted` 阶段只有申请记录，不建主数据 |
+| `supplier` | lookup → 供应商 | 内部登记和邀请注册的申请新建时就关联已登记的供应商（邀请注册的供应商由品类经理在邀请前登记，04 §3.3）；公开表单的申请由品类经理推进到「资料审核」时新建（或 `reapply` 时关联旧档）供应商，`submitted` 阶段只有申请记录，不建主数据 |
 | `reject_reason` | textarea | |
 | `supplement_note` | textarea（只读） | 补充说明：「退回补充」后供应商在门户经「补充完成，重新提交」（`srm_application_resubmit`）写入（v0.6） |
 | `cycle_days` | number | 从提交到批准的天数，批准时由 flow 写入（准入周期指标） |
@@ -333,7 +333,8 @@ upsert 写入，结构不变。
 > v0.1（内部代录，见 [07 §1](./07-delivery-plan.md#1-分期路线图)）先实现一个子集：申请由内部人员为已登记的
 > 潜在或淘汰供应商发起，直接关联 `supplier`；申请品类用多值 lookup `applied_categories`（不经匿名表单，
 > 可以读品类对象）；不含现场审核分支和公司资料等表单字段；`approval_status` 记录审批节点的结论。
-> 本表其余字段随 v0.4（供应商审核）和 v0.6（门户、邀请注册）补齐。
+> v0.6 加 `source`：受邀供应商在门户经「提交准入申请」提交，申请同样预关联供应商、品类取自门户邀请，所以公司信息、
+> 联系人和附件仍在供应商档案、联系人和证书上，不在申请上。表中公司信息、执照、隐私同意等字段随公开表单（FR-201）加入。
 
 **`srm_supplier_audit` 供应商审核**（OWD `private`，内部读靠权限集的 `viewAllRecords`：年度计划由系统生成、SQE 之间要互相接手，
 SQE、质量经理经共享规则 `srm_supplier_audit_edit_*` 改所有审核（可改不可删，objectstack#25470 的裁定写法）；只有质量岗位有 `allowEdit`，删除不开放；v0.4）
@@ -422,11 +423,25 @@ SQE、质量经理经共享规则 `srm_supplier_audit_edit_*` 改所有审核（
 同一家供应商同时只能有一张审批中的处置单（读供应商的 `open_disposition_count`），免得两张单子审完后互相覆盖。
 淘汰和黑名单清掉冻结记录，是为了重新准入后再冻结、解冻时，不会把没有重新准入的品类恢复。
 
-**`srm_supplier_invitation` 门户邀请**（OWD `private`；v0.6）：`supplier`（lookup，
-可空：存量供应商批量邀请时填）、`company_name`、`contact_name`、`contact_email`、
-`token`（text，只读，flow 生成）、`expires_at`、`status`（`sent` / `accepted` / `expired` /
-`revoked`）、`application`（lookup，供应商接受邀请并提交申请后回填）、`invited_by`（user）。
-邀请注册是 v0.6 的默认注册方式（01 FR-202）；组织邀请本身由组织管理员在成员页发（flow 发不了，07 §6 V3），本对象记录邀请的业务信息和进度（04 §3.3）。
+**`srm_supplier_invitation` 门户邀请**（OWD `private`；v0.6）：品类经理、采购主管提出的门户开通需求（01 FR-202，04 §3.3）。
+组织邀请本身由组织管理员在成员页发（flow 发不了，07 §6 V3），门户访问只在「开通门户」写入联系人的 `portal_user` 后生效
+（ADR-0010），本对象记录邀请的业务信息和进度。门户不可见。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `invitation_no` | autonumber | `INV{YYYY}{00000}` |
+| `supplier` | lookup → 供应商 | 必填。门户只能经名册看到数据，没有供应商档案就无法隔离：新公司先登记为潜在供应商（2026-11-02 总监裁定）；黑名单供应商不得邀请 |
+| `contact` | lookup → 联系人 | 必填，须属于该供应商、在职、尚未开通门户 |
+| `contact_email` | email（只读） | 新建时由 `srm_invitation_send` 从联系人复制，组织管理员按它在成员页发邀请 |
+| `categories` | lookup → 品类（多值） | 申请品类。潜在、淘汰的供应商是**准入邀请**，必填，开通后供应商按这些品类提交准入申请；准入中、合格、冻结的供应商只开通门户，不填 |
+| `portal_admin` / `admin_authorization` | boolean / file | 授予门户管理员（默认 false）；勾选时授权书必填（GL-10 6.3.1 c） |
+| `notes` | textarea | |
+| `status` | select（只读，stageField） | `sent` 已发送 → `accepted` 已开通；`sent` → `expired` 已过期（`srm_invitation_expire_sweep`）；`sent` / `accepted` → `revoked` 已撤销（准入未通过、联系人停用、淘汰 / 黑名单） |
+| `expires_on` | date（只读） | 开通期限，新建日 + 14 天（示例，`srm_invitation_send` 写入） |
+| `portal_user` / `enabled_by` / `enabled_at` | user / user / datetime（只读） | 「开通门户」写入 |
+| `application` | lookup → 准入申请（只读） | 供应商在门户提交准入申请后回填 |
+
+原设计的 `company_name` / `contact_name`（从供应商、联系人带出）、`token`（组织邀请自带链接）、`invited_by`（即创建人）不建。
 
 ### 4.3 寻源（v0.7）
 

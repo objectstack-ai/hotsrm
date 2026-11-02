@@ -44,3 +44,30 @@ export const CertificateVerifyAction = defineAction({
   requiredPermissions: ['srm_verify_certificate'],
   refreshAfter: true,
 });
+
+// 门户邀请上的「开通门户」（04 §3.3 第 2 步）：组织管理员在成员页发出邀请、对方接受后运行。谁能开通由 flow 自己检查
+export const PortalEnableAction = defineAction({
+  name: 'srm_portal_enable',
+  label: '开通门户',
+  objectName: 'srm_supplier_invitation',
+  icon: 'key-round',
+  type: 'flow',
+  target: 'srm_portal_enable',
+  locations: ['record_header', 'list_item'],
+  visible: P`record.status == 'sent'`,
+  refreshAfter: true,
+});
+
+// 门户公司资料上的「提交准入申请」（03 §3 第 1 步，FR-202）：只对受邀的门户用户有效，flow 按调用者的名册行确定供应商
+export const ApplicationSubmitAction = defineAction({
+  name: 'srm_application_submit',
+  label: '提交准入申请',
+  objectName: 'srm_supplier',
+  icon: 'send',
+  type: 'flow',
+  target: 'srm_application_submit',
+  locations: ['record_header'],
+  visible: P`record.status == 'potential' || record.status == 'eliminated'`,
+  requiredPermissions: ['srm_portal_access'],
+  refreshAfter: true,
+});
