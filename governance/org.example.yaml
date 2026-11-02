@@ -21,6 +21,8 @@ dept:
   finance: 财务部
   legal: 法务部门
   oversight: 法务、审计、纪检监察部门
+  # 负责信息系统账号、认证配置与信息安全的部门；SRM 的组织管理员通常在这里
+  it: 信息技术部门
   audit: 审计部门
   warehouse: 仓储部门
   discipline: 监察部门

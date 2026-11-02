@@ -187,7 +187,7 @@ record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
   example: 3
-  used_in: [QP-01 第 8 章, QP-02 第 8 章, QP-03 第 8 章, QP-04 第 8 章, GL-01 第 8 章, GL-04 6.7.1, GL-06 第 8 章, GL-07 第 8 章, WI-01 第 8 章]
+  used_in: [QP-01 第 8 章, QP-02 第 8 章, QP-03 第 8 章, QP-04 第 8 章, GL-01 第 8 章, GL-04 6.7.1, GL-06 第 8 章, GL-07 第 8 章, GL-10 6.9.3, GL-10 第 8 章, WI-01 第 8 章]
   system: 制度要求
 
 contract_reminder_days:
