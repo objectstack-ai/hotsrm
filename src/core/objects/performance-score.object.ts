@@ -11,6 +11,8 @@ export const PerformanceScore = ObjectSchema.create({
   pluralLabel: '评分明细',
   icon: 'list-checks',
   sharingModel: 'controlled_by_parent',
+  // 列表搜索只扫评分说明：回避原因门户读不到，默认扫全部文本字段会让门户的搜索整体被拒（04 §4.2）
+  searchableFields: ['comment'],
 
   fields: {
     review: Field.masterDetail('srm_performance_review', {

@@ -1,5 +1,6 @@
 import { Supplier } from '../objects/supplier.object.js';
 import { SupplierBankAccount } from '../objects/supplier-bank-account.object.js';
+import { QualityIssue } from '../objects/quality-issue.object.js';
 
 // 门户权限集（04 §3.2、§3.4，ADR-0010）。门户用户按组织角色 external 邀请，任命到静态岗位 srm_portal_user
 // （门户管理员再加 srm_portal_admin）；能看哪家供应商只由成员键 current_user.portal_supplier_ids 决定，
@@ -17,6 +18,10 @@ const OWN = 'supplier in current_user.portal_supplier_ids';
 export const PortalContractStatuses = ['signing', 'active', 'expired', 'terminated'];
 // 门户能看到的考评单状态：发布后才可见；申诉只能对已发布的考评提起，申诉期间照常可见（04 §3.2）
 export const PortalReviewStatuses = ['published', 'appealed'];
+// 整改单：供应商能改的是轮到自己回复的单（待响应、已提交临时措施——SQE 看 D3 期间可以接着填 D4–D7）；改完只能
+// 停在供应商的两步上。状态怎么走由整改单 status 选项的门禁按操作人限定（只能 待响应 → 已提交临时措施 → 已提交根因与措施）
+export const PortalScarEditableStatuses = ['open', 'containment_submitted'];
+const PortalScarResultStatuses = ['open', 'containment_submitted', 'action_submitted'];
 const list = (values: string[]) => `[${values.map((v) => `'${v}'`).join(', ')}]`;
 
 const none = { allowCreate: false, allowRead: true, allowEdit: false, allowDelete: false, viewAllRecords: false, modifyAllRecords: false };
@@ -42,6 +47,28 @@ const supplierFields = Object.fromEntries(
     .map((field) => [`srm_supplier.${field}`, supplierHidden.has(field) ? hidden : readOnly]),
 );
 
+// 整改单：门户只能填供应商回复（D3–D7、证据）并推进状态；问题描述、SQE 意见、期限、索赔等一律只读（04 §3.2、§4.2）。
+// 索赔的接受 / 异议只经「确认索赔」screen flow（srm_claim_respond）
+const scarEditable = new Set(['containment_action', 'root_cause', 'corrective_action', 'preventive_action', 'evidence', 'status']);
+const scarFields = Object.fromEntries(
+  Object.keys(QualityIssue.fields)
+    .filter((field) => !scarEditable.has(field))
+    .map((field) => [`srm_quality_issue.${field}`, readOnly]),
+);
+
+// 绩效：门户看总分、维度得分、等级、评分明细的原始值、得分与说明（扣分项，FR-704）；评分人、回避改派、审定人与审定意见
+// 是内部评价过程，门户不可见（GL-05 回避要求，04 §4.2）
+const performanceHidden = [
+  'srm_performance_review.reviewer',
+  'srm_performance_review.review_comment',
+  'srm_performance_review.appeal_handled_by',
+  'srm_performance_score.scorer',
+  'srm_performance_score.reassigned_from',
+  'srm_performance_score.reassigned_by',
+  'srm_performance_score.reassign_reason',
+  'srm_performance_score.reassigned_date',
+];
+
 // 证书：门户上传新证书；状态、强制标志、核验结论只由 flow 与「核验证书」写入（防止自解资质异常，04 §3.7）
 const certificateFlowOwned = ['status', 'is_mandatory', 'verified', 'legacy_imported'];
 const certificateFields = Object.fromEntries(certificateFlowOwned.map((field) => [`srm_supplier_certificate.${field}`, readOnly]));
@@ -61,7 +88,8 @@ export const PortalSupplierPermissionSet = {
     srm_contract: none,
     srm_contract_line: none,
     srm_delivery_record: none,
-    srm_quality_issue: none,
+    // 授予编辑权是为了供应商回复；能改哪些行由 srm_portal_quality_issue_write 限定，其余字段 FLS 只读
+    srm_quality_issue: { ...none, allowEdit: true },
     srm_performance_review: none,
     srm_performance_score: none,
   },
@@ -71,8 +99,8 @@ export const PortalSupplierPermissionSet = {
     // 联系人：在职标志也是成员键的过滤条件，门户不能自己恢复一个被停用的账号
     'srm_supplier_contact.active': readOnly,
     'srm_supplier_contact.mobile': readOnly,
-    'srm_quality_issue.sqe_comment': readOnly,
-    'srm_quality_issue.claim_amount': readOnly,
+    ...scarFields,
+    ...Object.fromEntries(performanceHidden.map((field) => [field, hidden])),
   },
   rowLevelSecurity: [
     { name: 'srm_portal_supplier_read', object: 'srm_supplier', operation: 'select', using: 'id in current_user.portal_supplier_ids' },
@@ -93,6 +121,13 @@ export const PortalSupplierPermissionSet = {
     },
     { name: 'srm_portal_delivery_read', object: 'srm_delivery_record', operation: 'select', using: OWN },
     { name: 'srm_portal_quality_issue_read', object: 'srm_quality_issue', operation: 'select', using: OWN },
+    {
+      name: 'srm_portal_quality_issue_write',
+      object: 'srm_quality_issue',
+      operation: 'update',
+      using: `${OWN} && status in ${list(PortalScarEditableStatuses)}`,
+      check: `${OWN} && status in ${list(PortalScarResultStatuses)}`,
+    },
     {
       name: 'srm_portal_review_read',
       object: 'srm_performance_review',

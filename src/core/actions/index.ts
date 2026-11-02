@@ -4,3 +4,4 @@ export { ContractSubmitAction, ContractActivateAction } from './contract.actions
 export { AuditFindingToScarAction } from './audit.actions.js';
 export { DispositionSubmitAction, DispositionCancelAction } from './disposition.actions.js';
 export { ScoreSubmitAction, PerformanceVoidAction, AppealSubmitAction, AppealResolveAction, ScoreReassignAction } from './performance.actions.js';
+export { ClaimRespondAction } from './quality-issue.actions.js';

@@ -4,7 +4,7 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 // 指标建评分明细并快照权重，从交付记录算出 OTD、批次合格率、PPM 与对应得分后转人工评分（scoring）。本期没有交付记录、
 // 某项自动指标没有数据时标记「数据不全」，该项不给分（07 R7）。v0.5 P3：评分人经「提交评分」打分，截止后缺评取默认分
 // （srm_score_overdue_sweep）→ 审定中：srm_performance_publish 汇总分级并交采购总监审定，通过即发布并回写供应商等级，
-// 驳回即退回重评 → 发布后可代录申诉一次（srm_appeal_submit），采购总监处理（srm_appeal_resolve）后回到已发布。
+// 驳回即退回重评 → 发布后可申诉一次（srm_appeal_submit：门户管理员提交，或内部代录），采购总监处理（srm_appeal_resolve）后回到已发布。
 // 全部字段由 flow 写入，对用户只读。
 // 同一供应商同一期间只有一张考评单（唯一索引兜底，flow 先查后建，重复运行不重复建）。
 // 门户只看本公司已发布（含申诉中）的考评单，按 supplier 读成员键隔离（04 §3.2，ADR-0010）。
@@ -18,6 +18,8 @@ export const PerformanceReview = ObjectSchema.create({
   enable: { trackHistory: true },
   stageField: 'status',
   nameField: 'review_no',
+  // 列表搜索只扫这几个门户也能读的字段：默认会扫全部文本字段，门户读不到的审定意见会让门户的搜索整体被拒（04 §4.2）
+  searchableFields: ['review_no', 'period', 'cycle', 'status', 'grade'],
 
   fieldGroups: [
     { key: 'basic', label: '基本信息', icon: 'award' },
@@ -116,10 +118,10 @@ export const PerformanceReview = ObjectSchema.create({
     review_comment: Field.textarea({ label: '审定意见', group: 'scores', readonly: true, maxLength: 2000 }),
     published_date: Field.date({ label: '发布日期', group: 'scores', readonly: true }),
 
-    // 申诉（03 §10 第 7 步，FR-706）：发布后 perf_appeal_days 内一次；v0.6 前由采购代录
+    // 申诉（03 §10 第 7 步，FR-706）：发布后 perf_appeal_days 内一次；供应商门户管理员提交，没开通门户的由采购代录
     appeal_reason: Field.textarea({ label: '申诉理由', group: 'appeal', readonly: true, maxLength: 2000 }),
     appeal_date: Field.date({ label: '申诉日期', group: 'appeal', readonly: true }),
-    appeal_recorded_by: Field.user({ label: '申诉代录人', group: 'appeal', readonly: true }),
+    appeal_recorded_by: Field.user({ label: '申诉提交人', group: 'appeal', readonly: true }),
     appeal_result: Field.textarea({ label: '申诉处理结果', group: 'appeal', readonly: true, maxLength: 2000 }),
     appeal_outcome: Field.select({
       label: '申诉结论',
