@@ -306,6 +306,7 @@ upsert 写入，结构不变。
 |---|---|---|
 | `application_no` | autonumber | `APP{YYYY}{00000}`，按年重置 |
 | `source` | select（只读） | `internal` 内部登记（默认）/ `invited` 邀请（v0.6，由「提交准入申请」写入）/ `self_registered` 自助注册（待平台，随公开表单加入） |
+| `contact` | lookup → `srm_supplier_contact`（只读） | 申请联系人（v0.6 U6）：门户提交时由「提交准入申请」写入提交人在名册上的联系人，受理、退回补充、通过、未通过的通知发给它在名册上的门户账号；内部登记的申请为空 |
 | `company_name` | text | 必填 |
 | `country` | select | 必填，默认 `cn`，选项同供应商的 `srm_country` |
 | `credit_code` / `registration_no` | text | 规则同供应商：中国供应商填统一社会信用代码，境外供应商填当地注册号或税号 |

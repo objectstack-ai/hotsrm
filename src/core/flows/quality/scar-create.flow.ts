@@ -5,7 +5,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // 新建和修改都看（月度导入是 upsert，第二遍导入可能把「合格」改成「不合格」），只在「变成」主要 / 严重不合格时开单；
 // 同一条交付记录已有整改单时不再开，重复导入不重复开单（03 §2.3 R2）。次要不合格只计入绩效，不开单。
 // 负责 SQE 取物料品类的 SQE；品类没有 SQE 时通知质量经理指派。期限由整改单字段的默认值按参数算好。
-// 供应商 quality 联系人的通知等 objectstack#25444 或 v0.6 门户上线后再加。
+// 供应商 quality 联系人的通知在 srm_scar_supplier_notice（v0.6 U6）。
 const qualifying = (r: string) => `${r}.inspection_result == 'fail' && (${r}.severity == 'critical' || ${r}.severity == 'major')`;
 
 export const ScarCreateFlow: Automation.Flow = {

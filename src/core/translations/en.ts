@@ -429,6 +429,7 @@ export const en: TranslationData = {
         supplier: { label: 'Supplier' },
         applied_categories: { label: 'Applied Categories' },
         source: { label: 'Source', options: { internal: 'Internal Registration', invited: 'Invitation' } },
+        contact: { label: 'Applicant Contact' },
         status: {
           label: 'Status',
           options: {

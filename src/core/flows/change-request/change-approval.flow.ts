@@ -14,6 +14,24 @@ const snapshotOf = (v: string, keys: string[]) => ({
   source: `{${keys.map((k) => `'${k}': has(${v}.${k}) ? ${v}.${k} : null`).join(', ')}}`,
 });
 
+// 发起人是门户用户（门户管理员经 srm_change_submit 提交）时，结果由 srm_change_supplier_notice 以中英文模板发给供应商的
+// 门户管理员，这里不再发内部措辞的通知（v0.6 U6）
+const portalCreator = (key: string): Automation.FlowNode[] => [
+  {
+    id: `${key}_creator`,
+    type: 'get_record',
+    label: '发起人是门户用户？',
+    config: { objectName: 'sys_user_position', filter: { user_id: cel`record.created_by`, position: 'srm_portal_user' }, outputVariable: `${key}PortalCreator` },
+  },
+  { id: `${key}_internal`, type: 'decision', label: '内部发起？' },
+];
+const portalCreatorEdges = (key: string, from: string, notify: string): Automation.FlowEdge[] => [
+  { id: `e_${key}_creator`, source: from, target: `${key}_creator`, type: 'default' },
+  { id: `e_${key}_check`, source: `${key}_creator`, target: `${key}_internal`, type: 'default' },
+  { id: `e_${key}_internal`, source: `${key}_internal`, target: notify, type: 'conditional', condition: { dialect: 'cel', source: `${key}PortalCreator == null` }, label: '内部' },
+  { id: `e_${key}_portal`, source: `${key}_internal`, target: 'end', type: 'conditional', condition: { dialect: 'cel', source: `${key}PortalCreator != null` }, label: '门户' },
+];
+
 const approval = (label: string, position: string) => ({
   type: 'approval' as const,
   label,
@@ -180,6 +198,7 @@ export const ChangeApprovalFlow: Automation.Flow = {
       label: '写回档案',
       config: { flowName: 'srm_change_apply', input: { recordId: cel`record.id` } },
     },
+    ...portalCreator('applied'),
     {
       id: 'notify_applied',
       type: 'notify',
@@ -209,6 +228,7 @@ export const ChangeApprovalFlow: Automation.Flow = {
         },
       },
     },
+    ...portalCreator('rejected'),
     {
       id: 'notify_rejected',
       type: 'notify',
@@ -323,12 +343,12 @@ export const ChangeApprovalFlow: Automation.Flow = {
     { id: 'e_f_again', source: 'finance_self', target: 'finance_review', type: 'back', label: '重新复核' },
     { id: 'e_f_next', source: 'record_finance', target: 'apply', type: 'default' },
 
-    { id: 'e_applied', source: 'apply', target: 'notify_applied', type: 'default' },
+    ...portalCreatorEdges('applied', 'apply', 'notify_applied'),
     { id: 'e_applied_end', source: 'notify_applied', target: 'end', type: 'default' },
 
     { id: 'e_p_rejected', source: 'purchase_reject_action', target: 'mark_rejected', type: 'default' },
     { id: 'e_f_rejected', source: 'finance_reject_action', target: 'mark_rejected', type: 'default' },
-    { id: 'e_rejected', source: 'mark_rejected', target: 'notify_rejected', type: 'default' },
+    ...portalCreatorEdges('rejected', 'mark_rejected', 'notify_rejected'),
     { id: 'e_rejected_end', source: 'notify_rejected', target: 'end', type: 'default' },
 
     { id: 'e_resubmit', source: 'revise_window', target: 'purchase_review', type: 'back', label: 'resubmit' },

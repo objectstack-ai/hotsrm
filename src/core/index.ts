@@ -16,6 +16,7 @@ import {
   DeliveryScorecardReport,
 } from './analytics/index.js';
 import * as translations from './translations/index.js';
+import { SrmEmailTemplates } from './notifications/index.js';
 import { SrmSeedData } from './data/index.js';
 import { SrmPermissionSets } from './security/permission-sets.js';
 import { SrmPositions } from './security/positions.js';
@@ -53,6 +54,8 @@ export default defineStack({
   permissions: SrmPermissionSets,
   positions: SrmPositions,
   sharingRules: SrmSharingRules,
+  // 供应商侧通知的中英文模板（05 §5，v0.6 U6）：notify 节点按模板名引用，邮件和站内信按收件人语言渲染
+  emailTemplates: SrmEmailTemplates,
 
   i18n: {
     defaultLocale: 'zh-CN',

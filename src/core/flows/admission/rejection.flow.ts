@@ -2,11 +2,13 @@ import { P, cel } from '@objectstack/spec';
 import type * as Automation from '@objectstack/spec/automation';
 import { loadOrgAdmins, notifyOrgAdmins } from '../portal/org-admins.js';
 import { clearPortalUsers, revokeInvitations } from '../portal/revoke.js';
+import { loadRoster, notifySupplier, rosterContact } from '../portal/supplier-notice.js';
 
 // P1 步骤 8（03 §3）：申请未通过，供应商从「准入中」退回——普通申请回「潜在」，
 // 重新准入（reapply）的旧档回「淘汰」。黑名单申请在受理时就已驳回，供应商一直是黑名单，不动。
 // v0.6 起同时回收门户账号：清掉该供应商全部联系人上的 portal_user，门户邀请撤销，有门户账号时通知组织管理员撤销
 // 门户岗位任命并移出组织（04 §3.3）。再申请要重新邀请、重新开通。
+// 回收前先通知申请联系人「准入申请未通过」（v0.6 U6）：回收后名册上就没有他了，所以这一条不放在 srm_application_supplier_notice 里。
 export const AdmissionRejectionFlow: Automation.Flow = {
   name: 'srm_admission_rejection',
   label: '准入未通过',
@@ -44,6 +46,20 @@ export const AdmissionRejectionFlow: Automation.Flow = {
       label: '有门户账号？',
       config: { objectName: 'srm_supplier_contact', filter: { supplier: cel`record.supplier`, portal_user: { $ne: null } }, outputVariable: 'portalContact' },
     },
+    {
+      id: 'load_vendor_name',
+      type: 'get_record',
+      label: '读取供应商名称',
+      config: { objectName: 'srm_supplier', filter: { id: cel`record.supplier` }, fields: ['name'], outputVariable: 'vendor' },
+    },
+    loadRoster('record.supplier'),
+    notifySupplier('notify_applicant', '通知申请联系人：未通过', {
+      recipients: `has(record.contact) && record.contact != null ? ${rosterContact('record.contact')} : []`,
+      template: 'srm_application_rejected',
+      data: { no: 'record.application_no', supplier: `vendor != null ? vendor.name : '-'`, path: `'/srm_supplier_application/' + record.id` },
+      sourceObject: 'srm_supplier_application',
+      sourceId: 'record.id',
+    }),
     clearPortalUsers('revoke_portal', '回收门户账号', { supplier: cel`record.supplier` }),
     revokeInvitations('revoke_invitations', { supplier: cel`record.supplier` }),
     { id: 'had_portal', type: 'decision', label: '需要通知组织管理员？' },
@@ -83,7 +99,10 @@ export const AdmissionRejectionFlow: Automation.Flow = {
     },
     { id: 'e2', source: 'supplier_eliminated', target: 'load_portal', type: 'default' },
     { id: 'e3', source: 'supplier_potential', target: 'load_portal', type: 'default' },
-    { id: 'e4', source: 'load_portal', target: 'revoke_portal', type: 'default' },
+    { id: 'e4', source: 'load_portal', target: 'load_vendor_name', type: 'default' },
+    { id: 'e4a', source: 'load_vendor_name', target: 'load_roster', type: 'default' },
+    { id: 'e4b', source: 'load_roster', target: 'notify_applicant_guard', type: 'default' },
+    { id: 'e4c', source: 'notify_applicant_guard', target: 'revoke_portal', type: 'default' },
     { id: 'e5', source: 'revoke_portal', target: 'revoke_invitations', type: 'default' },
     { id: 'e6', source: 'revoke_invitations', target: 'had_portal', type: 'default' },
     { id: 'e_had', source: 'had_portal', target: 'load_vendor', type: 'conditional', condition: P`portalContact != null`, label: '有门户账号' },
