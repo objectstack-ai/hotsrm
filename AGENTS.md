@@ -27,9 +27,11 @@ hotsrm 是基于 [ObjectStack](https://github.com/objectstack-ai/objectstack) �
 1. **只用元数据**（[ADR-0001](./docs/adr/0001-declarative-only.md)）：业务规则不得依赖生命周期
    钩子、插件或服务端函数。平台本身有沙箱钩子，但本仓库不用：托管云可以关闭应用包
    代码，依赖它们的规则会静默失效。例外只能按包写新的 ADR。
-2. **供应商之间零可见**（[ADR-0003](./docs/adr/0003-portal-isolation-by-supplier-position.md)）：
-   - 新增面向供应商的顶层对象，必须同时有 `portal_position` 字段、前缀校验规则、门户 RLS
-     和隔离测试；
+2. **供应商之间零可见**（[ADR-0010](./docs/adr/0010-portal-isolation-by-membership-key.md)）：
+   - 新增面向供应商的顶层对象，必须同时有 `supplier` 引用（或能经主记录追溯到供应商）、
+     门户权限集上读成员键 `current_user.portal_supplier_ids` 的 RLS、OWD 为 `private` 时只授
+     门户岗位的读共享规则，以及隔离测试；
+   - 联系人上的 `portal_user` 只由 flow 写入，不得对任何岗位开放编辑；
    - 内部权限集一律不设 `isDefault`；
    - 不得删除或跳过隔离测试。
 3. **封标**（[ADR-0004](./docs/adr/0004-sealed-bid.md)）：任何能读到报价的权限集、报表、视图

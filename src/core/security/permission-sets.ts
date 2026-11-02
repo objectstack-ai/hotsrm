@@ -2,6 +2,7 @@ import { Supplier } from '../objects/supplier.object.js';
 import { Contract } from '../objects/contract.object.js';
 import { QualityIssue } from '../objects/quality-issue.object.js';
 import { PerformanceReview } from '../objects/performance-review.object.js';
+import { SrmPortalPermissionSets } from './portal-permission-sets.js';
 
 // 内部权限集（04 §2.2）的 v0.1 子集。一律不设 isDefault（AGENTS.md 红线 2）。
 // 状态类字段（供应商状态、资质异常、证书状态）只由 flow 写入，权限集里一律只读。
@@ -323,4 +324,5 @@ export const SrmPermissionSets = [
   LegalPermissionSet,
   AuditorPermissionSet,
   AdminPermissionSet,
+  ...SrmPortalPermissionSets,
 ];

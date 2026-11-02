@@ -7,6 +7,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // - 解冻：只恢复同一范围冻结的资格（全部解冻恢复「全部品类」冻结的，指定品类解冻恢复所选品类中
 //   「指定品类」冻结的），原本就暂停的资格不动；全部品类时供应商→合格；
 // - 淘汰 / 拉入黑名单：供应商→淘汰 / 黑名单，品类资格全部暂停并清掉冻结记录，重新准入时按申请品类恢复；
+//   同时清掉该供应商联系人上的门户账号，门户访问在下一个请求就失效（ADR-0010，04 §3.3）；重新准入后要再开通门户；
 // - 解除黑名单：供应商→淘汰，之后只能重新走准入（FR-208）。
 // 拉入黑名单同时写供应商的黑名单名录字段（拉黑日期、禁入期满日、处置单、原因，v0.5）。禁入期限取
 // params/core.yaml 的 blacklist_years（示例 5 年），客户改参数时同步 BLACKLIST_YEARS。
@@ -59,6 +60,19 @@ const suspendAll = (id: string) => ({
   },
 });
 
+// 撤销门户访问（ADR-0010）：成员键只认联系人上的 portal_user，清掉它就不再放行任何行；组织成员身份由管理员移除
+const revokePortal = (id: string) => ({
+  id,
+  type: 'update_record' as const,
+  label: '撤销门户访问',
+  config: {
+    objectName: 'srm_supplier_contact',
+    filter: { supplier: cel`disp.supplier`, portal_user: { $ne: null } },
+    multi: true,
+    fields: { portal_user: null },
+  },
+});
+
 export const DispositionApplyFlow: Automation.Flow = {
   name: 'srm_disposition_apply',
   label: '执行供应商处置',
@@ -101,6 +115,7 @@ export const DispositionApplyFlow: Automation.Flow = {
       blacklist_reason: cel`disp.reason`,
     }),
     suspendAll('suspend_all'),
+    revokePortal('revoke_portal'),
     setSupplier('remove_blacklist_supplier', '解除黑名单（转为淘汰）', 'eliminated'),
 
     {
@@ -168,7 +183,8 @@ export const DispositionApplyFlow: Automation.Flow = {
     { id: 'e_el1', source: 'eliminate_supplier', target: 'suspend_all', type: 'default' },
     { id: 'e_blacklist', source: 'by_action', target: 'blacklist_supplier', type: 'conditional', condition: P`disp.action == 'blacklist'`, label: '拉入黑名单' },
     { id: 'e_bl1', source: 'blacklist_supplier', target: 'suspend_all', type: 'default' },
-    { id: 'e_suspended', source: 'suspend_all', target: 'done', type: 'default' },
+    { id: 'e_suspended', source: 'suspend_all', target: 'revoke_portal', type: 'default' },
+    { id: 'e_revoked', source: 'revoke_portal', target: 'done', type: 'default' },
     {
       id: 'e_remove_blacklist',
       source: 'by_action',

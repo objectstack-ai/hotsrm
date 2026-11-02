@@ -45,7 +45,7 @@ hotsrm 附带一套供应商管理体系文件模板（程序文件、管理办�
 - **记结论、不记过程**：订单到付款留在 ERP，SRM 用导入的交付记录算绩效，预留集成点
   （[ADR-0008](./docs/adr/0008-order-to-pay-stays-in-erp.md)）。
 - **供应商之间零可见**：门户按供应商隔离，取不到隔离依据时一行也不放行
-  （[ADR-0003](./docs/adr/0003-portal-isolation-by-supplier-position.md)）。
+  （[ADR-0010](./docs/adr/0010-portal-isolation-by-membership-key.md)）。
 - **封标**：开标前，内部任何角色（包括 AI 助手）都读不到报价
   （[ADR-0004](./docs/adr/0004-sealed-bid.md)）。
 - **流程即 flow**：单据状态是对象上的字段，审批是 flow 节点，审批历史由平台保存。

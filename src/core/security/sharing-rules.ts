@@ -1,6 +1,7 @@
 import { P } from '@objectstack/spec';
 import { defineSharingRule } from '@objectstack/spec/security';
 import { SrmPositions } from './positions.js';
+import { PortalContractStatuses } from './portal-permission-sets.js';
 
 // 共享规则：对象 OWD 保持 public_read（或 private）时，让某个岗位能改别人建的记录而不能删（objectstack#25470 的裁定写法）。
 // 对象权限仍要有 allowEdit，共享只放宽「哪些行」，不放宽「哪些动作」；能改哪些字段仍由 allowEdit 与 FLS 决定。
@@ -88,6 +89,31 @@ export const RiskEventEditRules = editRules('srm_risk_event', P`record.descripti
   'srm_quality_manager',
 ]);
 
+// 门户读（v0.6，ADR-0010）：external 成员对 private 对象只能读自己拥有的和共享给它的行，门户 RLS 解除不了这个下限，
+// 所以准入申请、变更单、合同各有一条只授 srm_portal_user 的读共享规则。共享规则本身放给全体门户用户，行范围由
+// srm_portal_supplier 上读成员键的 RLS 限定到本公司——两把锁缺一不可，test/portal-isolation.test.ts 守着这一点。
+// 合同只共享门户可见的状态（04 §3.2），草稿与审批中的合同连共享都不进
+const portalRead = (object: string, condition: Condition, label: string) =>
+  defineSharingRule({
+    name: `${object}_portal_read`,
+    label,
+    object,
+    type: 'criteria',
+    condition,
+    accessLevel: 'read',
+    sharedWith: { type: 'position', value: 'srm_portal_user' },
+  });
+
+export const PortalReadRules = [
+  portalRead('srm_supplier_application', P`record.supplier != ''`, '门户查看本公司准入申请'),
+  portalRead('srm_supplier_change_request', P`record.supplier != ''`, '门户查看本公司变更单'),
+  portalRead(
+    'srm_contract',
+    { dialect: 'cel', source: `record.status in [${PortalContractStatuses.map((s) => `'${s}'`).join(', ')}]` },
+    '门户查看本公司合同',
+  ),
+];
+
 export const SrmSharingRules = [
   KpiDirectorEdit,
   ...SupplierEditRules,
@@ -96,4 +122,5 @@ export const SrmSharingRules = [
   ...QualityIssueEditRules,
   ...SupplierAuditEditRules,
   ...RiskEventEditRules,
+  ...PortalReadRules,
 ];

@@ -26,7 +26,7 @@ export const SupplierAudit = ObjectSchema.create({
   icon: 'clipboard-list',
   // 读靠权限集的 viewAllRecords。年度计划由系统生成，SQE 之间要互相接手：质量岗位改别人建的审核靠按岗位授 edit 的
   // 共享规则 srm_supplier_audit_edit_*（可改不可删，objectstack#25470 的裁定写法）；只有质量岗位有 allowEdit。
-  // 审核记录不对供应商开放，门户上线后也不加 portal_position
+  // 审核记录不对供应商开放：门户权限集不授予本对象（04 §3.2）
   sharingModel: 'private',
   enable: { trackHistory: true },
   stageField: 'status',

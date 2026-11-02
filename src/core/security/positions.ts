@@ -19,4 +19,12 @@ export const SrmPositions = [
   // 内控 / 监标：只挂 srm_auditor（已含全部 SRM 对象只读）；淘汰、黑名单的会签审批由 flow 授予
   { name: 'srm_procurement_compliance', label: '内控 / 监标', permissionSets: ['srm_auditor'] },
   { name: 'srm_admin', label: 'SRM 系统管理员', permissionSets: ['srm_internal_base', 'srm_admin'] },
+  // 门户岗位（v0.6，ADR-0010）：全体门户用户共用这两个静态岗位，不再每家供应商建一个。门户用户按组织角色 external
+  // 邀请，任命到 srm_portal_user；本公司门户管理员再任命到 srm_portal_admin。能看哪家供应商只由联系人上的
+  // portal_user 决定（成员键 portal_supplier_ids），内部员工不任命到这两个岗位
+  { name: 'srm_portal_user', label: '供应商门户用户', permissionSets: ['srm_portal_supplier'] },
+  { name: 'srm_portal_admin', label: '供应商门户管理员', permissionSets: ['srm_portal_admin'] },
 ];
+
+// 门户岗位：共享规则只把 private 对象放给 srm_portal_user，行范围再由门户 RLS 限定到本公司
+export const SrmPortalPositions = ['srm_portal_user', 'srm_portal_admin'];

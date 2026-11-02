@@ -18,7 +18,7 @@ export const QualityIssue = ObjectSchema.create({
   icon: 'clipboard-x',
   // 自动开的整改单属于系统，SQE 之间要互相接手：质量岗位与应付会计改别人建的单靠按岗位授 edit 的共享规则
   // srm_quality_issue_edit_*（可改不可删，objectstack#25470 的裁定写法）；能改哪些字段由 allowEdit 与 FLS 决定。
-  // portal_position 与门户 RLS 在 v0.6 加（ADR-0003）
+  // 门户按 supplier 读成员键隔离（ADR-0010，src/core/security/portal-permission-sets.ts）
   sharingModel: 'public_read',
   enable: { trackHistory: true },
   stageField: 'status',

@@ -166,6 +166,7 @@ export const en: TranslationData = {
         email: { label: 'Email' },
         is_primary: { label: 'Primary Contact' },
         active: { label: 'Active' },
+        portal_user: { label: 'Portal Account' },
       },
     },
     srm_supplier_certificate: {

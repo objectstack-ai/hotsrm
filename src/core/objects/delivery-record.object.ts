@@ -16,7 +16,7 @@ export const DeliveryRecord = ObjectSchema.create({
   label: '交付记录',
   pluralLabel: '交付记录',
   icon: 'truck',
-  // 内部只读，录入经 srm_quality / srm_iqc，删除只给 srm_admin；portal_position 与门户 RLS 在 v0.6 加（ADR-0003）
+  // 内部只读，录入经 srm_quality / srm_iqc，删除只给 srm_admin；门户按 supplier 读成员键隔离（ADR-0010）
   sharingModel: 'public_read',
   nameField: 'erp_order_no',
 
