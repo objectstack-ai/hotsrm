@@ -85,14 +85,20 @@
 
 v0.1 只有内部登记：品类经理在工作台新建准入申请（`source = internal`），下图中的公开
 表单、开通门户、门户补资料三步跳过，`reviewer` 默认取创建人所在品类的品类经理。v0.6 起
-受邀供应商在门户填申请（`source = invited`）；公开表单（`self_registered`）待平台
+受邀供应商在门户提交申请（`source = invited`）：品类经理先登记潜在供应商和联系人，再建门户邀请并填申请品类，
+组织管理员开通门户后，供应商补齐资料，在门户的公司资料上点「提交准入申请」，品类由邀请带入（2026-11-02 总监裁定，
+01 FR-202）；公开表单（`self_registered`）待平台
 （01 FR-201），只收文字信息，附件在供应商注册账户、登录门户后上传。现场审核对象随 v0.4 加入，审核结论由 flow 写回申请。
 
 内部登记时申请直接关联已登记的供应商（身份标识已由供应商上的唯一约束查重），所以 v0.3 的受理
 flow 按所关联供应商的状态写 `duplicate_check`：`potential` → `pass`；`eliminated` → `reapply`；
 `blacklisted` → 申请直接 `rejected` 并通知申请人，供应商状态不动；其他状态在新建申请时就被校验规则
-`supplier_admissible` 拦下，不会出现 `duplicate`。步骤 2「建档」与 `srm_application_accept` 随门户申请
-（v0.6）加入，之前受理时供应商直接进入 `qualifying`、申请进入 `doc_review`。重新准入批准后按本次申请
+`supplier_admissible` 拦下，不会出现 `duplicate`。受邀申请与内部登记一样预关联供应商，受理照旧（`eliminated` →
+`reapply` 是重新准入 FR-208 的门户路径）。步骤 2「建档」与 `srm_application_accept` 不随 v0.6 加入，留给公开表单
+（FR-201）；之前受理时供应商直接进入 `qualifying`、申请进入 `doc_review`。
+
+受邀申请由系统身份建（门户不授准入申请的新建权），所以受理、退回补充、批准、未通过的「通知申请人」发给该供应商
+开通了门户的联系人（`portal_user`），不发给 `created_by`；随 v0.6 U6 供应商通知（#82）实现。重新准入批准后按本次申请
 品类恢复或新建品类资格，没再申请的品类保持淘汰时的 `suspended`。
 
 ```mermaid
@@ -130,14 +136,14 @@ sequenceDiagram
 
 | 步骤 | 触发 | 自动化 / 人工动作 |
 |---|---|---|
-| 1 受理 | 申请创建（v0.1 内部登记；v0.6 受邀供应商在门户提交） | flow `srm_application_intake`（record_change，after-create）：按身份标识查供应商（`country == 'cn'` 用 `credit_code`，其他国家 / 地区用 `country` + `registration_no`，BR-01）；命中 `blacklisted` → 申请置 `rejected`、`duplicate_check = blacklisted`，通知申请人；命中 `eliminated` → `reapply`，申请的 `supplier` 指向旧档并允许继续（淘汰后重新准入的唯一路径，FR-208）；命中 `qualified` / `qualifying` / `frozen` / `potential` → `duplicate`，通知品类经理人工判断；未命中 → `pass`。同一 flow 按申请品类找到品类经理和 SQE，写入 `reviewer` / `sqe`，把这些品类中最高的 `risk_class` 和 `material_class` 复制到申请 |
-| 2 建档 | 品类经理把申请推进到 `doc_review`（人工确认后，防止灌水污染主数据） | flow `srm_application_accept`：`duplicate_check == 'pass'` 时新建 `potential` 供应商与主联系人并回填 `supplier`；`reapply` 时沿用旧档；供应商 `potential / eliminated → qualifying`；`submitted` 阶段只有申请记录，不建主数据 |
-| 3 开通门户 | 品类经理 / 管理员（v0.6） | 邀请主联系人加入组织并开通门户（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）；v0.1–v0.5 跳过 |
+| 1 受理 | 申请创建（v0.1 内部登记；v0.6 受邀供应商在门户经 screen flow `srm_application_submit` 提交：供应商取自调用者自己的名册行，品类取自门户邀请，申请回填到邀请） | flow `srm_application_intake`（record_change，after-create）：按身份标识查供应商（`country == 'cn'` 用 `credit_code`，其他国家 / 地区用 `country` + `registration_no`，BR-01）；命中 `blacklisted` → 申请置 `rejected`、`duplicate_check = blacklisted`，通知申请人；命中 `eliminated` → `reapply`，申请的 `supplier` 指向旧档并允许继续（淘汰后重新准入的唯一路径，FR-208）；命中 `qualified` / `qualifying` / `frozen` / `potential` → `duplicate`，通知品类经理人工判断；未命中 → `pass`。同一 flow 按申请品类找到品类经理和 SQE，写入 `reviewer` / `sqe`，把这些品类中最高的 `risk_class` 和 `material_class` 复制到申请 |
+| 2 建档（公开表单，待平台） | 品类经理把申请推进到 `doc_review`（人工确认后，防止灌水污染主数据）；内部登记与邀请注册的申请已预关联供应商，没有这一步 | flow `srm_application_accept`：`duplicate_check == 'pass'` 时新建 `potential` 供应商与主联系人并回填 `supplier`；`reapply` 时沿用旧档；供应商 `potential / eliminated → qualifying`；`submitted` 阶段只有申请记录，不建主数据 |
+| 3 开通门户 | 品类经理、采购主管提出（门户邀请）；组织管理员操作（v0.6） | 组织管理员按邀请邮箱在成员页邀请为 `external`，对方接受后运行「开通门户」（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）；准入邀请在开通后由供应商提交申请，所以这一步在步骤 1 之前；v0.1–v0.5 跳过 |
 | 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，通知联系人随 v0.6 U6）。供应商补齐后在申请上点「补充完成，重新提交」（screen flow `srm_application_resubmit`，v0.6）：写补充说明 `supplement_note`，申请回到 `doc_review`，通知初审人；只有申请所属供应商的门户用户能提交（flow 按门户名册检查）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
 | 5 现场审核 | `risk_class == 'high'` | SQE 建供应商审核记录（`audit_type = admission`，关联本次申请），审核后录入总分、最低审核块得分、结论与问题项（结论按 `audit_score_thresholds` 校验，02 §4.2）。审核完成或改了结论时，flow `srm_audit_admission_apply` 把结论写回申请：`audit_result` 记结论，通过或有条件通过时 `audit_passed = true`，否则为 false，并通知初审人；已批准或已驳回的申请不再写。校验规则 `audit_before_review`：`risk_class == 'high' && audit_passed != true` 时申请不得进入 `admission_review`（FR-204）。申请上的勾选框只由 flow 写，品类经理改不了 |
 | 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'class_a'` 或 `risk_class == 'high'` 时第 2 级改为采购总监、`srm_quality_manager` 并行会签（`per_group`：两个岗位各一人通过，同岗位多人时任一人即可；任一人驳回即驳回）。初审人就是申请的新建人或把申请推进到准入评审的人时，品类经理一级上提给采购总监、与第 2 级合并（标准申请由采购总监审批，A 类或高风险由采购总监 + 质量经理会签），申请上 `review_escalated` 记为 true；不要求另一位品类经理，免得只有一位品类经理的品类卡住（平台没有「不可自审」选项，objectstack#25446；同合同、处置单的做法）。驳回 → 申请回 `doc_review` 并通知 |
 | 7 批准后 | 审批通过 | 申请→`approved`，写入 `cycle_days`；供应商 `qualifying → qualified`；按申请品类建 `srm_supplier_category`（申请的 `audit_result` 为有条件通过时为 `trial`，否则 `qualified`，WI-01 6.6.2）；通知供应商。ERP 建档与 `erp_vendor_code` 回写为预留集成点（06 §1） |
-| 8 未通过 | 终止 | 申请→`rejected`；供应商 `qualifying → potential`（`reapply` 的旧档回 `eliminated`）；v0.6 起回收门户账号 |
+| 8 未通过 | 终止 | 申请→`rejected`；供应商 `qualifying → potential`（`reapply` 的旧档回 `eliminated`）；v0.6 起 `srm_admission_rejection` 同时回收门户账号：清掉该供应商全部联系人的 `portal_user`、撤销门户邀请，有门户账号时通知组织管理员撤任命、移出组织（GL-10 6.6.1 c）。只有潜在、淘汰的供应商能申请（`supplier_admissible`），所以驳回总会让供应商退回，已合格供应商不受影响 |
 
 ## 4. P3 寻源：询价 → 比价 → 定标（v0.7）
 
@@ -505,7 +511,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_contract_expiry_notice` / `srm_contract_expire_sweep` | time_relative：`end_date` −60 / −30 / −7 天 / schedule：每日 01:10（追赶式） | 合同 | v0.3 |
 | `srm_contract_renew` | 子 flow：到期扫描调用 | 合同 → 续签草稿、明细 | v0.3 |
 | `srm_contract_agreement_recalc` | record_change：质量协议 / 廉洁协议进入或离开 `active` | 合同 → 供应商 | v0.3 |
-| `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单（淘汰 / 黑名单时 → 联系人 `portal_user` 清空，v0.6） | v0.3 |
+| `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单（淘汰 / 黑名单时 → 联系人 `portal_user` 清空、门户邀请撤销、通知组织管理员，v0.6） | v0.3 |
 | `srm_scar_create` | record_change：交付记录不合格 | 交付记录 → 整改单 | v0.4 |
 | `srm_scar_review` | record_change：状态→`action_submitted` | 整改单 | v0.4 |
 | `srm_scar_reopen` | record_change：状态 `closed`→`open` | 整改单 | v0.4 |
@@ -520,7 +526,10 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_performance_apply` | record_change：状态→`published` | 考评单 → 整改单、处置单 | v0.5 |
 | `srm_risk_event_apply` | record_change：风险事件新建或改为高风险 | 风险事件 → 处置单（草稿） | v0.5 |
 | `srm_blacklist_expiry_notice` | time_relative：供应商 `blacklist_until` −30 / 0 天 | 供应商（黑名单） | v0.5 |
-| `srm_invitation_send` / `srm_invitation_expire_sweep` | record_change / schedule | 门户邀请 | v0.6 |
+| `srm_invitation_send` / `srm_invitation_expire_sweep` | record_change：新建（补邀请邮箱、开通期限，通知组织管理员）/ schedule：每日 01:20（追赶式，过期仍「已发送」的置为已过期） | 门户邀请 | v0.6 |
+| `srm_portal_roster_write` | 子 flow：只由「开通门户」调用（系统身份写联系人 `portal_user`，平台拒绝直接启动） | 门户邀请 → 联系人 | v0.6 |
+| `srm_portal_contact_revoke` | record_change：开通了门户的联系人停用 | 联系人（清 `portal_user`）、门户邀请（撤销），通知组织管理员 | v0.6 |
+| `srm_admission_rejection` | record_change：申请→`rejected` | 准入申请 → 供应商（v0.6 起 → 联系人 `portal_user` 清空、门户邀请撤销） | v0.1 |
 | `srm_single_source_approval` | record_change：状态→`approval_pending` | 寻源单 | v0.7 |
 | `srm_event_publish` | record_change：状态→`published` | 寻源单 | v0.7 |
 | `srm_bid_close_sweep` | schedule：每 10 分钟 + api 心跳 | 寻源单、报价单 | v0.7 |
@@ -531,8 +540,8 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_esign_callback`、`srm_erp_push_retry`、`srm_external_risk_scan` | api / schedule | 合同、同步字段、风险事件 | 客户驱动主题 |
 | `srm_statement_generate`、`srm_invoice_post`、`srm_payment_callback` | — | — | 不做（ERP） |
 
-用户操作入口的 screen flow（均以系统身份运行，flow 内做校验后再写入）。门户能发起的（`srm_appeal_submit`、`srm_claim_respond`）
-读不到成员键，进门检查改为直接查名册：操作人必须是记录所属供应商的在职联系人（`portal_user` = 本人、`active == true`，
+用户操作入口的 screen flow（除注明的以外均以系统身份运行，flow 内做校验后再写入）。门户能发起的（`srm_appeal_submit`、`srm_claim_respond`、
+`srm_application_submit`）读不到成员键，进门检查改为直接查名册：操作人必须是记录所属供应商的在职联系人（`portal_user` = 本人、`active == true`，
 与成员键的名册条件相同，04 §3.1），否则拒绝；记录页按钮对门户不可见的记录本来就答「不存在」，这一检查挡的是直接触发 flow 的请求：
 
 | screen flow | 入口 | 使用者 | 版本 |
@@ -542,6 +551,8 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_bank_verify` 核验银行账户 | 银行账户 | 应付会计 | v0.2 |
 | `srm_contract_submit` 提交审批 | 合同（草稿） | 品类经理、采购主管 | v0.3 |
 | `srm_contract_activate` 确认生效 | 合同（签署中） | 采购员、采购主管、品类经理 | v0.3 |
+| `srm_portal_enable` 开通门户（**`runAs: 'user'`**：任命门户岗位要以组织管理员身份写，名册经子 flow `srm_portal_roster_write` 写） | 门户邀请（已发送） | 组织管理员（`owner` / `admin`，通常兼 SRM 系统管理员）；品类经理、采购主管只建门户邀请 | v0.6 |
+| `srm_application_submit` 提交准入申请 | 门户：公司资料（潜在 / 淘汰） | 受邀的门户用户 | v0.6 |
 | `srm_change_submit` 提交变更申请 | 门户：供应商档案（内部员工照旧在变更单列表直接新建） | 门户管理员（按门户名册检查） | v0.6 |
 | `srm_application_resubmit` 补充完成，重新提交 | 门户：准入申请（退回补充） | 申请所属供应商的门户用户 | v0.6 |
 | `srm_audit_finding_to_scar` 转整改单 | 供应商审核（已完成） | SQE、质量经理 | v0.4 |
@@ -552,7 +563,6 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_appeal_submit` 申诉 | 考评单（已发布）；v0.6 起门户：绩效 | 采购员、采购主管、品类经理代录（v0.5）；门户管理员（v0.6） | v0.5 |
 | `srm_claim_respond` 确认索赔 | 门户：整改单（索赔已提出） | 门户用户 | v0.6 |
 | `srm_appeal_resolve` 处理申诉 | 考评单（申诉中） | 采购总监 | v0.5 |
-| `srm_portal_enable` 开通门户 | 供应商联系人 | `srm_supplier_admin` | v0.6 |
 | `srm_invite_supplier` 邀请供应商 | 寻源单 | 寻源工程师 | v0.7 |
 | `srm_event_submit` 发布 | 寻源单 | 寻源工程师 | v0.7 |
 | `srm_deadline_extend` 延期截止 | 寻源单 | 寻源工程师 | v0.7 |

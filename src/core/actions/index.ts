@@ -6,3 +6,4 @@ export { DispositionSubmitAction, DispositionCancelAction } from './disposition.
 export { ScoreSubmitAction, PerformanceVoidAction, AppealSubmitAction, AppealResolveAction, ScoreReassignAction } from './performance.actions.js';
 export { ClaimRespondAction } from './quality-issue.actions.js';
 export { ChangeSubmitAction, ApplicationResubmitAction, CertificateVerifyAction } from './portal.actions.js';
+export { PortalEnableAction, ApplicationSubmitAction } from './portal.actions.js';

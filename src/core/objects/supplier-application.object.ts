@@ -31,6 +31,17 @@ export const SupplierApplication = ObjectSchema.create({
       multiple: true,
       required: true,
     },
+    // 来源：内部登记（品类经理在工作台新建）或邀请（v0.6，受邀供应商在门户经「提交准入申请」提交，由该 flow 写入）
+    source: Field.select({
+      label: '来源',
+      group: 'application',
+      readonly: true,
+      defaultValue: 'internal',
+      options: [
+        { label: '内部登记', value: 'internal' },
+        { label: '邀请', value: 'invited' },
+      ],
+    }),
     status: Field.select({
       label: '状态',
       group: 'review',

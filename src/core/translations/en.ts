@@ -146,6 +146,7 @@ export const en: TranslationData = {
           confirmText: "Confirm that this supplier's record, contacts and certificates have been checked?",
           successMessage: 'Review confirmed',
         },
+        srm_application_submit: { label: 'Submit Admission Application' },
       },
     },
     srm_supplier_contact: {
@@ -168,6 +169,10 @@ export const en: TranslationData = {
         is_primary: { label: 'Primary Contact' },
         active: { label: 'Active' },
         portal_user: { label: 'Portal Account' },
+      },
+      _views: {
+        default: { label: 'All Contacts' },
+        portal_accounts: { label: 'Portal Accounts' },
       },
     },
     srm_supplier_certificate: {
@@ -312,6 +317,42 @@ export const en: TranslationData = {
         freeze_disposition: { label: 'Freeze Disposition' },
       },
     },
+    srm_supplier_invitation: {
+      label: 'Portal Invitation',
+      pluralLabel: 'Portal Invitations',
+      _sections: { invitation: { label: 'Invitation' }, progress: { label: 'Portal Opening' } },
+      _validations: {
+        invitation_status_flow: { message: 'This invitation status change is not allowed' },
+        invitation_contact_of_supplier: { message: 'The contact must belong to this supplier' },
+        invitation_contact_active: { message: 'Only an active contact can be invited' },
+        invitation_contact_not_enabled: { message: 'This contact already has a portal account' },
+        invitation_supplier_not_blacklisted: { message: 'A blacklisted supplier cannot be given portal access' },
+        invitation_categories_required: { message: 'A Potential or Eliminated supplier is invited for admission: enter the applied categories' },
+        invitation_categories_for_admission: { message: 'Applied categories are entered only when inviting a Potential or Eliminated supplier' },
+      },
+      _actions: { srm_portal_enable: { label: 'Open Portal' } },
+      _views: {
+        default: { label: 'All Portal Invitations' },
+        sent: { label: 'To Open' },
+        accepted: { label: 'Opened' },
+      },
+      fields: {
+        invitation_no: { label: 'Invitation No.' },
+        supplier: { label: 'Supplier' },
+        contact: { label: 'Contact' },
+        contact_email: { label: 'Invitation Email' },
+        categories: { label: 'Applied Categories' },
+        portal_admin: { label: 'Grant Portal Admin' },
+        admin_authorization: { label: 'Portal Admin Authorization Letter' },
+        notes: { label: 'Notes' },
+        status: { label: 'Status', options: { sent: 'Sent', accepted: 'Opened', expired: 'Expired', revoked: 'Revoked' } },
+        expires_on: { label: 'Open By' },
+        portal_user: { label: 'Portal Account' },
+        enabled_by: { label: 'Opened By' },
+        enabled_at: { label: 'Opened At' },
+        application: { label: 'Admission Application' },
+      },
+    },
     srm_supplier_disposition: {
       label: 'Supplier Disposition',
       pluralLabel: 'Supplier Dispositions',
@@ -387,6 +428,7 @@ export const en: TranslationData = {
         application_no: { label: 'Application No.' },
         supplier: { label: 'Supplier' },
         applied_categories: { label: 'Applied Categories' },
+        source: { label: 'Source', options: { internal: 'Internal Registration', invited: 'Invitation' } },
         status: {
           label: 'Status',
           options: {
@@ -1051,6 +1093,49 @@ export const en: TranslationData = {
         refuse_none: { message: 'No nonconformities left to raise: observations are not raised, and findings already raised are not raised again' },
       },
     },
+    srm_portal_enable: {
+      label: 'Open Portal',
+      successMessage: 'Portal opened: from the next request this user sees this supplier\'s data',
+      screens: {
+        pick: {
+          title: 'Open portal: {{ vendor.name }}',
+          description:
+            'Contact: {{ contact.name }}　Invitation email: {{ invite.contact_email }}\n'
+            + 'First invite this email on the organization members page (role external). After the person signs up and accepts, pick the user here. '
+            + 'Once opened, the user sees only this supplier\'s data.',
+          fields: { portal_account: { label: 'Portal Account' } },
+        },
+      },
+      refusals: {
+        refuse_admin: { message: 'The portal is opened by an organization administrator; category managers and buyer leads create a portal invitation for the administrator' },
+        refuse_status: { message: 'Only a Sent invitation can be opened; ask the category manager to invite again if it expired or was revoked' },
+        refuse_blacklisted: { message: 'A blacklisted supplier cannot be given portal access' },
+        refuse_contact: { message: 'The contact is inactive or already has a portal account' },
+        refuse_member: { message: 'This user has not joined the organization: invite the invitation email on the members page (role external) and open the portal after it is accepted' },
+        refuse_role: { message: 'A portal account must join the organization as an external member; employees cannot be portal accounts' },
+        refuse_taken: { message: 'This user is already the portal account of another contact; one portal account belongs to one contact' },
+      },
+    },
+    srm_portal_roster_write: {
+      refusals: {
+        refuse_taken: { message: 'This user is already the portal account of another contact; one portal account belongs to one contact' },
+      },
+    },
+    srm_application_submit: {
+      label: 'Submit Admission Application',
+      successMessage: 'Admission application submitted; the category manager will let you know after reviewing your documents',
+      screens: {
+        confirm: {
+          title: 'Submit admission application: {{ vendor.name }}',
+          description: 'The applied categories come from the invitation. Complete your company profile, certificates and bank account first; the category manager reviews them after you submit.',
+        },
+      },
+      refusals: {
+        refuse_portal: { message: 'Admission applications are submitted by invited suppliers in the portal; for internal registration create an admission application' },
+        refuse_invitation: { message: 'No admission invitation is waiting: the application was already submitted, or the invitation has no applied categories' },
+        refuse_status: { message: 'Your company cannot apply for admission in its current status; please contact your category manager' },
+      },
+    },
     srm_disposition_submit: {
       label: 'Submit Disposition for Approval',
       successMessage: 'Disposition submitted for approval',
@@ -1270,6 +1355,8 @@ export const en: TranslationData = {
         nav_bank_account: { label: 'Bank Accounts' },
         nav_change_request: { label: 'Change Requests' },
         nav_disposition: { label: 'Dispositions' },
+        nav_invitation: { label: 'Portal Invitations' },
+        nav_portal_accounts: { label: 'Portal Accounts' },
         group_contract: { label: 'Contracts' },
         nav_contract: { label: 'Contracts' },
         group_quality: { label: 'Quality' },

@@ -274,6 +274,7 @@ test/                            # 仓库根目录
 | PF16 | objectstack#26133 导入 upsert 时同一文件里匹配键相同的两行都新建，之后再导报 `AMBIGUOUS_MATCH` | 证书等没有唯一约束的对象重复建档 | 清洗时同一张证书只留一行（[导入说明 §6.2](../implementation/legacy-supplier-import.md#62-清洗清单)） | 2026-10-26 新提 |
 | PF17 | objectstack#25251 自动化不得以系统身份写岗位任命、权限集授予、邀请和成员（裁定 B）；邀请只经组织接口（V2、V3） | 门户开通、回收 | 组织管理员在成员页邀请、移出组织；任命与门户管理员授权由 `runAs: 'user'` 的「开通门户」flow 在组织管理员操作时写；处置 flow 不撤任命，改为通知组织管理员（04 §3.3） | 平台裁定，长期做法（2026-11-02 实测登记，不另提 issue） |
 | PF18 | objectstack#29050 直接触发 flow（REST trigger）不按启动人的权限读 `recordId`，按钮入口（#16370）会答「不存在」 | 门户能启动的系统身份 screen flow（确认索赔、申诉、提交变更申请、准入补充后重新提交） | 每条 flow 进门自己查名册（`portal_user` = 本人、`active == true`，与成员键同条件），元数据测试守住（04 §3.7） | 2026-11-02 新提 |
+| PF19 | 平台既定行为（objectstack#3407 起）：数据层剔除对只读字段的写入，flow 节点只在步骤结果里给警告（`droppedFields`），写入照样算成功；`runAs: 'user'` 的 flow 因此写不进字段级只读的 `portal_user` | 门户开通（名册写入） | 「开通门户」以 `runAs: 'user'` 任命门户岗位，名册由系统身份的子 flow `srm_portal_roster_write` 写；平台拒绝直接启动系统身份的 autolaunched flow，子 flow 只经开通 flow 进入（04 §3.3）；`test/portal-invitation.test.ts` 的探针盯着平台行为 | 平台既定行为，长期做法（2026-11-02 U3 实测，总监裁定不另提 issue） |
 
 其他代码和文档里指向平台的临时做法，2026-10-26 核对结果：
 

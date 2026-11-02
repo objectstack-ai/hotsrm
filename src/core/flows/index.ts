@@ -45,3 +45,8 @@ export { CertificateVerifyFlow } from './qualification/certificate-verify.flow.j
 export { ChangeSubmitFlow } from './change-request/change-submit.flow.js';
 export { ApplicationResubmitFlow } from './admission/resubmit.flow.js';
 export { BankPendingNoticeFlow } from './bank-account/bank-pending-notice.flow.js';
+export { InvitationSendFlow } from './portal/invitation-send.flow.js';
+export { InvitationExpireSweepFlow } from './portal/invitation-expire-sweep.flow.js';
+export { PortalEnableFlow, PortalRosterWriteFlow } from './portal/portal-enable.flow.js';
+export { ApplicationSubmitFlow } from './portal/application-submit.flow.js';
+export { PortalContactRevokeFlow } from './portal/contact-revoke.flow.js';

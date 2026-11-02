@@ -1,5 +1,7 @@
 import { P, cel } from '@objectstack/spec';
 import type * as Automation from '@objectstack/spec/automation';
+import { loadOrgAdmins, notifyOrgAdmins } from '../portal/org-admins.js';
+import { clearPortalUsers, revokeInvitations } from '../portal/revoke.js';
 
 // 执行供应商处置（02 §5.1，03 §5）：审批全部通过后由 srm_disposition_approval 调用，以系统身份改供应商
 // 状态和品类资格，处置单置为「已执行」。
@@ -60,19 +62,6 @@ const suspendAll = (id: string) => ({
   },
 });
 
-// 撤销门户访问（ADR-0010）：成员键只认联系人上的 portal_user，清掉它就不再放行任何行；组织成员身份由管理员移除
-const revokePortal = (id: string) => ({
-  id,
-  type: 'update_record' as const,
-  label: '撤销门户访问',
-  config: {
-    objectName: 'srm_supplier_contact',
-    filter: { supplier: cel`disp.supplier`, portal_user: { $ne: null } },
-    multi: true,
-    fields: { portal_user: null },
-  },
-});
-
 export const DispositionApplyFlow: Automation.Flow = {
   name: 'srm_disposition_apply',
   label: '执行供应商处置',
@@ -115,7 +104,30 @@ export const DispositionApplyFlow: Automation.Flow = {
       blacklist_reason: cel`disp.reason`,
     }),
     suspendAll('suspend_all'),
-    revokePortal('revoke_portal'),
+    // 撤销门户访问（ADR-0010，04 §3.3）：清掉该供应商全部联系人上的 portal_user，门户邀请一并撤销，通知组织管理员
+    // 撤销门户岗位任命并把门户用户移出组织（系统身份写不了任命，objectstack#25251）
+    {
+      id: 'load_portal',
+      type: 'get_record',
+      label: '有门户账号？',
+      config: { objectName: 'srm_supplier_contact', filter: { supplier: cel`disp.supplier`, portal_user: { $ne: null } }, outputVariable: 'portalContact' },
+    },
+    clearPortalUsers('revoke_portal', '撤销门户访问', { supplier: cel`disp.supplier` }),
+    revokeInvitations('revoke_invitations', { supplier: cel`disp.supplier` }),
+    { id: 'had_portal', type: 'decision', label: '需要通知组织管理员？' },
+    {
+      id: 'load_vendor',
+      type: 'get_record',
+      label: '读取供应商',
+      config: { objectName: 'srm_supplier', filter: { id: cel`disp.supplier` }, fields: ['name'], outputVariable: 'vendor' },
+    },
+    loadOrgAdmins(),
+    notifyOrgAdmins('notify_admins', '通知组织管理员移除门户用户', {
+      title: '门户访问已撤销：{{ vendor.name }}',
+      message: '处置单 {{ disp.disposition_no }} 已执行，{{ vendor.name }} 的门户访问已撤销。请撤销该供应商门户用户的门户岗位任命，并把他们移出组织。',
+      sourceObject: 'srm_supplier_disposition',
+      sourceId: cel`disp.id`,
+    }),
     setSupplier('remove_blacklist_supplier', '解除黑名单（转为淘汰）', 'eliminated'),
 
     {
@@ -183,8 +195,15 @@ export const DispositionApplyFlow: Automation.Flow = {
     { id: 'e_el1', source: 'eliminate_supplier', target: 'suspend_all', type: 'default' },
     { id: 'e_blacklist', source: 'by_action', target: 'blacklist_supplier', type: 'conditional', condition: P`disp.action == 'blacklist'`, label: '拉入黑名单' },
     { id: 'e_bl1', source: 'blacklist_supplier', target: 'suspend_all', type: 'default' },
-    { id: 'e_suspended', source: 'suspend_all', target: 'revoke_portal', type: 'default' },
-    { id: 'e_revoked', source: 'revoke_portal', target: 'done', type: 'default' },
+    { id: 'e_suspended', source: 'suspend_all', target: 'load_portal', type: 'default' },
+    { id: 'e_portal', source: 'load_portal', target: 'revoke_portal', type: 'default' },
+    { id: 'e_revoked', source: 'revoke_portal', target: 'revoke_invitations', type: 'default' },
+    { id: 'e_rv0', source: 'revoke_invitations', target: 'had_portal', type: 'default' },
+    { id: 'e_rv1', source: 'had_portal', target: 'load_vendor', type: 'conditional', condition: P`portalContact != null`, label: '有门户账号' },
+    { id: 'e_rv5', source: 'had_portal', target: 'done', type: 'conditional', condition: P`portalContact == null`, label: '没有' },
+    { id: 'e_rv2', source: 'load_vendor', target: 'load_org_admins', type: 'default' },
+    { id: 'e_rv3', source: 'load_org_admins', target: 'notify_admins_guard', type: 'default' },
+    { id: 'e_rv4', source: 'notify_admins_guard', target: 'done', type: 'default' },
     {
       id: 'e_remove_blacklist',
       source: 'by_action',
