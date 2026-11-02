@@ -637,17 +637,18 @@ SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改�
 | `source` | select（共享选项列表 `srm_quality_issue_source`） | `iqc` 来料 / `production` 制程 / `customer` 客户投诉 / `audit` 审核发现 / `performance` 绩效改善 |
 | `severity` | select | 同检验 |
 | `problem_description` | richtext | D2 问题描述，必填 |
-| `status` | select（stageField） | 见 §5.6 |
+| `status` | select（stageField） | 见 §5.6；门户用户只能走供应商的两步（待响应 → 已提交临时措施 → 已提交根因与措施），其余状态保持不变，由选项的 `visibleWhen` 按操作人在服务端限定（v0.6 U5） |
 | `sqe` | user | 负责 SQE |
 | `containment_due` / `final_due` | datetime / date | 只读，创建时按参数算好：临时措施 `scar_containment_hours`（示例 72 小时），最终回复 `scar_final_days`（示例 30 天）；问题复发重新打开时按重开时间重算 |
-| `containment_action` | richtext | D3，供应商填写（v0.6 前由 SQE 代填）；提交临时措施后必填 |
+| `containment_action` | richtext | D3，供应商在门户填写（没开通门户的由 SQE 代填）；提交临时措施后必填 |
 | `root_cause` | richtext | D4；提交根因与措施后必填 |
 | `corrective_action` / `preventive_action` | richtext | D5–D6 / D7；纠正措施提交后必填 |
 | `evidence` | file（多个） | 整改证据 |
 | `sqe_comment` | textarea | 审核意见，退回时必填 |
 | `is_overdue` | boolean | 默认 false，逾期 flow 维护 |
 | `claim_amount` | currency | 索赔金额 |
-| `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计从「供应商已接受」手工标记，选项对其他人不可选；SRM 不生成扣款）；不是 `none` 时必须填索赔金额 |
+| `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计从「供应商已接受」手工标记，选项对其他人不可选；SRM 不生成扣款）；不是 `none` 时必须填索赔金额；供应商在门户经「确认索赔」接受或提出异议（v0.6 U5） |
+| `claim_response` | textarea | 供应商索赔意见，提出异议时必填；「确认索赔」写入，SQE 代录线下确认时可补记（v0.6 U5） |
 
 整改单上 8D 内容在关闭或撤销后只读。
 
@@ -655,7 +656,7 @@ SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改�
 （D2 `problem_description`、D3 `containment_action`、D4 `root_cause`、D5–D7 `corrective_action` / `preventive_action`、
 `evidence`、`sqe_comment`），`status` 即 8D 进度，QP-04 的控制点都由这些字段覆盖。平台已裁定对象上的 repeater 不声明
 子字段、有类型的列表要用子对象（objectstack#25681），核心不为此增加对象（对象数按 07 §1 不变）。页面需要时间点的，
-v0.6 U5 可以加两个由现有状态流转 flow 写入的日期时间字段（临时措施提交时间、根因与措施提交时间）。客户要求逐步记录
+可以加两个由状态流转 flow 写入的日期时间字段（临时措施提交时间、根因与措施提交时间）；v0.6 U5 没有加，提交时间看字段历史（整改单开启了 `trackHistory`）。客户要求逐步记录
 责任人和日期的（如汽车行业），放客户层，或在门槛 2 之前以新增字段的方式加。
 
 ### 4.7 绩效（v0.5）
@@ -690,9 +691,11 @@ ERP 集成前为空）、`delivery_count`（number，本期交付行数）、`da
 某项启用的自动指标没有数据时为 true，该项不给零分，07 R7）、`score_due`（date，评分截止日，转人工评分时为当天 +
 `perf_score_days`）、`approval_status`（审批结论，审定发布的审批节点写入）、`reviewer`（user，审定人）、`review_comment`
 （审定意见：通过或退回重评时采购总监的意见）、`published_date`（date）、`appeal_reason`、`appeal_date`（date，申诉登记日）、
-`appeal_recorded_by`（user，代录人）、`appeal_result`、`appeal_outcome`（`maintained` 维持原结果 / `adjusted` 调整总分）、
+`appeal_recorded_by`（user，申诉提交人：门户管理员或内部代录人）、`appeal_result`、`appeal_outcome`（`maintained` 维持原结果 / `adjusted` 调整总分）、
 `appeal_handled_by`（user，处理申诉的采购总监）、`void_reason`（v0.5 P3 加入后面这些字段）。
 自动指标由交付记录按 `period` 汇总，比率字段存小数（0.985 即 98.5%）；flow 写的字段一律只读。
+列表搜索只扫 `review_no`、`period`、`cycle`、`status`、`grade`（`searchableFields`），评分明细只扫 `comment`：默认会扫全部
+文本字段，而审定意见、回避原因门户读不到（04 §4.2），扫到读不到的字段平台会拒绝整个搜索。
 维度得分是该维度各评分明细按权重的加权平均（0–100，没有该维度的指标时为空），总分是全部明细的 `Σ(score × weight)`
 （启用指标权重合计 100%），都保留两位小数，等级按两位小数的总分判断。
 

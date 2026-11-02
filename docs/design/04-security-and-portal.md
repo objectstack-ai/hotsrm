@@ -25,8 +25,8 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 ## 2. 角色、岗位与权限集
 
 平台把**能做什么**（权限集）和**看多大范围**（OWD、共享规则、RLS、层级范围）分开。
-本设计的权限集挂在岗位上，员工通过岗位任命获得权限；唯一的例外是门户管理员权限集，
-它直接授予具体的供应商用户（§3.3）。
+本设计的权限集挂在岗位上，员工通过岗位任命获得权限；供应商的门户用户同样经静态门户岗位获得权限，
+门户管理员按人任命到 `srm_portal_admin`（§3.1 第 6 条、§3.3）。
 
 ### 2.1 内部岗位
 
@@ -53,7 +53,7 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 |---|---|
 | `srm_internal_base` | 内部员工的基础：读品类、物料、工厂、供应商主数据（不含银行账号）、价格库；**不是** `isDefault` |
 | `srm_sourcing` | 寻源单、寻源明细的增改（状态只经 screen flow 推进）；邀请、技术评分、定标只经 screen flow；读报价（受封标 RLS 约束）；新建合同 |
-| `srm_supplier_admin` | 供应商档案、联系人、证书、准入申请、审核、供货品类资格、处置单、合同的增改；开通门户 |
+| `srm_supplier_admin` | 供应商档案、联系人、证书、准入申请、审核、供货品类资格、处置单、合同的增改；门户邀请（提出开通需求，开通本身由组织管理员操作，§3.3） |
 | `srm_buyer` | 供应商档案、合同、交付记录读；物料只改 `category` 关联（其余字段 FLS 只读，不新建、不删除）；代供应商发起变更单（v0.6 前；银行账户变更要填完整账号，由持完整账号能力的品类经理或采购主管发起）；ERP 集成后加订单、送货单的内部字段 |
 | `srm_quality` | 审核、交付记录（录入）、整改单的增改；证书只读，核验经 screen flow |
 | `srm_iqc` | 交付记录的录入（没有质量系统的客户） |
@@ -64,7 +64,7 @@ SRM 同时服务内部员工和互相竞争的供应商，权限设计的首要�
 | `srm_auditor` | 全部 SRM 对象只读（报价同样受封标约束），可读审批历史与字段历史，不可导出银行账号 |
 | `srm_admin` | 品类、指标库、编码、通知模板的配置；物料导入与维护；存量供应商、联系人、证书的导入（v0.2，唯一能写「存量导入」标记的权限集，[导入说明](../implementation/legacy-supplier-import.md)）；不授予报价读权限 |
 | `srm_portal_supplier` | 供应商门户用户：见 §3.2 |
-| `srm_portal_supplier_admin` | 在 `srm_portal_supplier` 之上：维护本公司联系人、银行账户，提交变更申请与绩效申诉；直接授予具体用户 |
+| `srm_portal_admin` | 在 `srm_portal_supplier` 之上：维护本公司联系人、银行账户，看完整银行账号，提交变更申请与绩效申诉；挂在门户管理员岗位 `srm_portal_admin` 上，按人任命 |
 | `srm_integration` | 预留（ERP 集成后）：集成服务账号，物料、交付记录、订单镜像的写入；供应商仅可写 `erp_vendor_code`，价格记录只读；**不**授予报价单与银行账号 |
 
 **为什么 SRM 不用 `isDefault` 权限集**：`isDefault` 的权限集绑定到组织的每一个成员。
@@ -184,8 +184,8 @@ flowchart LR
 | 价格记录 | 本公司 | — | |
 | 合同 / 合同明细 | 本公司且 `status in ['signing','active','expired','terminated']` | — | 草稿与审批中的合同不可见；`private`：读共享规则只共享这几种状态，RLS 再限定本公司 |
 | 交付记录 | 本公司 | — | 供应商看到的是用于算分的交付结果 |
-| 整改单 | 本公司 | 供应商回复字段 | `sqe_comment`、`claim_amount` 只读 |
-| 考评单 / 评分明细 | 本公司且 `status in ['published','appealed']` | 只经「申诉」screen flow（U5） | 未发布的考评不可见；申诉只能对已发布的考评提起，申诉期间照常可见 |
+| 整改单 | 本公司 | 状态为 `open`、`containment_submitted` 的本公司整改单：只能改 D3–D7 与证据，状态只能走 待响应 → 已提交临时措施 → 已提交根因与措施；索赔只经「确认索赔」screen flow（U5） | 写策略 `using` 限定轮到供应商回复的行，`check` 限定改完仍属本公司、停在这三个状态；状态怎么走由 `status` 选项的 `visibleWhen` 按操作人限定（服务端执行）；其余字段（含 `sqe_comment`、`claim_amount`、`claim_status`）FLS 只读 |
+| 考评单 / 评分明细 | 本公司且 `status in ['published','appealed']` | 只经「申诉」screen flow，门户管理员（U5） | 未发布的考评不可见；申诉只能对已发布的考评提起，申诉期间照常可见；评分人、回避改派、审定人与审定意见、申诉处理人门户不可见（§4.2） |
 | 采购订单 / 订单行、送货单 / 明细 | 预留（ERP 集成后） | 订单行的答复字段；送货单只经 screen flow | 订单头授予编辑权但字段全部 FLS 只读 |
 | 寻源单、寻源明细、审核、风险事件、处置单、门户邀请 | 不可见 | — | 门户权限集不授予这些对象；处置结果体现在供应商状态上 |
 
@@ -233,6 +233,7 @@ flowchart LR
 | 联系人离职 / 停用 | 联系人 `active = false`（名册过滤条件），下一个请求起看不到数据；组织管理员随后撤销门户岗位任命并移出组织 |
 | 供应商冻结 | 账号与门户功能保持不变：整改单仍要回复，资料仍要维护；冻结只阻止新的询价邀请（BR-03），新订单由 ERP 侧冻结标志拦截 |
 | 供应商淘汰 / 黑名单 | `srm_disposition_apply` 执行时清掉该供应商全部联系人上的 `portal_user`，门户访问即刻失效，不靠人工停用联系人；岗位任命与组织成员身份由组织管理员随后移除（处置 flow 写不了任命，07 §6 V2）。重新准入通过后要重新开通门户 |
+| 准入未通过 | 申请驳回、供应商退回 `potential`（重新准入的旧档回 `eliminated`）时清掉该供应商联系人上的 `portal_user`（03 §3 第 8 步，v0.6 U3）；已合格供应商增加品类的申请被驳回不动门户。岗位任命与组织成员身份由组织管理员随后移除 |
 | 季度复核 | 报表列出每家供应商的门户账号与在职联系人，差异由采购主管确认 |
 
 ### 3.4 RLS 示例
@@ -341,6 +342,8 @@ export const PortalSupplier = definePermissionSet({
 | 交叉读 | 准备供应商 A、B 各一个门户用户；对 §3.2 每个对象，用 A 的身份按 B 的记录 id 读取 | 全部返回「不存在」，列表与搜索中不出现 |
 | 交叉写 | 用 A 的身份修改 B 的记录、把自己的单据改挂到 B 名下、在 B 名下新建联系人或证书 | 全部拒绝 |
 | 冒用名册 | 用门户身份（含门户管理员）或任何内部岗位写联系人的 `portal_user`、改联系人归属或在职标志 | 拒绝或写入被丢弃，授权不变；只有 flow 能写 |
+| 越过回复范围 | 用 A 的身份改本公司整改单的非回复字段（SQE 意见、索赔、问题描述、逾期标志）、把状态改成效果验证 / 关闭 / 撤销或退回、改轮到 SQE 的整改单 | 拒绝或写入被丢弃，值不变（v0.6 U5） |
+| 越权 screen flow | 用 A 的身份对 B 的整改单「确认索赔」、对 B 的考评单「申诉」，分别经记录页按钮和直接触发 flow；联系人停用后对本公司考评单申诉 | 按钮答「不存在」，直接触发被 flow 的名册检查拒绝，记录不变；恢复在职后本公司的申诉照常（v0.6 U5） |
 | 开标后改价 | 开标后用中标供应商的身份修改本公司报价明细的单价或中标字段 | 拒绝（v0.7 寻源上线时加入） |
 | 自解资质异常 | 用门户身份把本公司过期证书的 `status` 改为有效、新建证书时自带「已核验」、写 `verified`；修改有效期或类型 | 改状态、自带核验被拒绝或写入被丢弃；修改内容放行但 `verified` 复位，资质异常在 SQE 核验前不解除（U4） |
 | 自助写路径 | 用 A 的身份改 B 的证书、联系人、变更单，在 B 名下建银行账户；伪造 `recordId` 启动「提交变更申请」「补充完成，重新提交」；门户身份启动「核验证书」 | 全部拒绝，B 的记录不变（U4） |
@@ -370,7 +373,7 @@ export const PortalSupplier = definePermissionSet({
 报价明细是报价单的 `master_detail` 子对象，跟随父记录，自动同样受限。要点：
 
 - **管理员也不例外**：`srm_admin` 不授予报价读权限；平台超级管理员的数据库级访问在
-  运维制度里约束（访问留痕、双人授权），不在应用权限里放开；
+  体系文件 GL-10 第 6.8 条里约束（双人授权、访问留痕），不在应用权限里放开；
 - **AI 助手不例外**：AI 以提问者的身份查询，同一条 RLS 生效（[06 §3](./06-integration-and-ai.md#3-ai-助手)）；
 - **数量可见、内容不可见**：寻源单上的 `submitted_quote_count` 由平台在报价写入时重算，
   内部能看到「已报价 N 家」；
@@ -378,7 +381,7 @@ export const PortalSupplier = definePermissionSet({
   系统身份写入，flow 本身留有运行记录；
 - **价格记录不受封标约束**：`srm_supplier_admin`、`srm_buyer` 对价格记录可读，但价格记录
   在定标后才由 flow 产生，与中标报价一一对应，不泄露封标期间的任何报价；
-- **平台管理员的数据库级访问**是已知例外，写进运维制度（GL-10）而不是应用权限。
+- **平台管理员的数据库级访问**是已知例外，写进体系文件 GL-10 第 6.8 条（双人授权、报价截止前不访问报价、访问留痕定期检查）而不是应用权限。
 
 ### 4.2 字段级权限（FLS）
 
@@ -395,6 +398,8 @@ export const PortalSupplier = definePermissionSet({
 | `srm_po_line.unit_price` / `quantity` / `required_date`（预留） | 内部、本公司门户 | 仅 ERP 集成 | 订单以 ERP 为准 |
 | `srm_quality_issue.claim_amount` | 内部、本公司门户 | SQE | |
 | `srm_performance_review.*_score` | 内部、本公司门户（已发布） | 算分 flow、评分人 | |
+| `srm_performance_review` 的 `reviewer`、`review_comment`、`appeal_handled_by`；`srm_performance_score` 的 `scorer`、`reassigned_from`、`reassigned_by`、`reassign_reason`、`reassigned_date` | 内部 | flow | 内部评价过程：评分人与回避信息不对被评供应商公开（GL-05）。两个对象声明了 `searchableFields`，门户的列表搜索不扫这些字段（02 §4.7） |
+| `srm_quality_issue` 的 D3–D7、`evidence`、`status` | 内部、本公司门户 | SQE；本公司门户（轮到供应商回复时，§3.2） | 门户在整改单上能改的只有这几项 |
 | `srm_supplier_contact.portal_user` | 内部、本公司门户 | 仅 flow（字段级只读） | 门户名册：写入即授出这家供应商的门户数据（ADR-0010） |
 | `srm_supplier_contact.active` | 内部、本公司门户 | 内部（`srm_supplier_admin`）；门户只读 | 名册过滤条件，门户不能恢复被停用的账号 |
 | `srm_supplier` 的 `name`、`country`、`credit_code`、`registration_no`、`address`、`legal_representative`、`registered_capital`、`status`、`grade`、`qualification_alert`、`erp_vendor_code` | 内部、本公司门户 | 内部（关键信息变更走变更单） | 门户只读；门户可直接改的只有 `short_name`、`website`、`supplier_type`、`taxpayer_type`、`established_date` 等资料字段 |

@@ -8,7 +8,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // 以系统身份运行：门户对准入申请只有读共享（ADR-0010 两把锁）。flow 进门判断启动人持门户岗位、并且是这张申请所属供应商
 // 在职联系人上登记的门户账号（与成员键同一份名册），伪造别家申请的 recordId 时名册对不上，直接结束（objectstack#25481）。
 const uid = `current_user != null ? current_user.id : ''`;
-const allowed = `current_user != null && 'srm_portal_user' in current_user.positions && application != null && roster != null`;
+const allowed = `current_user != null && 'srm_portal_user' in current_user.positions && application != null && membership != null`;
 const returned = `application.status == 'returned'`;
 const c = (source: string) => ({ dialect: 'cel' as const, source });
 
@@ -31,13 +31,13 @@ export const ApplicationResubmitFlow: Automation.Flow = {
       config: { objectName: 'srm_supplier_application', filter: { id: cel`recordId` }, outputVariable: 'application' },
     },
     {
-      id: 'load_roster',
+      id: 'load_membership',
       type: 'get_record',
       label: '启动人是这家供应商的门户账号？',
       config: {
         objectName: 'srm_supplier_contact',
         filter: { supplier: c(`application != null ? application.supplier : ''`), portal_user: c(uid), active: true },
-        outputVariable: 'roster',
+        outputVariable: 'membership',
       },
     },
     { id: 'gate', type: 'decision', label: '可以重新提交？' },
@@ -105,8 +105,8 @@ export const ApplicationResubmitFlow: Automation.Flow = {
 
   edges: [
     { id: 'e0', source: 'start', target: 'load', type: 'default' },
-    { id: 'e1', source: 'load', target: 'load_roster', type: 'default' },
-    { id: 'e2', source: 'load_roster', target: 'gate', type: 'default' },
+    { id: 'e1', source: 'load', target: 'load_membership', type: 'default' },
+    { id: 'e2', source: 'load_membership', target: 'gate', type: 'default' },
     { id: 'e3', source: 'gate', target: 'refuse_position', type: 'conditional', condition: c(`!(${allowed})`), label: '不可以' },
     { id: 'e4', source: 'gate', target: 'refuse_status', type: 'conditional', condition: c(`${allowed} && !(${returned})`), label: '不是退回补充' },
     { id: 'e5', source: 'gate', target: 'confirm', type: 'conditional', condition: c(`${allowed} && ${returned}`), label: '可以' },

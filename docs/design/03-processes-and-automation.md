@@ -339,13 +339,13 @@ stateDiagram-v2
 
 | 步骤 | 触发 | 动作 |
 |---|---|---|
-| 1 生成 | 交付记录写入（新建或修改，月度导入是 upsert），**变成** `inspection_result == 'fail'` 且 `severity in ['critical','major']`；或审核问题项经「转整改单」screen flow；客户投诉、制程等来源由 SQE 手工新建 | flow `srm_scar_create`：同一条交付记录已有整改单时不再开（重复导入不重复开单）；新建整改单，`sqe` 取物料品类的 SQE，`containment_due = 创建时间 + scar_containment_hours`、`final_due = 创建日期 + scar_final_days`（参数见 `params/core.yaml`，由字段默认值算好）；通知 SQE，品类没有 SQE 时通知质量经理指派（BR-15）；供应商 `quality` 联系人的通知等 objectstack#25444 或 v0.6 门户。`minor` 不合格只计入绩效，不自动开单。审核问题项由 SQE 或质量经理在已完成的审核上点「转整改单」（`srm_audit_finding_to_scar`）：还没转出的严重、一般不符合项各开一张（`source = audit`，严重 → `critical`、一般 → `major`，负责 SQE 为操作人），整改单回填到问题项，重复点击不重复开单；观察项不转。v0.6 前供应商的回复由 SQE 代填 |
-| 2 临时措施 | 供应商提交 D3（v0.6 前 SQE 代填 D3 后把状态改为「已提交临时措施」） | 状态→`containment_submitted`；D3 必填。SQE 认为临时措施不够时退回到 `open`，退回意见写入 `sqe_comment`（必填） |
-| 3 根因与措施 | 供应商提交 D4–D7（v0.6 前 SQE 代填后改状态） | 状态→`action_submitted`；flow `srm_scar_review` 发起 `approval` 节点：`field` 审批人 = `sqe`（没填时交给质量经理），审批期间锁定记录。SQE 用审批的「驳回」退回：状态回到 `containment_submitted`，审批意见写入 `sqe_comment`（FR-604），改好后再次提交重新审核。平台的「退回修改」窗口只能原样回到审批节点、中间改不了状态，所以退回用驳回表达；驳回时没写意见的不算数，提醒 SQE 后重新审核 |
+| 1 生成 | 交付记录写入（新建或修改，月度导入是 upsert），**变成** `inspection_result == 'fail'` 且 `severity in ['critical','major']`；或审核问题项经「转整改单」screen flow；客户投诉、制程等来源由 SQE 手工新建 | flow `srm_scar_create`：同一条交付记录已有整改单时不再开（重复导入不重复开单）；新建整改单，`sqe` 取物料品类的 SQE，`containment_due = 创建时间 + scar_containment_hours`、`final_due = 创建日期 + scar_final_days`（参数见 `params/core.yaml`，由字段默认值算好）；通知 SQE，品类没有 SQE 时通知质量经理指派（BR-15）；供应商 `quality` 联系人的通知随 v0.6 U6（#82）。`minor` 不合格只计入绩效，不自动开单。审核问题项由 SQE 或质量经理在已完成的审核上点「转整改单」（`srm_audit_finding_to_scar`）：还没转出的严重、一般不符合项各开一张（`source = audit`，严重 → `critical`、一般 → `major`，负责 SQE 为操作人），整改单回填到问题项，重复点击不重复开单；观察项不转。供应商在门户回复（v0.6 U5），没开通门户的由 SQE 代填 |
+| 2 临时措施 | 供应商在门户填 D3 后把状态改为「已提交临时措施」（没开通门户的由 SQE 代填） | 状态→`containment_submitted`；D3 必填。提交人不是负责 SQE 本人时 `srm_scar_containment_notice` 通知 SQE（没有 SQE 时通知质量经理）。SQE 认为临时措施不够时退回到 `open`，退回意见写入 `sqe_comment`（必填）。门户只能改本公司处于 `open`、`containment_submitted` 的整改单，只能改 D3–D7 与证据，状态只能往前走这两步（04 §3.2）；SQE 审核 D3 期间供应商可以接着填 D4–D7 |
+| 3 根因与措施 | 供应商在门户提交 D4–D7（没开通门户的由 SQE 代填后改状态） | 状态→`action_submitted`；flow `srm_scar_review` 发起 `approval` 节点：`field` 审批人 = `sqe`（没填时交给质量经理），审批期间锁定记录。SQE 用审批的「驳回」退回：状态回到 `containment_submitted`，审批意见写入 `sqe_comment`（FR-604），改好后再次提交重新审核。平台的「退回修改」窗口只能原样回到审批节点、中间改不了状态，所以退回用驳回表达；驳回时没写意见的不算数，提醒 SQE 后重新审核 |
 | 4 效果验证 | SQE 审核通过 | 状态→`verifying`；SQE 跟踪后续批次，确认有效后关闭（D8），或验证不通过退回 `action_submitted` 重新审核 |
 | 5 逾期升级 | 追赶式扫描 `srm_scar_overdue_sweep`（每小时；外部心跳见 §2.3 R3） | 超过 `containment_due` 仍为 `open`、或超过 `final_due` 仍未到 `verifying`：`is_overdue = true`，通知负责 SQE 与质量经理（SQE 主管，FR-605）；标志保留到关闭，供「SCAR 按期关闭率」统计；提醒供应商等 objectstack#25444 或 v0.6 |
 | 5a 复发重开 | SQE 把已关闭的整改单改回 `open` | flow `srm_scar_reopen`：期限按重开时间重算，逾期标志清掉，通知负责 SQE |
-| 6 索赔 | SQE 填写 `claim_amount`，`claim_status → proposed` | 供应商在门户接受或提出异议（v0.6 前线下确认后由 SQE 记录）；接受后（`supplier_accepted`）由财务在 ERP 扣款，应付会计回来标记 `settled`。SRM 不生成扣款 |
+| 6 索赔 | SQE 填写 `claim_amount`，`claim_status → proposed` | 供应商在门户的整改单上点「确认索赔」（screen flow `srm_claim_respond`）接受或提出异议，异议必须写意见（`claim_response`）；没开通门户的线下确认后由 SQE 记录。接受（`supplier_accepted`）通知负责 SQE 与应付会计，由财务在 ERP 扣款，应付会计回来标记 `settled`；异议（`disputed`）通知负责 SQE 协商，调整金额后可重新提出。SRM 不生成扣款 |
 
 **供应商审核与年度审核计划**（v0.4，FR-607；体系文件 WI-01）：准入审核见 §3 第 5 步；年度审核与专项审核由 SQE
 建审核记录，审核后录入结论与问题项，不符合项经「转整改单」进入上面的整改流程。年度计划由
@@ -392,7 +392,7 @@ stateDiagram-v2
 | 4 汇总分级 | 状态→`reviewing`（`srm_performance_publish`） | `total_score = Σ(score × weight)`，各维度得分为维度内按权重的加权平均；等级线取参数 `perf_grade_min`（示例 A ≥ 90、B ≥ 80、C ≥ 70，其余 D），写入考评单 |
 | 5 审定发布 | 同一 flow 的审批：采购总监（`position = srm_procurement_director`） | 通过后→`published`，写审定人、发布日期；回写供应商 `grade`、`latest_score`（同一供应商已有更晚期间的已发布考评单时不回写），通知评分人；供应商可在门户查看结果与扣分项（FR-704，v0.6）。采购总监驳回即「退回重评」：考评单回到 `scoring`，审定意见写入 `review_comment`，截止日重新起算，通知评分人改分。职责分离（同 BR-11）：审定人不能是本考评单的评分人，撞人时这次通过不算数，通知后重新开一轮审定 |
 | 6 结果应用 | 发布后的记录触发（`srm_performance_apply`，审定中 → 已发布） | C 级：生成改善要求（整改单，`source = performance`）；D 级：生成处置单草稿（冻结）；连续 `perf_d_exit_periods` 期 D 级：生成淘汰处置单草稿交品类经理评审（BR-18）；A 级：在名录中标记优选，供寻源邀请参考。参数 `perf_auto_apply`（示例开启）关闭时只通知品类经理（07 D9），细则见表后说明 |
-| 7 申诉 | 供应商发布后 `perf_appeal_days`（示例 7）天内 | v0.6 前由采购员、采购主管或品类经理在考评单上代录（screen flow `srm_appeal_submit`，门户上线后供应商自己提交）：只能申诉一次，写申诉理由 → `appealed`，通知采购总监。采购总监经「处理申诉」（`srm_appeal_resolve`）写处理结果，选择维持原结果或调整总分（等级按新总分重算并回写供应商）→ 回到 `published`，处理人和结果留在考评单上（FR-706）。处理人同样不能是本考评单的评分人。结果应用（第 6 步）只在审定发布时触发；申诉改变等级时，flow 通知品类经理，按原等级生成的草稿由品类经理作废或另行处理 |
+| 7 申诉 | 供应商发布后 `perf_appeal_days`（示例 7）天内 | 供应商门户管理员在门户的考评单上提交（screen flow `srm_appeal_submit`，v0.6 U5）；没开通门户的由采购员、采购主管或品类经理代录：只能申诉一次，写申诉理由 → `appealed`，通知采购总监。采购总监经「处理申诉」（`srm_appeal_resolve`）写处理结果，选择维持原结果或调整总分（等级按新总分重算并回写供应商）→ 回到 `published`，处理人和结果留在考评单上（FR-706）。处理人同样不能是本考评单的评分人。结果应用（第 6 步）只在审定发布时触发；申诉改变等级时，flow 通知品类经理，按原等级生成的草稿由品类经理作废或另行处理 |
 
 > 结果应用（v0.5，`srm_performance_apply`）：只在审定发布（`reviewing` → `published`）时触发，申诉处理回到已发布不触发。
 > - C 级：开一张整改单，`source = performance`、严重度 `minor`、`performance_review` 指回考评单，问题描述写总分与各维度得分；负责
@@ -510,6 +510,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_scar_review` | record_change：状态→`action_submitted` | 整改单 | v0.4 |
 | `srm_scar_reopen` | record_change：状态 `closed`→`open` | 整改单 | v0.4 |
 | `srm_scar_overdue_sweep` | schedule：每小时（api 心跳等 objectstack#25675） | 整改单 | v0.4 |
+| `srm_scar_containment_notice` | record_change：状态 `open`→`containment_submitted`，提交人不是负责 SQE | 整改单 → SQE | v0.6 |
 | `srm_audit_admission_apply` | record_change：准入审核完成或改结论 | 供应商审核 → 准入申请 | v0.4 |
 | `srm_audit_plan_generate` | schedule：每月 1 日 02:30（追赶式；年初那次生成全年计划） | 供应商审核 | v0.4 |
 | `srm_performance_generate` | schedule：每月 `perf_generate_day`（示例 6 日）起连续 7 天 03:00（追赶式，按类别周期） | 考评单、评分明细 | v0.5 |
@@ -530,7 +531,9 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_esign_callback`、`srm_erp_push_retry`、`srm_external_risk_scan` | api / schedule | 合同、同步字段、风险事件 | 客户驱动主题 |
 | `srm_statement_generate`、`srm_invoice_post`、`srm_payment_callback` | — | — | 不做（ERP） |
 
-用户操作入口的 screen flow（均以系统身份运行，flow 内做校验后再写入）：
+用户操作入口的 screen flow（均以系统身份运行，flow 内做校验后再写入）。门户能发起的（`srm_appeal_submit`、`srm_claim_respond`）
+读不到成员键，进门检查改为直接查名册：操作人必须是记录所属供应商的在职联系人（`portal_user` = 本人、`active == true`，
+与成员键的名册条件相同，04 §3.1），否则拒绝；记录页按钮对门户不可见的记录本来就答「不存在」，这一检查挡的是直接触发 flow 的请求：
 
 | screen flow | 入口 | 使用者 | 版本 |
 |---|---|---|---|
@@ -547,6 +550,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_score_reassign` 改派评分人 | 评分项（考评单人工评分中） | 采购总监 | v0.5 |
 | `srm_performance_void` 作废 | 考评单（人工评分） | 采购总监 | v0.5 |
 | `srm_appeal_submit` 申诉 | 考评单（已发布）；v0.6 起门户：绩效 | 采购员、采购主管、品类经理代录（v0.5）；门户管理员（v0.6） | v0.5 |
+| `srm_claim_respond` 确认索赔 | 门户：整改单（索赔已提出） | 门户用户 | v0.6 |
 | `srm_appeal_resolve` 处理申诉 | 考评单（申诉中） | 采购总监 | v0.5 |
 | `srm_portal_enable` 开通门户 | 供应商联系人 | `srm_supplier_admin` | v0.6 |
 | `srm_invite_supplier` 邀请供应商 | 寻源单 | 寻源工程师 | v0.7 |

@@ -2,7 +2,7 @@ import { P, cel } from '@objectstack/spec';
 import { ObjectSchema, Field } from '@objectstack/spec/data';
 
 // 质量整改单 SCAR / 8D（02 §4.6、§5.6，03 §8，FR-602–606）。主要 / 严重不合格的交付记录由 srm_scar_create 自动开单；
-// 客户投诉、制程等来源由 SQE 手工新建。v0.6 门户上线前供应商的回复（D3、D4–D7）由 SQE 代填：填好 D3 把状态改为
+// 客户投诉、制程等来源由 SQE 手工新建。供应商在门户回复（v0.6 U5；没开通门户的供应商仍由 SQE 代填）：填好 D3 把状态改为
 // 「已提交临时措施」，填好 D4–D7 改为「已提交根因与措施」，后者触发 srm_scar_review 由负责 SQE 审核；
 // 审核通过进入「效果验证」，SQE 跟踪后续批次确认有效后关闭（D8）。复发时重新打开（srm_scar_reopen 重算期限），
 // 误判撤销。逾期由 srm_scar_overdue_sweep 置标志并通知 SQE 与质量经理（FR-605）。
@@ -10,6 +10,11 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 const celOf = (source: string) => ({ dialect: 'cel' as const, source });
 const blank = (k: string) => `(!has(record.${k}) || record.${k} == null || isBlank(record.${k}))`;
 const ended = P`record.status == 'closed' || record.status == 'cancelled'`;
+// 门户用户只能做供应商的两步：待响应 → 已提交临时措施 → 已提交根因与措施，其余状态只能保持不变（选项门禁在服务端
+// 按操作人判断，04 §3.2）。哪些行能改、改完仍属本公司由门户权限集的 RLS 决定
+const portal = `(current_user != null && 'srm_portal_user' in current_user.positions)`;
+const from = (...states: string[]) =>
+  celOf(`!${portal} || (previous != null && has(previous.status) && previous.status in [${states.map((v) => `'${v}'`).join(', ')}])`);
 
 export const QualityIssue = ObjectSchema.create({
   name: 'srm_quality_issue',
@@ -97,12 +102,12 @@ export const QualityIssue = ObjectSchema.create({
       group: 'review',
       defaultValue: 'open',
       options: [
-        { label: '待供应商响应', value: 'open', kind: 'open' },
-        { label: '已提交临时措施', value: 'containment_submitted', kind: 'open' },
-        { label: '已提交根因与措施', value: 'action_submitted', kind: 'open' },
-        { label: '效果验证', value: 'verifying', kind: 'open' },
-        { label: '已关闭', value: 'closed', kind: 'won' },
-        { label: '已撤销', value: 'cancelled', kind: 'lost' },
+        { label: '待供应商响应', value: 'open', kind: 'open', visibleWhen: from('open') },
+        { label: '已提交临时措施', value: 'containment_submitted', kind: 'open', visibleWhen: from('open', 'containment_submitted') },
+        { label: '已提交根因与措施', value: 'action_submitted', kind: 'open', visibleWhen: from('containment_submitted', 'action_submitted') },
+        { label: '效果验证', value: 'verifying', kind: 'open', visibleWhen: from('verifying') },
+        { label: '已关闭', value: 'closed', kind: 'won', visibleWhen: from('closed') },
+        { label: '已撤销', value: 'cancelled', kind: 'lost', visibleWhen: from('cancelled') },
       ],
     }),
     sqe: Field.user({ label: '负责 SQE', group: 'review', readonlyWhen: ended }),
@@ -113,7 +118,8 @@ export const QualityIssue = ObjectSchema.create({
     sqe_comment: Field.textarea({ label: 'SQE 审核意见', group: 'review', maxLength: 2000 }),
     is_overdue: Field.boolean({ label: '逾期', group: 'review', defaultValue: false, readonly: true }),
 
-    // 索赔只记结论，供财务在 ERP 扣款时参考，SRM 不生成扣款（ADR-0008）。「已扣款」只由应付会计标记
+    // 索赔只记结论，供财务在 ERP 扣款时参考，SRM 不生成扣款（ADR-0008）。供应商在门户经「确认索赔」（srm_claim_respond）
+    // 接受或提出异议，没开通门户的由 SQE 线下确认后记录。「已扣款」只由应付会计标记
     claim_amount: Field.currency({ label: '索赔金额', group: 'claim', min: 0 }),
     claim_status: Field.select({
       label: '索赔状态',
@@ -131,6 +137,8 @@ export const QualityIssue = ObjectSchema.create({
         },
       ],
     }),
+    // 供应商确认索赔时写的意见，提出异议时必填（srm_claim_respond 写入；SQE 代录线下确认时可补记）
+    claim_response: Field.textarea({ label: '供应商索赔意见', group: 'claim', maxLength: 2000 }),
   },
 
   validations: [

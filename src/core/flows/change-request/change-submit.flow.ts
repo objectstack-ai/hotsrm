@@ -10,7 +10,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // 启动记录，但不信任它：伪造别家的 recordId 时名册对不上，直接结束。银行账户、联系人的归属由变更单上的校验规则再把一道关。
 // 临时做法：平台还不能在 flow 上声明谁可以启动（objectstack#25481），任何成员都能启动系统身份的 screen flow。
 const uid = `current_user != null ? current_user.id : ''`;
-const allowed = `current_user != null && 'srm_portal_admin' in current_user.positions && supplier != null && roster != null`;
+const allowed = `current_user != null && 'srm_portal_admin' in current_user.positions && supplier != null && membership != null`;
 const c = (source: string) => ({ dialect: 'cel' as const, source });
 // 屏幕上没填的字段不会绑定成变量，只能用 has(vars.x) 判断（spec FlowVariableSchema 的说明）
 const opt = (name: string) => c(`has(vars.${name}) && vars.${name} != null && vars.${name} != '' ? vars.${name} : null`);
@@ -37,13 +37,13 @@ export const ChangeSubmitFlow: Automation.Flow = {
       config: { objectName: 'srm_supplier', filter: { id: cel`recordId` }, outputVariable: 'supplier' },
     },
     {
-      id: 'load_roster',
+      id: 'load_membership',
       type: 'get_record',
       label: '启动人是这家供应商的门户账号？',
       config: {
         objectName: 'srm_supplier_contact',
         filter: { supplier: cel`recordId`, portal_user: c(uid), active: true },
-        outputVariable: 'roster',
+        outputVariable: 'membership',
       },
     },
     { id: 'gate', type: 'decision', label: '可以提交？' },
@@ -194,8 +194,8 @@ export const ChangeSubmitFlow: Automation.Flow = {
 
   edges: [
     { id: 'e0', source: 'start', target: 'load_supplier', type: 'default' },
-    { id: 'e1', source: 'load_supplier', target: 'load_roster', type: 'default' },
-    { id: 'e2', source: 'load_roster', target: 'gate', type: 'default' },
+    { id: 'e1', source: 'load_supplier', target: 'load_membership', type: 'default' },
+    { id: 'e2', source: 'load_membership', target: 'gate', type: 'default' },
     { id: 'e3', source: 'gate', target: 'refuse_position', type: 'conditional', condition: c(`!(${allowed})`), label: '不可以' },
     { id: 'e4', source: 'gate', target: 'fill', type: 'conditional', condition: c(allowed), label: '可以' },
     { id: 'e5', source: 'fill', target: 'by_type', type: 'default' },

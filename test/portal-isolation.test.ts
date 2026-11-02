@@ -119,6 +119,31 @@ describe('portal isolation metadata (ADR-0010)', () => {
     }
   });
 
+  // 门户能改的整改单字段只有供应商回复与状态（v0.6 U5）；索赔、SQE 意见、期限等一律只读
+  it('lets the portal edit only the SCAR response fields', () => {
+    const supplierSet = SrmPortalPermissionSets.find((s) => s.name === 'srm_portal_supplier') as unknown as { fields: Record<string, { editable: boolean }> };
+    const issue = objectNamed('srm_quality_issue');
+    const editable = Object.keys(issue.fields).filter((field) => supplierSet.fields[`srm_quality_issue.${field}`]?.editable !== false);
+    expect(editable.sort()).toEqual(['containment_action', 'corrective_action', 'evidence', 'preventive_action', 'root_cause', 'status']);
+  });
+
+  // 以系统身份运行、门户能发起的 screen flow 读不到成员键，只能自己查名册：条件必须与成员键的名册条件一致
+  it('makes every portal-facing system flow check the contact roster like the membership key', () => {
+    const key = SupplierContact.membershipKeys!.portal_supplier_ids as { userField: string; valueField: string; filter: string };
+    expect(key.filter).toBe('active == true');
+    for (const name of ['srm_claim_respond', 'srm_appeal_submit', 'srm_change_submit', 'srm_application_resubmit']) {
+      const flow = (config.flows ?? []).find((f) => f.name === name)!;
+      expect(flow.runAs, name).toBe('system');
+      const roster = flow.nodes.find((n) => n.id === 'load_membership') as { config: { objectName: string; filter: Row } } | undefined;
+      expect(roster?.config.objectName, name).toBe('srm_supplier_contact');
+      expect(Object.keys(roster!.config.filter).sort(), name).toEqual(['active', key.userField, key.valueField].sort());
+      expect(roster!.config.filter.active, name).toBe(true);
+      // 每条走到界面或写入的路径都经过 membership 判断
+      const gate = flow.edges.filter((e) => e.source === 'gate');
+      for (const edge of gate) expect(JSON.stringify(edge.condition), `${name} ${edge.id}`).toContain('membership');
+    }
+  });
+
   it('keeps portal and internal positions apart', () => {
     const portalSetNames = new Set(portalSets.map((s) => s.name));
     for (const position of SrmPositions) {
@@ -353,6 +378,90 @@ describe('portal isolation (04 §3.7)', () => {
     }
     const rows = await stack.rows('srm_supplier', { id: B.supplier });
     expect(rows[0]!.website ?? null).toBeNull();
+  });
+
+  // 整改单回复（v0.6 U5）：只能改本公司、轮到供应商回复的单，只能改回复字段，状态只能走供应商的两步
+  it('limits SCAR replies to the own supplier, the supplier\'s turn and the response fields', async () => {
+    // 种子写入直接给定状态（不触发审核流程）；本公司新建的单记入 A 的可见行
+    const issue = async (supplier: string, doc: Row = {}) => {
+      const id = String((await seed('srm_quality_issue', { supplier, severity: 'major', problem_description: '示例门户回复隔离', ...doc })).id);
+      (supplier === A.supplier ? A : B).visible.get('srm_quality_issue')!.push(id);
+      return id;
+    };
+    const write = (id: string, doc: Row) => stack.hooks.run('srm_quality_issue', 'update', { id, ...doc }, { as: a.token });
+    const stored = async (id: string) => (await stack.rows('srm_quality_issue', { id }))[0]!;
+    // 别家的单：改不了，也提交不了
+    const foreign = await issue(B.supplier);
+    await expect(write(foreign, { containment_action: '越权回复' })).rejects.toBeTruthy();
+    await expect(write(foreign, { status: 'containment_submitted' })).rejects.toBeTruthy();
+    expect(await stored(foreign)).toMatchObject({ status: 'open' });
+    expect((await stored(foreign)).containment_action ?? null).toBeNull();
+
+    const own = await issue(A.supplier);
+    // 不是回复字段：拒绝或被丢弃，值不变
+    for (const doc of [{ sqe_comment: '自填意见' }, { claim_amount: 1 }, { claim_status: 'supplier_accepted' }, { problem_description: '改问题' }, { is_overdue: true }, { supplier: B.supplier }]) {
+      await write(own, doc).catch(() => undefined);
+      const after = await stored(own);
+      for (const [field, value] of Object.entries(doc)) expect(after[field], field).not.toEqual(value);
+    }
+    // 状态不能跳过审核、不能撤销或关闭
+    for (const status of ['action_submitted', 'verifying', 'closed', 'cancelled']) {
+      await expect(write(own, { containment_action: '示例临时措施', status }), status).rejects.toBeTruthy();
+    }
+    await write(own, { containment_action: '示例临时措施', status: 'containment_submitted' });
+    // 提交后不能自己退回
+    await expect(write(own, { status: 'open' })).rejects.toBeTruthy();
+    expect((await stored(own)).status).toBe('containment_submitted');
+    // 轮到 SQE（效果验证、已关闭）时整张单都改不了
+    for (const status of ['action_submitted', 'verifying', 'closed', 'cancelled']) {
+      const locked = await issue(A.supplier, { containment_action: '示例', root_cause: '示例', corrective_action: '示例', status });
+      await expect(write(locked, { preventive_action: '改' }), status).rejects.toBeTruthy();
+      expect((await stored(locked)).preventive_action ?? null, status).toBeNull();
+    }
+  });
+
+  // 系统身份运行的 screen flow 自己做隔离检查：别家的整改单、考评单一律拒绝，记录不变
+  it('refuses the claim and appeal flows on another supplier\'s records', async () => {
+    // 两个入口都试：记录页按钮（action）和直接触发 flow（REST trigger，不经按钮所在页面的读取）。flow 以系统身份
+    // 读记录，所以隔离只能靠 flow 自己的名册检查
+    const run = async (who: Portal, object: string, flow: string, recordId: string, input: Row) => {
+      const finish = async (start: Promise<unknown>) => {
+        let res = (await start.catch((e) => ({ status: 'error', error: e }))) as Row;
+        for (let i = 0; i < 3 && res.status === 'paused' && res.runId; i++) {
+          res = (await stack.flows.resume({ flowName: flow, runId: res.runId }, input, { as: who.token }).catch((e) => ({ status: 'error', error: e }))) as Row;
+        }
+        return String(res.status ?? (res.success === true ? 'completed' : 'failed'));
+      };
+      return {
+        // 按钮入口：记录对门户不可见，平台答「不存在」；直接触发：flow 的名册检查拒绝
+        status: [
+          await finish(stack.actions.run(object, flow, { as: who.token, recordId })),
+          await finish(stack.flows.run(flow, { recordId }, { as: who.token })),
+        ],
+      };
+    };
+    const REFUSED = { status: ['error', 'refused'] };
+    const foreign = String((await sys('srm_quality_issue', { supplier: B.supplier, severity: 'major', problem_description: '示例索赔隔离', claim_amount: 100, claim_status: 'proposed' })).id);
+    B.visible.get('srm_quality_issue')!.push(foreign);
+    expect(await run(a, 'srm_quality_issue', 'srm_claim_respond', foreign, { decision: 'accept' })).toEqual(REFUSED);
+    expect((await stack.rows('srm_quality_issue', { id: foreign }))[0]!.claim_status).toBe('proposed');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const review = B.visible.get('srm_performance_review')![0]!;
+    await stack.hooks.run('srm_performance_review', 'update', { id: review, published_date: today }, { system: true });
+    expect((await run(aAdmin, 'srm_performance_review', 'srm_appeal_submit', review, { appeal_text: '越权申诉' }))).toEqual(REFUSED);
+    expect((await stack.rows('srm_performance_review', { id: review }))[0]!).toMatchObject({ status: 'published' });
+    expect((await stack.rows('srm_performance_review', { id: review }))[0]!.appeal_reason ?? null).toBeNull();
+    // 联系人停用后，同一个门户管理员对本公司的考评单也申诉不了
+    const own = A.visible.get('srm_performance_review')![0]!;
+    await stack.hooks.run('srm_performance_review', 'update', { id: own, published_date: today }, { system: true });
+    await stack.hooks.run('srm_supplier_contact', 'update', { id: aAdmin.contact, active: false }, { system: true });
+    expect((await run(aAdmin, 'srm_performance_review', 'srm_appeal_submit', own, { appeal_text: '停用后申诉' }))).toEqual(REFUSED);
+    await stack.hooks.run('srm_supplier_contact', 'update', { id: aAdmin.contact, active: true }, { system: true });
+    expect((await stack.rows('srm_performance_review', { id: own }))[0]!.status).toBe('published');
+    // 对照：恢复在职后，本公司的考评单经按钮能申诉，说明上面的拒绝来自隔离检查而不是入口本身不通
+    expect((await run(aAdmin, 'srm_performance_review', 'srm_appeal_submit', own, { appeal_text: '示例申诉' })).status[0]).toBe('completed');
+    expect((await stack.rows('srm_performance_review', { id: own }))[0]!).toMatchObject({ status: 'appealed', appeal_recorded_by: aAdmin.id });
   });
 
   // 名册就是授权：任何门户身份、任何内部岗位都写不了 portal_user，也改不了联系人归属和在职标志
