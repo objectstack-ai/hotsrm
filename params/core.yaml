@@ -105,6 +105,13 @@ blacklist_years:
   used_in: [QP-01 6.9.3]
   system: 制度要求；黑名单状态由处置单设置，解除需单独审批（核心 03 §5）
 
+coc_resign_months:
+  label: 现有供应商补签行为准则的期限
+  unit: 个月
+  example: 12
+  used_in: [ZC-01 4.4.1, ZC-01 第 6 节, SP-01 前言]
+  system: 制度要求；签署状态记录在供应商协议中，签署率按季度统计
+
 record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
