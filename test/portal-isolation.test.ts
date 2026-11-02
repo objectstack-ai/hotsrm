@@ -131,7 +131,7 @@ describe('portal isolation metadata (ADR-0010)', () => {
   it('makes every portal-facing system flow check the contact roster like the membership key', () => {
     const key = SupplierContact.membershipKeys!.portal_supplier_ids as { userField: string; valueField: string; filter: string };
     expect(key.filter).toBe('active == true');
-    for (const name of ['srm_claim_respond', 'srm_appeal_submit']) {
+    for (const name of ['srm_claim_respond', 'srm_appeal_submit', 'srm_change_submit', 'srm_application_resubmit']) {
       const flow = (config.flows ?? []).find((f) => f.name === name)!;
       expect(flow.runAs, name).toBe('system');
       const roster = flow.nodes.find((n) => n.id === 'load_membership') as { config: { objectName: string; filter: Row } } | undefined;
@@ -511,10 +511,13 @@ describe('portal isolation (04 §3.7)', () => {
     expect(idsOf(await list(b.token, 'srm_supplier_certificate'))).not.toContain(String(created.id));
   });
 
-  // 自解资质异常：门户上传的新证书不能自带「已核验」或状态，已有证书门户改不了
+  // 自解资质异常：门户上传的新证书不能自带「已核验」或状态；改已有证书的内容会复位「已核验」（v0.6 U4，03 §11），
+  // 状态门户改不了。资质异常要经 SQE 核验才解除，完整场景见 portal-self-service.test.ts
   it('does not let a portal user clear a qualification alert', async () => {
     const certificate = A.visible.get('srm_supplier_certificate')![0]!;
-    await expect(stack.hooks.run('srm_supplier_certificate', 'update', { id: certificate, valid_to: '2040-01-01' }, { as: a.token })).rejects.toBeTruthy();
+    expect((await stack.rows('srm_supplier_certificate', { id: certificate }))[0]!.verified).toBe(true);
+    await stack.hooks.run('srm_supplier_certificate', 'update', { id: certificate, valid_to: '2040-01-01' }, { as: a.token });
+    expect((await stack.rows('srm_supplier_certificate', { id: certificate }))[0]!.verified).toBe(false);
     await expect(stack.hooks.run('srm_supplier_certificate', 'update', { id: certificate, status: 'valid' }, { as: a.token })).rejects.toBeTruthy();
     await expect(
       stack.hooks.run(
@@ -524,6 +527,36 @@ describe('portal isolation (04 §3.7)', () => {
         { as: a.token },
       ),
     ).rejects.toMatchObject({ code: 'PERMISSION_DENIED' });
+  });
+
+  // v0.6 U4 的写路径（04 §3.7）：改别家的证书、联系人、变更单，在别家名下建银行账户，经 screen flow 给别家提交变更或
+  // 重新提交别家的准入申请，一律拒绝；别家的记录一个字段都不变
+  it('refuses the self-service write paths across suppliers', async () => {
+    const bCert = B.visible.get('srm_supplier_certificate')![0]!;
+    await expect(stack.hooks.run('srm_supplier_certificate', 'update', { id: bCert, valid_to: '2041-01-01' }, { as: a.token })).rejects.toBeTruthy();
+    // 把自己的证书改挂到别家名下
+    const own = A.visible.get('srm_supplier_certificate')![0]!;
+    await expect(stack.hooks.run('srm_supplier_certificate', 'update', { id: own, supplier: B.supplier }, { as: a.token })).rejects.toBeTruthy();
+    const bContact = B.visible.get('srm_supplier_contact')![0]!;
+    await expect(stack.hooks.run('srm_supplier_contact', 'update', { id: bContact, mobile: '13000000000' }, { as: aAdmin.token })).rejects.toBeTruthy();
+    await expect(
+      stack.hooks.run('srm_supplier_bank_account', 'insert', { supplier: B.supplier, bank_name: '示例银行', account_name: B.name, account_no: '6222000011112222' }, { as: aAdmin.token }),
+    ).rejects.toBeTruthy();
+    const bChange = B.visible.get('srm_supplier_change_request')![0]!;
+    await expect(stack.hooks.run('srm_supplier_change_request', 'update', { id: bChange, reason: '冒名' }, { as: aAdmin.token })).rejects.toBeTruthy();
+    // 系统身份的 screen flow：门户管理员伪造别家的供应商、门户用户伪造别家的准入申请，名册对不上即结束
+    const submit = (await stack.flows.run('srm_change_submit', { recordId: B.supplier }, { as: aAdmin.token })) as { status?: string };
+    expect(submit.status).toBe('refused');
+    const resubmit = (await stack.flows.run('srm_application_resubmit', { recordId: B.visible.get('srm_supplier_application')![0]! }, { as: a.token })) as { status?: string };
+    expect(resubmit.status).toBe('refused');
+    // 核验证书只给 SQE / 质量经理
+    const verify = (await stack.flows.run('srm_certificate_verify', { recordId: own }, { as: aAdmin.token })) as { status?: string };
+    expect(verify.status).toBe('refused');
+    expect((await stack.rows('srm_supplier_certificate', { id: bCert }))[0]!.valid_to).not.toBe('2041-01-01');
+    expect((await stack.rows('srm_supplier_contact', { id: bContact }))[0]!.mobile ?? null).toBeNull();
+    expect((await stack.rows('srm_supplier_change_request', { id: bChange }))[0]!.reason).toBe('示例变更');
+    expect(await stack.rows('srm_supplier_change_request', { supplier: B.supplier })).toHaveLength(1);
+    expect((await stack.rows('srm_supplier_bank_account', { supplier: B.supplier })).map((r) => String(r.id))).toEqual(B.visible.get('srm_supplier_bank_account'));
   });
 
   it('shows the full bank account number to the portal admin only', async () => {

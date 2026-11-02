@@ -175,9 +175,9 @@ flowchart LR
 | 对象 | 门户读 | 门户写 | 说明 |
 |---|---|---|---|
 | 供应商 | 本公司 | 只能改资料字段（§4.2）；名称、地址、银行账户等关键信息走变更单 | RLS 在供应商自身的 `id` 上；授予编辑权是为了让门户能维护证书等子记录；内部评估类字段（关联方、优选、风险事件数等）门户不可见 |
-| 联系人、证书、银行账户、品类资格 | 跟随供应商 | 证书可增（v0.6 U2；修改随 U4 的「核验证书」一起放开）；联系人和银行账户仅门户管理员可增，门户管理员可改联系人手机 | `controlled_by_parent`；联系人的 `portal_user`、`active` 门户只读 |
-| 准入申请 | 本公司 | 「退回补充」状态时可改（U4） | `private`：读共享规则 + RLS |
-| 变更单 | 本公司 | 只经「提交变更申请」screen flow（门户管理员，U4） | `private`：读共享规则 + RLS |
+| 联系人、证书、银行账户、品类资格 | 跟随供应商 | 证书可增可改（U4）：门户改了类型、编号、发证机构、有效期或扫描件时 `verified` 复位、通知 SQE，经「核验证书」才能解除资质异常（03 §11）；联系人仅门户管理员可增可改；银行账户仅门户管理员可增，新建即「待核验」并通知应付会计，已有账户的修改走变更单 | `controlled_by_parent`；联系人的 `portal_user`、`active`，证书的 `status`、`is_mandatory`、`verified`、`verified_by`，银行账户的状态与核验人门户只读 |
+| 准入申请 | 本公司 | 只经「补充完成，重新提交」screen flow（`returned` 状态，门户用户，U4）：写补充说明，回到资料审核；申请本身的品类、初审人由内部维护 | `private`：读共享规则 + RLS；flow 以系统身份写，进门按门户名册检查启动人属于申请的供应商 |
+| 变更单 | 本公司 | 新建只经「提交变更申请」screen flow（门户管理员，U4）；被退回修改的单由门户管理员改完重新提交（写策略：本公司且 `approval_status == 'returned'`） | `private`：读共享规则 + RLS；改只限自己发起（拥有）的单——`external` 成员对 `private` 对象只能改自己的行，写策略再限定本公司、被退回 |
 | 寻源邀请 | 本公司 | 可改 `status`（接受 / 拒绝）与拒绝原因 | 邀请上有寻源单的快照，门户不读寻源单本身 |
 | 报价单 | 本公司 | `status in ['draft','submitted'] && bid_opened == false` 的本公司报价 | 写策略 `using` 限定可改哪些行，`check` 限定改完仍属本公司；上一轮的 `superseded` 报价不可改 |
 | 报价明细 | 跟随报价单 | 跟随报价单；只能改单价、交期、税率、起订量、备注 | 截止后由校验规则锁定（BR-06）；金额、中标字段、快照字段只读 |
@@ -345,14 +345,16 @@ export const PortalSupplier = definePermissionSet({
 | 越过回复范围 | 用 A 的身份改本公司整改单的非回复字段（SQE 意见、索赔、问题描述、逾期标志）、把状态改成效果验证 / 关闭 / 撤销或退回、改轮到 SQE 的整改单 | 拒绝或写入被丢弃，值不变（v0.6 U5） |
 | 越权 screen flow | 用 A 的身份对 B 的整改单「确认索赔」、对 B 的考评单「申诉」，分别经记录页按钮和直接触发 flow；联系人停用后对本公司考评单申诉 | 按钮答「不存在」，直接触发被 flow 的名册检查拒绝，记录不变；恢复在职后本公司的申诉照常（v0.6 U5） |
 | 开标后改价 | 开标后用中标供应商的身份修改本公司报价明细的单价或中标字段 | 拒绝（v0.7 寻源上线时加入） |
-| 自解资质异常 | 用门户身份把本公司过期证书的 `status` 改为有效，或修改有效期；新建证书时自带「已核验」 | 全部拒绝（v0.6 U2 门户只能新建证书；U4 放开修改时，改有效期重置 `verified`，资质异常不解除） |
+| 自解资质异常 | 用门户身份把本公司过期证书的 `status` 改为有效、新建证书时自带「已核验」、写 `verified`；修改有效期或类型 | 改状态、自带核验被拒绝或写入被丢弃；修改内容放行但 `verified` 复位，资质异常在 SQE 核验前不解除（U4） |
+| 自助写路径 | 用 A 的身份改 B 的证书、联系人、变更单，在 B 名下建银行账户；伪造 `recordId` 启动「提交变更申请」「补充完成，重新提交」；门户身份启动「核验证书」 | 全部拒绝，B 的记录不变（U4） |
 | 空名册 | 持门户岗位但不在任何在职联系人上的用户；联系人停用的用户；在名册上但没有门户岗位的用户；没开通门户的供应商的单据 | 每个对象零行 |
 | 回收 | 停用 A 用户的联系人、撤销其门户岗位任命、执行 A 的淘汰处置后立即访问 | 看不到任何供应商数据 |
 | 用户目录 | 用 A 的身份在界面和 REST API 上查询用户列表 | 看不到 B 的门户账号，也看不到内部员工的完整名单（§3.6） |
 | 多通道 | 以上用例分别经门户界面、REST API、导出、AI 助手执行 | 结果一致 |
 | 元数据守卫 | 检查门户权限集与共享规则 | 门户能读的每个对象都有读成员键的 RLS（或是子对象）；只授门户岗位的共享规则只有读权限且对象有这条 RLS；门户权限集不设 `isDefault`、不授删除 / 全量读写 / 导出；每个带供应商引用的对象要么授给门户，要么写明不授的理由 |
 
-自动化：`test/portal-isolation.test.ts` 覆盖除「开标后改价」以外的全部用例，在 CI 里跑，不得删除或跳过（AGENTS.md
+自动化：`test/portal-isolation.test.ts` 覆盖除「开标后改价」以外的全部用例（门户自助的完整场景另见
+`test/portal-self-service.test.ts`），在 CI 里跑，不得删除或跳过（AGENTS.md
 红线 2）；门户界面走的就是 REST API，导出经 REST 验证被拒；AI 助手以提问者身份查询、走同一套 RLS，v0.6 出口测试时
 在托管环境人工复核一次（07 §6.2 V6）。
 
@@ -386,7 +388,7 @@ export const PortalSupplier = definePermissionSet({
 | 字段 | 谁可读 | 谁可改 | 原因 |
 |---|---|---|---|
 | `srm_supplier_bank_account.account_no` | 完整值：应付会计（`srm_finance`）、`srm_supplier_admin`、本公司门户管理员（v0.6）；其他内部岗位读到只留后 4 位的脱敏值。实现为字段 `maskingRule: 'bank_account'` + `requiredPermissions: ['srm_view_bank_account_no']`，能力由权限集 `systemPermissions` 授予；没有任何权限集给银行账户 `allowExport` | 新建时（`srm_supplier_admin`；v0.6 起门户管理员）、经变更单 flow；`pending_verify` 期间与有效后都只读 | 资金安全（BR-20） |
-| `srm_supplier_contact.mobile` | 内部员工、本公司门户用户 | 本公司门户管理员 | 个人信息最小化 |
+| `srm_supplier_contact.mobile` | 内部员工、本公司门户用户 | 本公司门户管理员（v0.6 起门户管理员可增改本公司联系人） | 个人信息最小化 |
 | `srm_sourcing_event.budget_amount` | 寻源、采购总监、内控 | 寻源 | 门户不可见（门户本就不读寻源单） |
 | `srm_sourcing_item.target_price` / `last_price` | 同上 | 寻源 | 同上 |
 | `srm_quotation.technical_score` / `commercial_score` / `total_score` / `rank` | 内部评标相关角色（开标后） | 寻源、评标 flow | 门户不可见，防止供应商据此调价 |
@@ -401,7 +403,7 @@ export const PortalSupplier = definePermissionSet({
 | `srm_supplier_contact.portal_user` | 内部、本公司门户 | 仅 flow（字段级只读） | 门户名册：写入即授出这家供应商的门户数据（ADR-0010） |
 | `srm_supplier_contact.active` | 内部、本公司门户 | 内部（`srm_supplier_admin`）；门户只读 | 名册过滤条件，门户不能恢复被停用的账号 |
 | `srm_supplier` 的 `name`、`country`、`credit_code`、`registration_no`、`address`、`legal_representative`、`registered_capital`、`status`、`grade`、`qualification_alert`、`erp_vendor_code` | 内部、本公司门户 | 内部（关键信息变更走变更单） | 门户只读；门户可直接改的只有 `short_name`、`website`、`supplier_type`、`taxpayer_type`、`established_date` 等资料字段 |
-| `srm_supplier_certificate.status` / `is_mandatory` / `verified` | 内部、本公司门户 | 仅 flow 与「核验证书」screen flow | 防止供应商自行解除资质异常 |
+| `srm_supplier_certificate.status` / `is_mandatory` / `verified` / `verified_by` | 内部、本公司门户 | 仅 flow 与「核验证书」screen flow（`verified` 为对象级只读，内部也不能直接改） | 防止供应商自行解除资质异常 |
 | `srm_quotation_line` 的 `amount`、`is_awarded`、`award_quantity`、`award_ratio` 及快照字段 | 所有可读报价的人 | 仅 flow | 防止供应商改金额或自报中标 |
 | `srm_purchase_order` 全部字段（预留） | 内部、本公司门户 | 内部与集成 | 门户对订单头有编辑权只为写订单行，字段全部只读 |
 

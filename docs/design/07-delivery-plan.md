@@ -121,7 +121,7 @@ src/core/
 │   ├── positions.ts             # 内部岗位
 │   ├── permission-sets.ts       # 内部权限集
 │   └── portal.ts                # 门户权限集与 RLS（见 04 §3.4）
-├── apps/                        # srm_workbench、srm_portal 两个应用外壳（导航按分组）
+├── apps/                        # srm_workbench 一个应用（ADR-0019 D3），内部工作台与「供应商门户」导航组（导航按分组）
 ├── views/                       # 列表、看板、日历、甘特
 ├── reports/                     # 比价矩阵等（v0.7）
 ├── dashboards/
@@ -135,6 +135,7 @@ test/                            # 仓库根目录
 ├── approval-matrix.test.ts      # 03 §12 每一行（v0.1 起）
 ├── portal-platform.test.ts      # 门户平台实测 V1–V5（§6.2，v0.6 U1）
 ├── portal-isolation.test.ts     # 04 §3.7 的交叉越权用例（v0.6）
+├── portal-self-service.test.ts  # 门户自助维护：补证书与核验、变更申请、退回补充（v0.6 U4）
 ├── portal-response.test.ts     # 门户整改回复、索赔确认、绩效查看与申诉（v0.6 U5）
 ├── sealed-bid.test.ts           # 封标与截止锁价（v0.7）
 └── flows/*.test.ts              # 每条 flow 的正向与异常路径
@@ -272,6 +273,7 @@ test/                            # 仓库根目录
 | PF15 | objectstack#14500 flow 没有汇总能力：CEL 不能对列表求和，`get_record` 只返回行（已关的「汇总 / 分组节点」卡，hotsrm 的用法作为数据点记在评论里） | 考评生成的 Σ不良数、Σ实收数、启用指标权重合计 | `loop` + `assignment` 逐行累加；200 家 × 30 行约 8.6 秒，性能可接受 | 平台不纳入计划 |
 | PF16 | objectstack#26133 导入 upsert 时同一文件里匹配键相同的两行都新建，之后再导报 `AMBIGUOUS_MATCH` | 证书等没有唯一约束的对象重复建档 | 清洗时同一张证书只留一行（[导入说明 §6.2](../implementation/legacy-supplier-import.md#62-清洗清单)） | 2026-10-26 新提 |
 | PF17 | objectstack#25251 自动化不得以系统身份写岗位任命、权限集授予、邀请和成员（裁定 B）；邀请只经组织接口（V2、V3） | 门户开通、回收 | 组织管理员在成员页邀请、移出组织；任命与门户管理员授权由 `runAs: 'user'` 的「开通门户」flow 在组织管理员操作时写；处置 flow 不撤任命，改为通知组织管理员（04 §3.3） | 平台裁定，长期做法（2026-11-02 实测登记，不另提 issue） |
+| PF18 | objectstack#29050 直接触发 flow（REST trigger）不按启动人的权限读 `recordId`，按钮入口（#16370）会答「不存在」 | 门户能启动的系统身份 screen flow（确认索赔、申诉、提交变更申请、准入补充后重新提交） | 每条 flow 进门自己查名册（`portal_user` = 本人、`active == true`，与成员键同条件），元数据测试守住（04 §3.7） | 2026-11-02 新提 |
 
 其他代码和文档里指向平台的临时做法，2026-10-26 核对结果：
 

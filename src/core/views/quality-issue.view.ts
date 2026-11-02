@@ -46,6 +46,15 @@ export const QualityIssueViews = defineView({
       filter: [unfinished],
       sort: [{ field: 'final_due', order: 'asc' }],
     },
+    // 门户首页待办（01 §5.10，v0.6）：等供应商提交临时措施，或临时措施后（含被 SQE 退回后）等供应商提交根因与措施
+    portal_todo: {
+      label: '待我处理的整改单',
+      type: 'grid',
+      data,
+      columns: columns.filter((c) => c.field !== 'supplier' && c.field !== 'claim_status'),
+      filter: [{ field: 'status', operator: 'in', value: ['open', 'containment_submitted'] }],
+      sort: [{ field: 'containment_due', order: 'asc' }],
+    },
     overdue: {
       label: '逾期整改单',
       type: 'grid',

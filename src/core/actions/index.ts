@@ -5,3 +5,4 @@ export { AuditFindingToScarAction } from './audit.actions.js';
 export { DispositionSubmitAction, DispositionCancelAction } from './disposition.actions.js';
 export { ScoreSubmitAction, PerformanceVoidAction, AppealSubmitAction, AppealResolveAction, ScoreReassignAction } from './performance.actions.js';
 export { ClaimRespondAction } from './quality-issue.actions.js';
+export { ChangeSubmitAction, ApplicationResubmitAction, CertificateVerifyAction } from './portal.actions.js';

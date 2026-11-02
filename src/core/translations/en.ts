@@ -140,6 +140,7 @@ export const en: TranslationData = {
         primary_contact_conflict: { label: 'Duplicate Primary Contacts' },
       },
       _actions: {
+        srm_change_submit: { label: 'Submit Change Request' },
         srm_confirm_legacy_review: {
           label: 'Confirm Review',
           confirmText: "Confirm that this supplier's record, contacts and certificates have been checked?",
@@ -185,8 +186,10 @@ export const en: TranslationData = {
         attachment: { label: 'Scan' },
         status: { label: 'Status', options: { valid: 'Valid', expiring: 'Expiring', expired: 'Expired' } },
         verified: { label: 'Verified' },
+        verified_by: { label: 'Verified By' },
         legacy_imported: { label: 'Legacy Import' },
       },
+      _actions: { srm_certificate_verify: { label: 'Verify Certificate' } },
       _views: {
         default: { label: 'All Certificates' },
         expiring: { label: 'Expiring and Expired' },
@@ -408,7 +411,9 @@ export const en: TranslationData = {
         approval_status: { label: 'Approval Result', options: { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' } },
         approved_date: { label: 'Approved Date' },
         reject_reason: { label: 'Rejection Reason' },
+        supplement_note: { label: 'Supplement Note' },
       },
+      _actions: { srm_application_resubmit: { label: 'Supplemented, Resubmit' } },
       _views: {
         default: { label: 'All Applications' },
         in_progress: { label: 'In Progress' },
@@ -658,6 +663,7 @@ export const en: TranslationData = {
         default: { label: 'All Corrective Action Requests' },
         board: { label: 'Corrective Action Board' },
         unfinished: { label: 'Open Corrective Action Requests' },
+        portal_todo: { label: 'Corrective Actions Awaiting Me' },
         overdue: { label: 'Overdue Corrective Action Requests' },
         claims: { label: 'Claims' },
       },
@@ -1165,11 +1171,98 @@ export const en: TranslationData = {
         refuse_scorer: { message: 'You scored this review; ask another procurement director to handle the appeal' },
       },
     },
+    srm_certificate_verify: {
+      label: 'Verify Certificate',
+      successMessage: 'Certificate verified',
+      screens: {
+        confirm: {
+          title: 'Verify certificate: {{ certificate.cert_no }}',
+          description:
+            'Issuer: {{ certificate.issuer }}\nValid: {{ certificate.valid_from }} to {{ certificate.valid_to }}\n'
+            + 'Open the scan and check the number, holder and validity against the original or the issuer\'s public register, then verify.',
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only SQEs or quality managers can verify certificates' },
+        refuse_status: { message: 'This certificate has already been verified' },
+        refuse_expired: { message: 'The certificate has expired and cannot clear a qualification alert even if verified; ask the supplier to upload a new one' },
+      },
+    },
+    srm_change_submit: {
+      label: 'Submit Change Request',
+      successMessage: 'Change request submitted for purchasing approval',
+      screens: {
+        fill: {
+          title: 'Submit change request: {{ supplier.name }}',
+          description: 'Fill in only what changes. Purchasing approves the request, and a bank account change is also reviewed by finance; the profile is updated once approved.',
+          fields: {
+            change_type: { label: 'Change Type', options: { basic: 'Basic Information', address: 'Registered Address', bank_account: 'Bank Account', contact: 'Contact' } },
+            reason: { label: 'Reason for Change' },
+            new_name: { label: 'New Legal Name' },
+            new_credit_code: { label: 'New Unified Social Credit Code' },
+            new_registration_no: { label: 'New Registration / Tax No.' },
+            new_legal_representative: { label: 'New Legal Representative' },
+            new_registered_capital: { label: 'New Registered Capital' },
+            address_street: { label: 'New Address (Street)' },
+            address_city: { label: 'City' },
+            address_state: { label: 'Province / State' },
+            address_postal_code: { label: 'Postal Code' },
+            bank_account: { label: 'Bank Account to Replace' },
+            new_bank_name: { label: 'New Bank' },
+            new_branch_name: { label: 'New Branch' },
+            new_account_name: { label: 'New Account Name' },
+            new_account_no: { label: 'New Account No.' },
+            new_swift_code: { label: 'New SWIFT Code' },
+            new_currency: { label: 'New Account Currency', options: { cny: 'CNY', usd: 'USD', eur: 'EUR', jpy: 'JPY', hkd: 'HKD' } },
+            contact: { label: 'Contact' },
+            new_contact_name: { label: 'New Name' },
+            new_mobile: { label: 'New Mobile' },
+            new_email: { label: 'New Email' },
+          },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only this company\'s portal administrators can submit change requests in the portal' },
+      },
+    },
+    srm_application_resubmit: {
+      label: 'Supplemented, Resubmit',
+      successMessage: 'Resubmitted for document review',
+      screens: {
+        confirm: {
+          title: 'Resubmit admission application: {{ application.application_no }}',
+          description: 'First complete the profile, certificates and bank accounts under Company Profile, then describe what you added; the application returns to document review.',
+          fields: { note: { label: 'Supplement Note' } },
+        },
+      },
+      refusals: {
+        refuse_position: { message: 'Only portal users of the applying supplier can resubmit the application' },
+        refuse_status: { message: 'Only applications returned for supplement need resubmitting' },
+      },
+    },
   },
   apps: {
     srm_workbench: {
       label: 'SRM Workbench',
       navigation: {
+        group_portal: { label: 'Supplier Portal' },
+        portal_home: { label: 'Home' },
+        portal_nav_todo_issues: { label: 'Corrective Actions Awaiting Me' },
+        portal_nav_todo_certificates: { label: 'Expiring Certificates' },
+        portal_nav_todo_applications: { label: 'Admission Progress' },
+        portal_nav_latest_reviews: { label: 'Latest Performance' },
+        portal_company: { label: 'Company Profile' },
+        portal_nav_profile: { label: 'Our Company' },
+        portal_nav_contacts: { label: 'Contacts' },
+        portal_nav_certificates: { label: 'Certificates' },
+        portal_nav_bank_accounts: { label: 'Bank Accounts' },
+        portal_nav_change_requests: { label: 'Change Requests' },
+        portal_nav_applications: { label: 'Admission Applications' },
+        portal_quality: { label: 'Quality' },
+        portal_nav_quality_issues: { label: 'Corrective Action Requests' },
+        portal_nav_delivery_records: { label: 'Delivery Results' },
+        portal_performance: { label: 'Performance' },
+        portal_nav_reviews: { label: 'Performance Reviews' },
         group_supplier: { label: 'Suppliers' },
         nav_supplier: { label: 'Suppliers' },
         nav_application: { label: 'Admission Applications' },

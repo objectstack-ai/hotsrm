@@ -1,11 +1,72 @@
 import { App } from '@objectstack/spec/ui';
 
-// 内部工作台。导航按分组组织，扩展包往分组里挂菜单（ADR-0002）。
+// SRM 应用：内部工作台与供应商门户（05 §1）。导航按分组组织，扩展包往分组里挂菜单（ADR-0002）。
+// 平台规定一个应用包只有一个应用（objectstack ADR-0019 D3），所以门户不是第二个应用，而是本应用里只对持门户能力
+// srm_portal_access 的用户显示的一组导航（门户权限集授予）。这只是体验：门户用户能看到哪些行由门户 RLS 决定
+// （ADR-0010），点进内部菜单也只看到本公司的数据。
 export const Workbench = App.create({
   name: 'srm_workbench',
   label: 'SRM 工作台',
   icon: 'handshake',
   navigation: [
+    // 供应商门户（05 §1.2，v0.6）：首页是一组待办列表（01 §5.10），点进去就是要处理的那条记录；询价与报价随 v0.7 加入
+    {
+      id: 'group_portal',
+      type: 'group',
+      label: '供应商门户',
+      icon: 'store',
+      expanded: true,
+      requiredPermissions: ['srm_portal_access'],
+      children: [
+        {
+          id: 'portal_home',
+          type: 'group',
+          label: '首页',
+          icon: 'house',
+          expanded: true,
+          children: [
+            { id: 'portal_nav_todo_issues', type: 'object', objectName: 'srm_quality_issue', viewName: 'portal_todo', label: '待我处理的整改单', icon: 'clipboard-x' },
+            { id: 'portal_nav_todo_certificates', type: 'object', objectName: 'srm_supplier_certificate', viewName: 'expiring', label: '即将到期的证书', icon: 'badge-alert' },
+            { id: 'portal_nav_todo_applications', type: 'object', objectName: 'srm_supplier_application', viewName: 'in_progress', label: '准入申请进度', icon: 'clipboard-check' },
+            { id: 'portal_nav_latest_reviews', type: 'object', objectName: 'srm_performance_review', label: '最新绩效', icon: 'award' },
+          ],
+        },
+        {
+          id: 'portal_company',
+          type: 'group',
+          label: '公司资料',
+          icon: 'building',
+          expanded: true,
+          children: [
+            { id: 'portal_nav_profile', type: 'object', objectName: 'srm_supplier', label: '本公司档案', icon: 'factory' },
+            { id: 'portal_nav_contacts', type: 'object', objectName: 'srm_supplier_contact', label: '联系人', icon: 'contact' },
+            { id: 'portal_nav_certificates', type: 'object', objectName: 'srm_supplier_certificate', label: '资质证书', icon: 'badge-check' },
+            { id: 'portal_nav_bank_accounts', type: 'object', objectName: 'srm_supplier_bank_account', label: '银行账户', icon: 'landmark' },
+            { id: 'portal_nav_change_requests', type: 'object', objectName: 'srm_supplier_change_request', label: '变更申请', icon: 'file-pen' },
+            { id: 'portal_nav_applications', type: 'object', objectName: 'srm_supplier_application', label: '准入申请', icon: 'clipboard-check' },
+          ],
+        },
+        {
+          id: 'portal_quality',
+          type: 'group',
+          label: '质量',
+          icon: 'shield-check',
+          children: [
+            { id: 'portal_nav_quality_issues', type: 'object', objectName: 'srm_quality_issue', label: '整改单', icon: 'clipboard-x' },
+            { id: 'portal_nav_delivery_records', type: 'object', objectName: 'srm_delivery_record', label: '交付结果', icon: 'truck' },
+          ],
+        },
+        {
+          id: 'portal_performance',
+          type: 'group',
+          label: '绩效',
+          icon: 'gauge',
+          children: [
+            { id: 'portal_nav_reviews', type: 'object', objectName: 'srm_performance_review', label: '历次考评结果', icon: 'award' },
+          ],
+        },
+      ],
+    },
     {
       id: 'group_supplier',
       type: 'group',

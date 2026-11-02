@@ -80,14 +80,26 @@ describe('qualification monitoring', () => {
     expect((await read(Supplier.name, supplier)).qualification_alert).toBe(false);
   });
 
-  it('keeps the alert while another mandatory certificate is still expired', async () => {
+  // 资质异常按资质类型判断（03 §11）：另一种必备资质还过期着，续了这一种也不解除
+  it('keeps the alert while a mandatory certificate of another type is still expired', async () => {
     const supplier = await newSupplier();
     const first = await newCertificate(supplier, day(-1), true);
-    await newCertificate(supplier, day(-2), true);
+    await newCertificate(supplier, day(-2), true, 'business_license');
     await sweep();
     await stack.hooks.run(SupplierCertificate.name, 'update', { id: first, valid_to: day(365) }, { as: admin });
     await sweep();
     expect((await read(Supplier.name, supplier)).qualification_alert).toBe(true);
+  });
+
+  // 同类型补了一张新证书（内部录入即核验）就顶得住过期的旧证书，不必删除旧证书
+  it('clears the alert once a verified certificate of the same type replaces the expired one', async () => {
+    const supplier = await newSupplier();
+    await newCertificate(supplier, day(-1), true);
+    await sweep();
+    expect((await read(Supplier.name, supplier)).qualification_alert).toBe(true);
+    const renewed = await newCertificate(supplier, day(365), true);
+    expect(await read(SupplierCertificate.name, renewed)).toMatchObject({ verified: true });
+    expect((await read(Supplier.name, supplier)).qualification_alert).toBe(false);
   });
 
   it('changes nothing on a second run', async () => {
