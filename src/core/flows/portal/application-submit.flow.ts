@@ -94,6 +94,33 @@ export const ApplicationSubmitFlow: Automation.Flow = {
       label: '回填邀请',
       config: { objectName: 'srm_supplier_invitation', filter: { id: cel`invite.id` }, fields: { application: cel`app.id` } },
     },
+    // 申请由系统身份代建、属于提交的门户用户，内部没有人因此收到待办：告诉提出这份邀请的品类经理（或采购主管）来受理
+    {
+      id: 'notify_guard',
+      type: 'try_catch',
+      label: '通知邀请人',
+      config: {
+        try: {
+          nodes: [
+            {
+              id: 'notify_requester',
+              type: 'notify',
+              label: '通知邀请人受理',
+              config: {
+                recipients: cel`[invite.created_by]`,
+                title: '{{ vendor.name }} 在门户提交了准入申请',
+                message: '受邀供应商已在门户提交准入申请，请审核资料：资料不全的「退回补充」并写明退回意见，齐全的指定初审人后提交准入评审。',
+                severity: 'info',
+                sourceObject: 'srm_supplier_application',
+                sourceId: cel`app.id`,
+              },
+            },
+          ],
+        },
+        // 邀请人已离职等找不到人时不影响提交
+        catch: { nodes: [{ id: 'skip_notify', type: 'assignment', label: '跳过通知' }] },
+      },
+    },
     { id: 'end', type: 'end', label: '结束' },
   ],
 
@@ -115,6 +142,7 @@ export const ApplicationSubmitFlow: Automation.Flow = {
     { id: 'e_ok', source: 'gate', target: 'confirm', type: 'conditional', condition: c(`${portal} && ${invited} && ${admissible}`), label: '可以' },
     { id: 'e4', source: 'confirm', target: 'create', type: 'default' },
     { id: 'e5', source: 'create', target: 'backfill', type: 'default' },
-    { id: 'e6', source: 'backfill', target: 'end', type: 'default' },
+    { id: 'e6', source: 'backfill', target: 'notify_guard', type: 'default' },
+    { id: 'e7', source: 'notify_guard', target: 'end', type: 'default' },
   ],
 };

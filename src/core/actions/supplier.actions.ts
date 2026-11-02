@@ -11,6 +11,7 @@ export const ConfirmLegacyReviewAction = defineAction({
   patch: { legacy_reviewed: true },
   locations: ['record_header', 'list_item'],
   visible: P`record.legacy_imported == true && record.legacy_reviewed != true`,
+  requiredPermissions: ['srm_internal_access'],
   confirmText: '确认已核对该供应商的档案、联系人和证书？',
   successMessage: '已确认复核',
   refreshAfter: true,

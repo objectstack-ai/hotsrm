@@ -2,8 +2,9 @@ import { App } from '@objectstack/spec/ui';
 
 // SRM 应用：内部工作台与供应商门户（05 §1）。导航按分组组织，扩展包往分组里挂菜单（ADR-0002）。
 // 平台规定一个应用包只有一个应用（objectstack ADR-0019 D3），所以门户不是第二个应用，而是本应用里只对持门户能力
-// srm_portal_access 的用户显示的一组导航（门户权限集授予）。这只是体验：门户用户能看到哪些行由门户 RLS 决定
-// （ADR-0010），点进内部菜单也只看到本公司的数据。
+// srm_portal_access 的用户显示的一组导航（门户权限集授予）；内部分组反过来只对持 srm_internal_access 的内部员工显示
+// （v0.6 出口验收：门户用户原先也看到「处置单」「门户邀请」等内部菜单，点进去是「无权访问」）。这只是体验：门户用户
+// 能看到哪些行由门户 RLS 决定（ADR-0010），直接打开内部对象的地址也只看到本公司的数据。
 export const Workbench = App.create({
   name: 'srm_workbench',
   label: 'SRM 工作台',
@@ -70,6 +71,7 @@ export const Workbench = App.create({
     {
       id: 'group_supplier',
       type: 'group',
+      requiredPermissions: ['srm_internal_access'],
       label: '供应商',
       icon: 'factory',
       expanded: true,
@@ -87,6 +89,7 @@ export const Workbench = App.create({
     {
       id: 'group_contract',
       type: 'group',
+      requiredPermissions: ['srm_internal_access'],
       label: '合同',
       icon: 'file-signature',
       children: [
@@ -96,6 +99,7 @@ export const Workbench = App.create({
     {
       id: 'group_quality',
       type: 'group',
+      requiredPermissions: ['srm_internal_access'],
       label: '质量',
       icon: 'shield-check',
       children: [
@@ -107,6 +111,7 @@ export const Workbench = App.create({
     {
       id: 'group_performance',
       type: 'group',
+      requiredPermissions: ['srm_internal_access'],
       label: '绩效与风险',
       icon: 'gauge',
       children: [
@@ -119,6 +124,7 @@ export const Workbench = App.create({
     {
       id: 'group_analytics',
       type: 'group',
+      requiredPermissions: ['srm_internal_access'],
       label: '分析',
       icon: 'chart-column',
       children: [
@@ -131,6 +137,7 @@ export const Workbench = App.create({
     {
       id: 'group_master_data',
       type: 'group',
+      requiredPermissions: ['srm_internal_access'],
       label: '基础数据',
       icon: 'database',
       children: [

@@ -151,6 +151,19 @@ const TEMPLATES: Template[] = [
     },
   },
   {
+    name: 'srm_scar_claim_proposed',
+    label: '整改单提出索赔',
+    variables: ['no', 'supplier'],
+    zh: {
+      subject: '整改单 {{ no }} 提出了索赔，请确认',
+      body: '我方 SQE 已就 {{ supplier }} 的整改单 {{ no }} 提出索赔。请登录 {{ appName }} 供应商门户，在整改单上点「确认索赔」接受或提出异议。',
+    },
+    en: {
+      subject: 'A claim was raised on corrective action request {{ no }}',
+      body: 'Our SQE has raised a claim on corrective action request {{ no }} of {{ supplier }}. Sign in to the {{ appName }} supplier portal and click "Respond to Claim" on the request to accept it or dispute it.',
+    },
+  },
+  {
     name: 'srm_review_published',
     label: '绩效结果已发布',
     variables: ['no', 'supplier', 'period', 'appeal_days'],

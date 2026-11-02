@@ -289,6 +289,42 @@ describe('portal invitation and opening (v0.6 U3)', () => {
       expect(((await res.json()) as { records: Row[] }).records.map((r) => String(r.id))).toEqual([String(inv.application)]);
     });
 
+    it('tells the inviting category manager, who handles the application the portal user owns and returns it only with a reason', async () => {
+      const appId = String((await row('srm_supplier_invitation', String(invitationX.id))).application);
+      // 申请由系统身份代建、属于提交的门户用户；邀请人收到受理待办
+      await expect
+        .poll(async () => {
+          for (const note of await stack.rows('sys_notification', { source_id: appId })) {
+            const receipts = await stack.rows('sys_notification_receipt', { notification_id: note.id });
+            if (receipts.some((r) => String(r.user_id ?? r.recipient_id ?? '') === uid.manager)) return true;
+          }
+          return false;
+        })
+        .toBe(true);
+      // 品类经理不是申请的拥有人，仍能退回补充（共享规则），但要写退回意见
+      await expect(
+        stack.hooks.run('srm_supplier_application', 'update', { id: appId, status: 'returned' }, { as: token.manager }),
+      ).rejects.toThrow(/supplement|退回意见/);
+      await stack.hooks.run('srm_supplier_application', 'update', { id: appId, status: 'returned', return_reason: '请补传 ISO 9001 证书' }, { as: token.manager });
+      // 门户看得到退回意见
+      const res = await stack.apiAs(token.supX, 'GET', `/data/srm_supplier_application/${appId}`);
+      expect(res.status).toBe(200);
+      expect(JSON.stringify(await res.json())).toContain('请补传 ISO 9001 证书');
+      // 门户补充后重新提交：回到资料审核（后面的用例从这里接着走），通知退回它的品类经理，不通知门户用户自己
+      const before = (await stack.rows('sys_notification', { source_id: appId })).map((n) => String(n.id));
+      const started = (await stack.actions.run('srm_supplier_application', 'srm_application_resubmit', { as: token.supX, recordId: appId })) as Row;
+      const run = (await stack.flows.resume({ flowName: 'srm_application_resubmit', runId: started.runId }, { note: '已补传' }, { as: token.supX })) as Row;
+      expect(run.success, JSON.stringify(run)).toBe(true);
+      expect((await row('srm_supplier_application', appId)).status).toBe('doc_review');
+      await expect
+        .poll(async () => {
+          const fresh = (await stack.rows('sys_notification', { source_id: appId })).filter((n) => !before.includes(String(n.id)));
+          const receipts = (await Promise.all(fresh.map((n) => stack.rows('sys_notification_receipt', { notification_id: n.id })))).flat();
+          return receipts.map((r) => String(r.user_id ?? r.recipient_id ?? ''));
+        })
+        .toEqual([uid.manager]);
+    });
+
     it('submits once per invitation', async () => {
       refused(await submitApplication(token.supX, X.supplier), /No admission invitation is waiting/);
       expect(await stack.rows('srm_supplier_application', { supplier: X.supplier })).toHaveLength(1);
@@ -304,12 +340,13 @@ describe('portal invitation and opening (v0.6 U3)', () => {
   describe('revocation', () => {
     it('revokes the portal when the admission is rejected and the supplier returns to potential (03 §3 step 8)', async () => {
       const [app] = await stack.rows('srm_supplier_application', { supplier: X.supplier });
+      const before = (await stack.rows('sys_notification', { source_id: String(app!.id) })).length;
       await stack.hooks.run('srm_supplier_application', 'update', { id: app!.id, status: 'rejected', reject_reason: '示例未通过' }, { system: true });
       expect((await row('srm_supplier', X.supplier)).status).toBe('potential');
       expect((await row('srm_supplier_contact', X.contact)).portal_user ?? null).toBeNull();
       expect((await row('srm_supplier_invitation', String(invitationX.id))).status).toBe('revoked');
       expect(await visibleSuppliers('supX')).toMatchObject({ ids: [] });
-      await expect.poll(async () => (await stack.rows('sys_notification', { source_id: String(app!.id) })).length).toBeGreaterThan(0);
+      await expect.poll(async () => (await stack.rows('sys_notification', { source_id: String(app!.id) })).length).toBeGreaterThan(before);
     });
 
     it('clears the roster when a contact is deactivated, so reactivating it does not bring the portal back', async () => {

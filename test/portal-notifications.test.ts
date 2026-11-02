@@ -210,7 +210,7 @@ describe('supplier notifications (05 §5, v0.6 U6)', () => {
     expect((await row('srm_quality_issue', id)).status).toBe('open');
   }, 30_000);
 
-  it('tells the quality contact when the SQE returns D4–D7, when the SCAR reopens and when it goes overdue', async () => {
+  it('tells the quality contact when the SQE returns D4–D7, when the SCAR reopens, when a claim is raised and when it goes overdue', async () => {
     const returned = await seedScar(a, {
       status: 'action_submitted',
       containment_action: '示例：在库品全检隔离',
@@ -242,7 +242,14 @@ describe('supplier notifications (05 §5, v0.6 U6)', () => {
     expect(run.success, JSON.stringify(run)).toBe(true);
     const [overdue] = await inbox(aQuality.id, late);
     expect(overdue!.title).toContain('已逾期');
-    for (const id of [returned, reopened, late]) expect(await supplierRecipients(id)).toEqual([aQuality.id]);
+    // SQE 提出索赔：通知里没有金额（R5），请供应商到门户确认
+    const claimed = await seedScar(a, { status: 'verifying', containment_action: '示例：在库品全检隔离', root_cause: '示例：模具磨损', corrective_action: '示例：更换模具' });
+    await update('srm_quality_issue', claimed, { claim_amount: 3600, claim_status: 'proposed' });
+    const [claim] = await inbox(aQuality.id, claimed);
+    expect(claim!.title).toContain('提出了索赔');
+    expect(claim!.body_md).not.toContain('3600');
+    expect(claim!.body_md).not.toContain('3,600');
+    for (const id of [returned, reopened, late, claimed]) expect(await supplierRecipients(id)).toEqual([aQuality.id]);
   }, 30_000);
 
   it('warns the SQE and the supplier’s admin and quality contacts before and when a certificate expires', async () => {
@@ -284,7 +291,7 @@ describe('supplier notifications (05 §5, v0.6 U6)', () => {
     const app = await row('srm_supplier_application', id);
     expect(accepted!.title).toBe(`准入申请 ${app.application_no} 已受理`);
 
-    await update('srm_supplier_application', id, { status: 'returned' });
+    await update('srm_supplier_application', id, { status: 'returned', return_reason: '示例：请补传 ISO 9001 证书' });
     expect((await inbox(applicant.id, id, 2)).map((m) => m.title)).toContain(`准入申请 ${app.application_no} 需要补充资料`);
     // 供应商重新提交回到资料审核：不再发「已受理」
     await update('srm_supplier_application', id, { status: 'doc_review' });

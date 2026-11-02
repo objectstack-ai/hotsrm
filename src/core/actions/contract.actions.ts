@@ -11,6 +11,7 @@ export const ContractSubmitAction = defineAction({
   target: 'srm_contract_submit',
   locations: ['record_header'],
   visible: P`record.status == 'draft'`,
+  requiredPermissions: ['srm_internal_access'],
   refreshAfter: true,
 });
 
@@ -23,5 +24,6 @@ export const ContractActivateAction = defineAction({
   target: 'srm_contract_activate',
   locations: ['record_header'],
   visible: P`record.status == 'signing'`,
+  requiredPermissions: ['srm_internal_access'],
   refreshAfter: true,
 });

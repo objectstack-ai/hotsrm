@@ -328,6 +328,7 @@ upsert 写入，结构不变。
 | `sqe` | user | 负责审核的 SQE |
 | `supplier` | lookup → 供应商 | 内部登记和邀请注册的申请新建时就关联已登记的供应商（邀请注册的供应商由品类经理在邀请前登记，04 §3.3）；公开表单的申请由品类经理推进到「资料审核」时新建（或 `reapply` 时关联旧档）供应商，`submitted` 阶段只有申请记录，不建主数据 |
 | `reject_reason` | textarea | |
+| `return_reason` | textarea | 退回意见：品类经理「退回补充」时必填（校验规则 `return_reason_required`），供应商在门户的申请上看得到要补什么（v0.6 出口验收） |
 | `supplement_note` | textarea（只读） | 补充说明：「退回补充」后供应商在门户经「补充完成，重新提交」（`srm_application_resubmit`）写入（v0.6） |
 | `cycle_days` | number | 从提交到批准的天数，批准时由 flow 写入（准入周期指标） |
 

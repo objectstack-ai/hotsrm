@@ -11,5 +11,7 @@ export const BankVerifyAction = defineAction({
   target: 'srm_bank_verify',
   locations: ['record_header', 'list_item'],
   visible: P`record.status == 'pending_verify'`,
+  // 门户管理员能新建银行账户，但核验只属于内部（应付会计）：按钮不显示给门户用户
+  requiredPermissions: ['srm_internal_access'],
   refreshAfter: true,
 });

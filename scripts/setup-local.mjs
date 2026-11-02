@@ -63,10 +63,19 @@ for (const [key, position, name] of USERS) {
   if (created.status >= 300 && !JSON.stringify(created.json).includes('ALREADY_EXISTS')) must(created, `新建账号 ${email}`);
   const [user] = rows(must(await api(admin, 'GET', `/data/sys_user?email=${encodeURIComponent(email)}`), `查找 ${email}`));
   ids[key] = user.id;
+  // 成员策略为 invite-only（开门户的环境必须如此，04 §3.3）时管理员建的账号不会自动入组织，先加为普通成员
+  const member = rows(must(await api(admin, 'GET', `/data/sys_member?user_id=${user.id}&organization_id=${org}`), '查成员'));
+  if (!member.length) must(await api(admin, 'POST', '/auth/organization/add-member', { userId: user.id, organizationId: org, role: 'member' }), `加入组织 ${email}`);
   const has = rows(must(await api(admin, 'GET', `/data/sys_user_position?user_id=${user.id}&position=${position}`), '查岗位'));
   if (!has.length) must(await api(admin, 'POST', '/data/sys_user_position', { user_id: user.id, position, organization_id: org }), `指派岗位 ${position}`);
   console.log(`✓ ${email.padEnd(26)} ${name}`);
 }
+// SRM 系统管理员兼任组织管理员（04 §3.3）：在成员页邀请门户用户、运行「开通门户」
+const [srmadminMember] = rows(must(await api(admin, 'GET', `/data/sys_member?user_id=${ids.srmadmin}&organization_id=${org}`), '查成员'));
+if (srmadminMember.role !== 'admin' && srmadminMember.role !== 'owner') {
+  must(await api(admin, 'POST', '/auth/organization/update-member-role', { memberId: srmadminMember.id, organizationId: org, role: 'admin' }), '设为组织管理员');
+}
+console.log('✓ srmadmin@hotsrm.local 兼任组织管理员');
 const tokens = {};
 for (const key of ['srmadmin', 'cm', 'sqe']) tokens[key] = await signIn(`${key}@hotsrm.local`, PASSWORD);
 

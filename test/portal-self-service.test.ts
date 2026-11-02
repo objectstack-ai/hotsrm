@@ -302,7 +302,8 @@ describe('portal self-service (v0.6 U4)', () => {
     const supplier = String((await sys('srm_supplier', { name: `示例待补充有限公司 ${n}`, credit_code: `91000000MA0SSA${String(n).padStart(4, '0')}` })).id);
     const application = await stack.hooks.run('srm_supplier_application', 'insert', { supplier, applied_categories: [category] }, { as: manager.token });
     const id = String(application.id);
-    for (const status of ['doc_review', 'returned']) await stack.hooks.run('srm_supplier_application', 'update', { id, status }, { as: manager.token });
+    await stack.hooks.run('srm_supplier_application', 'update', { id, status: 'doc_review' }, { as: manager.token });
+    await stack.hooks.run('srm_supplier_application', 'update', { id, status: 'returned', return_reason: '请补传 ISO 9001 证书' }, { as: manager.token });
     const p = await portalUser(supplier);
     const other = await portalUser((await qualifiedSupplier()).id);
 
