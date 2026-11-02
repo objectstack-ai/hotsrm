@@ -6,7 +6,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // 通知初审人。申请本身的品类、初审人等由内部维护，门户不直接改。
 //
 // 以系统身份运行：门户对准入申请只有读共享（ADR-0010 两把锁）。flow 进门判断启动人持门户岗位、并且是这张申请所属供应商
-// 在职联系人上登记的门户账号（与成员键同一份名册），伪造别家申请的 recordId 时名册对不上，直接结束（objectstack#25481）。
+// 在职联系人上登记的门户账号（与成员键同一份名册），伪造别家申请的 recordId 时名册对不上，直接结束（直接触发不检查记录可读，objectstack#29050；谁可以启动见 objectstack#25481）。
 const uid = `current_user != null ? current_user.id : ''`;
 const allowed = `current_user != null && 'srm_portal_user' in current_user.positions && application != null && membership != null`;
 const returned = `application.status == 'returned'`;
