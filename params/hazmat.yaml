@@ -26,7 +26,7 @@ hz_incident_penalty_points:
   label: 一般安全事件绩效扣分
   unit: 分/次
   example: 5
-  used_in: [HZ-02, GL-06]
+  used_in: [HZ-02, GL-06 6.4.3]
   system: 安全事件计入考评的扣分规则
 
 hz_severe_incident_review_count:

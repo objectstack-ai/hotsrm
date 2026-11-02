@@ -52,57 +52,114 @@ perf_cycle:
   label: 绩效评价周期（按物资类别）
   example: { A: 每月, B: 每季度, C: 每年 }
   display: A 类{A}，B 类{B}，C 类{C}
-  used_in: [QP-01 6.7.1, QP-01 附录 A]
-  system: 考评计划的周期设置（核心 03 §10）
+  used_in: [QP-01 6.7.1, QP-01 附录 A, GL-06 6.1.2]
+  system: 考评生成 flow srm_performance_generate 按供应商所供最高物资类别（srm_category.material_class）取周期，flow 的 CYCLE 与本参数由测试核对一致（核心 03 §10，v0.5）
+
+perf_generate_day:
+  label: 绩效考评单生成日（每月）
+  unit: 日
+  example: 6
+  used_in: [QP-03 6.5.1, GL-06 6.1.3, GL-06 第 7 章]
+  system: 考评生成 flow srm_performance_generate 从每月这一天起连续 7 天运行（追赶式），之前留给 SQE 导入上月交付记录；flow 的 GENERATE_DAY 与本参数由测试核对一致（核心 03 §10 第 1 步）。取值不大于 22
+
+perf_kpi_weights:
+  label: 绩效指标权重（按指标编码）
+  unit: "%"
+  example: { LOT_PASS: 20, PPM: 10, OTD: 15, PLAN_FULFIL: 10, PRICE: 20, SERVICE: 10, SAFETY_ENV: 15 }
+  format: "{}%"
+  display: 批次合格率 {LOT_PASS}%，来料不良 PPM {PPM}%，交付准时率 {OTD}%，计划完成率 {PLAN_FULFIL}%，价格竞争力 {PRICE}%，响应与配合 {SERVICE}%，安全环保 {SAFETY_ENV}%
+  used_in: [QP-01 附录 D, GL-06 附录 A]
+  system: 绩效指标库 srm_kpi 的示例数据（src/core/data）；客户环境由采购总监在指标库维护，启用指标权重合计 100%（核心 02 §4.7）
 
 perf_grade_min:
   label: 绩效等级下限分
   unit: 分
   example: { A: 90, B: 80, C: 70 }
   display: A 级 ≥ {A}，B 级 ≥ {B}，C 级 ≥ {C}
-  used_in: [QP-01 6.7.3]
-  system: 考评单汇总分级规则（核心 03 §10 第 4 步）
+  used_in: [QP-01 6.7.3, GL-06 6.5.2, GL-06 附录 B]
+  system: 考评单汇总分级 srm_performance_publish 与申诉调整总分 srm_appeal_resolve，flow 的 GRADE_MIN 与本参数由测试核对一致（核心 03 §10 第 4 步）
+
+perf_score_days:
+  label: 绩效人工评分期限
+  unit: 日历日（转人工评分起）
+  example: 10
+  used_in: [GL-06 6.4.2, GL-06 第 7 章]
+  system: 考评单转人工评分时写入评分截止日 score_due，截止前 3 天提醒未评项，截止后由 srm_score_overdue_sweep 按缺评处理；flow 的 SCORE_DAYS 与本参数由测试核对一致（核心 03 §10 第 3 步）
+
+perf_missing_score:
+  label: 绩效评分缺评默认分
+  unit: 分
+  example: 60
+  used_in: [GL-06 6.4.4, GL-06 第 7 章]
+  system: 评分截止后未评的评分项取本分值并标记「未评」（srm_score_overdue_sweep）；flow 的 MISSING_SCORE 与本参数由测试核对一致（核心 03 §10 第 3 步，FR-703）
 
 perf_appeal_days:
   label: 绩效结果申诉期限
   unit: 日历日（发布后）
   example: 7
-  used_in: [QP-01 6.7.5]
-  system: 申诉 screen flow srm_appeal_submit 的时限校验（核心 03 §10 第 7 步）
+  used_in: [QP-01 6.7.5, GL-06 6.7.1, GL-06 第 7 章]
+  system: 申诉 screen flow srm_appeal_submit 的时限校验，flow 的 APPEAL_DAYS 与本参数由测试核对一致（核心 03 §10 第 7 步）
 
 perf_d_exit_periods:
   label: 启动淘汰的连续 D 级期数
   unit: 期
   example: 2
-  used_in: [QP-01 6.7.4, QP-01 6.9.1]
-  system: 考评发布后触发的淘汰评审 flow（核心 01 BR-18）
+  used_in: [QP-01 6.7.4, QP-01 6.9.2, GL-06 6.6.7, GL-06 附录 B, GL-08 6.1.2]
+  system: 绩效结果应用 flow srm_performance_apply 按同一周期相邻期间的已发布考评单判定连续 D 级，生成淘汰处置单草稿（核心 03 §10 第 6 步，01 BR-18）
+
+perf_auto_apply:
+  label: 绩效结果自动应用
+  example: 开启
+  used_in: [GL-06 6.6.2, GL-06 第 7 章]
+  system: 考评审定发布后的结果应用 flow srm_performance_apply：开启时 C 级自动开整改单、D 级生成冻结处置单草稿、连续 perf_d_exit_periods 期 D 级生成淘汰处置单草稿；关闭时只通知品类经理（07 D9「首年可以只发布不自动处置」）。flow 的 AUTO_APPLY 与本参数由测试核对一致（核心 03 §10 第 6 步）
 
 scar_containment_hours:
   label: 整改临时措施提交时限
   unit: 小时
   example: 72
-  used_in: [QP-01 6.8.2, GL-07]
+  used_in: [QP-01 6.8.2, QP-04 6.3.1, QP-04 第 7 章, GL-07 4.1, GL-07 第 7 章, GL-07 附录 B]
   system: srm_quality_issue.containment_due 的计算规则（核心 03 §8）
 
 scar_final_days:
   label: 整改根本原因与永久措施提交时限
   unit: 日历日
   example: 30
-  used_in: [QP-01 6.8.2, GL-07]
+  used_in: [QP-01 6.8.2, QP-04 6.3.1, QP-04 第 7 章, GL-07 4.2, GL-07 第 7 章, GL-07 附录 B]
   system: srm_quality_issue.final_due 的计算规则（核心 03 §8）
+
+scar_escalation_days:
+  label: 整改逾期升级至供应商管理层的天数
+  unit: 日历日（逾期后）
+  example: 7
+  used_in: [GL-07 6.6.2]
+  system: 制度要求；逾期标记与通知由 srm_scar_overdue_sweep 完成（核心 03 §8 第 5 步），升级由质量经理线下督办
+
+scar_verify_batches:
+  label: 整改效果验证的连续合格批次
+  unit: 批
+  example: 3
+  used_in: [GL-07 6.5.1]
+  system: 制度要求；SQE 按交付记录的后续批次判定后关闭整改单（核心 03 §8 第 4 步）
+
+claim_response_days:
+  label: 质量索赔的供应商确认期限
+  unit: 日历日（收到通知后）
+  example: 15
+  used_in: [GL-07 6.8.2]
+  system: 制度要求；确认结果由 SQE 记入整改单 claim_status（v0.6 起供应商在门户确认，核心 03 §8 第 6 步）
 
 inactivity_exit_months:
   label: 无交易淘汰期限
   unit: 个月
   example: 24
-  used_in: [QP-01 6.9.2]
+  used_in: [QP-01 6.9.2, GL-08 6.1.2]
   system: 制度要求；可由报表列出超期无交易的供应商，人工发起淘汰
 
 blacklist_years:
   label: 黑名单禁入期限
   unit: 年
   example: 5
-  used_in: [QP-01 6.9.3]
+  used_in: [QP-01 6.9.3, GL-08 6.5.3, GL-08 6.6.2]
   system: 制度要求；黑名单状态由处置单设置，解除需单独审批（核心 03 §5）
 
 coc_resign_months:
@@ -112,11 +169,25 @@ coc_resign_months:
   used_in: [ZC-01 4.4.1, ZC-01 第 6 节, SP-01 前言]
   system: 制度要求；签署状态记录在供应商协议中，签署率按季度统计
 
+disposition_appeal_days:
+  label: 处置结果申诉期限
+  unit: 日历日（收到通知后）
+  example: 15
+  used_in: [GL-08 6.7.1]
+  system: 制度要求；供应商门户上线前书面申诉
+
+change_review_days:
+  label: 信息变更审核时限
+  unit: 工作日
+  example: 5
+  used_in: [GL-04 6.3.5]
+  system: 变更审批 flow srm_change_approval 审批节点的 timeoutHours（核心 03 §5）
+
 record_retention_years:
   label: 供应商管理记录保存期限
   unit: 年
   example: 3
-  used_in: [QP-01 第 8 章, QP-02 第 8 章, GL-01 第 8 章, GL-04 6.7.1, WI-01 第 8 章]
+  used_in: [QP-01 第 8 章, QP-02 第 8 章, QP-03 第 8 章, QP-04 第 8 章, GL-01 第 8 章, GL-04 6.7.1, GL-06 第 8 章, GL-07 第 8 章, WI-01 第 8 章]
   system: 制度要求
 
 contract_reminder_days:
@@ -124,22 +195,22 @@ contract_reminder_days:
   unit: 日历日（到期前）
   example: [60, 30, 7]
   format: "{} 日"
-  used_in: [GL-03]
-  system: 合同到期提醒 flow，time_relative 触发（核心 03 §6）
+  used_in: [GL-03 6.7.1, GL-03 第 7 章, ZC-03 2.2]
+  system: 合同到期提醒 flow srm_contract_expiry_notice，time_relative 触发（核心 03 §6）
 
 po_ack_remind_hours:
   label: 订单未确认提醒供应商
   unit: 小时（下发后）
   example: 24
   used_in: [QP-02]
-  system: 追赶式扫描 srm_po_ack_sweep（核心 03 §7）
+  system: 制度要求；订单镜像在 ERP 集成后才有（核心 03 §7 预留，ADR-0008）
 
 po_ack_escalate_hours:
   label: 订单未确认升级采购主管
   unit: 小时（下发后）
   example: 48
   used_in: [QP-02]
-  system: 同上
+  system: 同上（ERP 集成后）
 
 # ---- 准入与现场审核（GL-01、WI-01） ----
 
@@ -156,6 +227,13 @@ cert_min_remaining_months:
   example: 3
   used_in: [GL-01 6.2.2]
   system: 制度要求；核验证书时由核验人判断
+
+admission_approval_days:
+  label: 准入评审每级审批时限
+  unit: 工作日
+  example: 3
+  used_in: [GL-01 附录 B]
+  system: 准入审批 flow 各审批节点的 timeoutHours（按日历小时换算，核心 03 §3）；到期提醒审批人
 
 doc_return_limit:
   label: 准入资料退回补充的次数上限
@@ -195,7 +273,7 @@ qualification_alert_freeze_days:
   label: 资质异常转冻结的期限
   unit: 日历日
   example: 60
-  used_in: [GL-01 6.8.4]
+  used_in: [GL-01 6.8.4, GL-08 6.1.1]
   system: 制度要求；从资质异常列表（核心 05）发起冻结处置（核心 01 FR-208）
 
 audit_score_thresholds:
@@ -203,7 +281,15 @@ audit_score_thresholds:
   example: { pass: 85, floor: 70 }
   display: 通过线 {pass} 分；有条件通过和单个审核块的下限 {floor} 分
   used_in: [WI-01 6.6.1]
-  system: 审核记录录入总分与结论（核心 02 srm_supplier_audit）；结论由审核组按分数线判定
+  system: 审核记录录入总分与结论（核心 02 srm_supplier_audit）；结论由审核组按分数线判定，系统拦截高于分数线的结论
+
+annual_audit_frequency:
+  label: 在册供应商现场复审频次（按物资类别）
+  unit: 个月
+  example: { A: 12, B: 24 }
+  display: A 类每 {A} 个月 1 次，B 类每 {B} 个月 1 次，C 类不定期
+  used_in: [WI-01 6.9.1]
+  system: 年度审核计划 flow srm_audit_plan_generate 按供应商所供最高物资类别（srm_category.material_class）生成到期的年度审核；C 类不生成（核心 03 §8）
 
 # ---- 政策层文件（ZC-01 管理目标、ZC-02 授权审批表、ZC-03 风险控制矩阵） ----
 
@@ -212,8 +298,8 @@ award_approval_tiers:
   unit: 万元（单次事项含税总金额）
   example: { mid: 10, high: 100 }
   display: 不足 {mid} 万元、{mid} 万元至不足 {high} 万元、{high} 万元及以上三档
-  used_in: [ZC-02 3, GL-02 附录 A]
-  system: 定标审批 flow 按定标金额选择审批层级；单一来源达到 high 档时加一级（核心 01 FR-308、03 §4）
+  used_in: [ZC-02 3, GL-02 附录 A, GL-03 附录 A]
+  system: 定标审批 flow 按定标金额选择审批层级，单一来源寻源达到 high 档时加总经理一级（核心 03 §12 审批矩阵，v0.7）；合同审批 flow 法务审查后按合同金额取同一档（v0.3）
 
 min_valid_quotes:
   label: 定标所需的有效报价家数
@@ -233,7 +319,7 @@ management_targets:
   label: 采购与供应商管理目标
   example: { avl_spend: 98%, competitive: 85%, exception: 5%, admission_days: 30 日, lot_pass: 98%, scar_ontime: 90% }
   display: 名录内采购金额占比 ≥ {avl_spend}，竞争性采购比例 ≥ {competitive}，单一来源与紧急采购比例 ≤ {exception}，准入周期 ≤ {admission_days}，来料批次合格率 ≥ {lot_pass}，整改按时关闭率 ≥ {scar_ontime}
-  used_in: [ZC-01 6]
+  used_in: [ZC-01 6, GL-07 6.9.1]
   system: 采购总览、寻源、供应商、质量仪表盘对照的目标值（核心 05 §4）
 
 # ---- 采购与寻源（QP-02、GL-02） ----
@@ -243,7 +329,7 @@ invoice_tolerance:
   unit: 元（不含税金额和税额分别比较）
   example: 1
   used_in: [QP-02 6.8.4]
-  system: 发票登记校验，超出容差拒绝提交（核心 01 FR-804）
+  system: 制度要求；发票在 ERP 中处理，SRM 不做（ADR-0008）
 
 open_tender_threshold:
   label: 公开招标的金额标准

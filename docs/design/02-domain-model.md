@@ -28,84 +28,95 @@
    计算后写入 `number` / `percent` 字段，而不是做成公式字段。
 7. **复选框不设必填**：`boolean` 字段一律给 `defaultValue: false`，「必须勾选」
    用校验规则表达。
-8. **ERP 来源数据带外部编号**：每个从 ERP 同步的对象有唯一的 `erp_*_id` 字段，
-   集成按它幂等 upsert。反过来，SRM 要推给 ERP 的对象（供应商、银行账户、处置单、价格记录、
-   采购订单〔确认交期回写〕、送货单、对账单、发票）带 `erp_sync_status` /
-   `erp_sync_error` / `erp_synced_at` 三个同步字段，推送失败可见，由重推扫描补发（见
-   [06 §1.1](./06-integration-and-ai.md#11-原则)）。
+8. **外部单号字段预留、空着**：从 ERP 导入的对象（物料、交付记录）有唯一的外部编号
+   字段（`erp_material_no`、`erp_receipt_no` + `erp_order_no` + 行号），表格导入按它幂等匹配。SRM 将来要推给
+   ERP 的对象（供应商、银行账户、价格记录、合同）保留 `erp_*` 编号字段，现阶段不写；
+   同步状态三字段（`erp_sync_status` / `erp_sync_error` / `erp_synced_at`）在 ERP 集成立项时
+   再加（[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md)，[06 §1](./06-integration-and-ai.md#1-预留的-erp-集成点)）。
 9. **每个对象显式声明 OWD**（`sharingModel`），这是平台 lint 的强制项；门户相关
    对象的 OWD 和 RLS 设计见 [04](./04-security-and-portal.md)。
 10. **金额用 `currency`，比例用 `percent`，附件用 `file`，地址用 `address`**。
 11. **面向供应商的单据冗余门户岗位**：每张供应商要看的**顶层**单据都带一个
     `portal_position`（text，只读）字段，在创建时由 flow 从供应商档案复制过来，
     门户 RLS 只认它（见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)）。
-    带这个字段的对象：准入申请、变更单、寻源邀请、报价单、价格记录、合同、采购
-    订单、送货单、收货记录、来料检验、整改单、考评单、对账单、发票。它们的
-    `master_detail` 子对象（报价明细、订单行、送货明细、评分明细、对账明细）用
-    `controlled_by_parent` 跟随父记录，不重复冗余。注意 `controlled_by_parent` 的
+    带这个字段的对象：准入申请、变更单、寻源邀请、报价单、价格记录、合同、整改单、
+    考评单（订单、送货单、付款进度等 ERP 集成后的门户镜像同理）。它们的
+    `master_detail` 子对象（报价明细、合同明细、评分明细）用
+    `controlled_by_parent` 跟随父记录，不重复冗余。字段本身在 v0.6 门户上线时再加，
+    不提前。注意 `controlled_by_parent` 的
     **写**同样跟随父记录：改子记录要求对父记录有编辑权。所以凡是门户要改子记录的
     地方（订单行答复、证书维护），门户对父记录授予编辑权，再用字段级权限把父记录
     的字段全部设为只读（见 [04 §3.2](./04-security-and-portal.md#32-各对象的门户策略)）。
-12. **校验规则最多读一跳**：`script` / `cross_field` 校验规则能读本记录，也能经一个
-    引用字段读关联记录（如邀请上的 `record.supplier.status`），该读取以系统身份进行、
-    读不到时拒绝写入。两跳以上或需要汇总的判断依据，要么在创建时由 flow 冗余到本
-    记录并设为只读（如把寻源单的截止时间复制到报价单，报价明细再经一跳读取），
-    要么改走以系统身份运行的 screen flow。
+12. **只有 `script` 校验规则能读一跳关联记录**：`validations[]` 的 `script` 规则能读本记录，
+    也能经一个引用字段读关联记录（如邀请上的 `record.supplier.status`），该读取以系统
+    身份进行、读不到时拒绝写入。**字段谓词**（`requiredWhen`、`readonlyWhen`、选项的
+    `visibleWhen`）以及 `previous.*`、`parent.*` 只能读本记录，经引用字段读关联记录会在
+    `objectstack validate` 阶段被拒绝（objectstack ADR-0137 D2）。两跳以上或需要汇总的
+    判断依据，要么在创建时由 flow 冗余到本记录并设为只读（如把寻源单的截止时间复制到
+    报价单，报价明细再经一跳读取），要么改走以系统身份运行的 screen flow。
 13. **为扩展包预留接口**：扩展包不修改核心，只能给核心对象加字段与校验
     （`objectExtensions`）、给共享选项列表追加选项（`picklistExtensions`）、往核心
     应用的导航分组里挂菜单（见[扩展包 §3.2](../packs/README.md#32-扩展包怎么接入核心)）。
     所以可能被扩展包追加选项的枚举，在核心里做成**共享选项列表**（picklist），不直接写在
     字段上：`srm_sourcing_event.sourcing_type`、`srm_contract.contract_type`、`srm_supplier_certificate.cert_type`、
     `srm_quality_issue.source`、`srm_kpi.dimension`、`srm_risk_event.risk_type`、
-    `srm_statement_line.line_type`、`srm_receipt.settlement_mode`。状态字段（stageField）
-    不做成可扩展的，状态机只由核心定义。
+    `srm_category.material_class`、`srm_supplier.country`。状态字段（stageField）
+    不做成可扩展的，状态机只由核心定义（每个选项带 `kind`，平台不允许 stageField 用共享
+    选项列表）。现阶段只做核心包（[ADR-0009](../adr/0009-core-first-pack-criteria-and-customer-layer.md)），
+    预留的方式只有这一条，不为未来的包多留分组或字段。
+14. **中国特有字段单独分组**：统一社会信用代码、纳税人类型等放在供应商的「工商与税务」
+    分组；外部单号字段放「外部系统」分组。便于将来拆中国本地化包和接 ERP（ADR-0009）。
 
 ## 2. 对象总览
 
-「来源」列：**SRM** 表示在 SRM 内产生；**ERP** 表示从 ERP 同步、SRM 内只读；
-**门户** 表示主要由供应商在门户里填写。
+核心共 **28 个对象**（[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md) 定为 27 个，2026-10-24 审核问题项从 repeater 改为子对象后为 28 个），按版本交付（[07 §1](./07-delivery-plan.md#1-分期路线图)）。
+「来源」列：**SRM** 表示在 SRM 内产生；**导入** 表示从 ERP 导出表格按外部编号幂等导入、SRM 内只读；
+**门户** 表示门户上线（v0.6）后主要由供应商在门户里填写，在此之前由内部代录。
 
-| # | 对象 | 中文名 | 领域 | 父对象（master_detail） | 来源 | 期次 |
+| # | 对象 | 中文名 | 领域 | 父对象（master_detail） | 来源 | 版本 |
 |---|---|---|---|---|---|---|
-| 1 | `srm_category` | 采购品类 | 基础数据 | — | SRM | 一期 |
-| 2 | `srm_material` | 物料 | 基础数据 | — | ERP | 一期 |
-| 3 | `srm_plant` | 工厂 / 收货地点 | 基础数据 | — | ERP | 一期 |
-| 4 | `srm_supplier` | 供应商 | 供应商主数据 | — | SRM | 一期 |
-| 5 | `srm_supplier_contact` | 供应商联系人 | 供应商主数据 | 供应商 | SRM / 门户 | 一期 |
-| 6 | `srm_supplier_bank_account` | 银行账户 | 供应商主数据 | 供应商 | 门户 | 一期 |
-| 7 | `srm_supplier_certificate` | 资质证书 | 供应商主数据 | 供应商 | 门户 | 一期 |
-| 8 | `srm_supplier_category` | 供货品类资格 | 供应商主数据 | 供应商 | SRM | 一期 |
-| 9 | `srm_supplier_application` | 准入申请 | 生命周期 | — | 门户（公开表单） | 一期 |
-| 10 | `srm_supplier_audit` | 供应商审核 | 生命周期 | — | SRM | 一期 |
-| 11 | `srm_supplier_change_request` | 信息变更单 | 生命周期 | — | 门户 | 二期 |
-| 12 | `srm_supplier_disposition` | 供应商处置单（冻结 / 解冻 / 淘汰 / 黑名单） | 生命周期 | — | SRM | 二期 |
-| 13 | `srm_sourcing_event` | 寻源单（询价 / 招标 / 竞价） | 寻源 | — | SRM | 一期 |
-| 14 | `srm_sourcing_item` | 寻源明细 | 寻源 | 寻源单 | SRM | 一期 |
-| 15 | `srm_sourcing_invitation` | 寻源邀请 | 寻源 | —（lookup 寻源单） | SRM | 一期 |
-| 16 | `srm_quotation` | 报价单 | 寻源 | — | 门户 | 一期 |
-| 17 | `srm_quotation_line` | 报价明细 | 寻源 | 报价单 | 门户 | 一期 |
-| 18 | `srm_price_record` | 价格记录（价格库） | 寻源 | — | SRM | 一期 |
-| 19 | `srm_purchase_request` | 采购申请 | 寻源 | — | SRM / ERP | 二期 |
-| 20 | `srm_source_list` | 货源清单与配额 | 寻源 | — | SRM | 五期 |
-| 21 | `srm_contract` | 合同 / 协议 | 合同 | — | SRM | 二期 |
-| 22 | `srm_purchase_order` | 采购订单 | 订单协同 | — | ERP | 二期 |
-| 23 | `srm_po_line` | 订单行 | 订单协同 | 采购订单 | ERP / 门户 | 二期 |
-| 24 | `srm_asn` | 送货单 | 订单协同 | — | 门户 | 二期 |
-| 25 | `srm_asn_line` | 送货明细 | 订单协同 | 送货单 | 门户 | 二期 |
-| 26 | `srm_receipt` | 收货记录（行级） | 订单协同 | — | ERP | 二期 |
-| 27 | `srm_inspection` | 来料检验 | 质量 | — | ERP / QMS | 三期 |
-| 28 | `srm_quality_issue` | 质量整改单（SCAR） | 质量 | — | SRM / 门户 | 三期 |
-| 29 | `srm_kpi` | 绩效指标 | 绩效 | — | SRM | 三期 |
-| 30 | `srm_performance_review` | 绩效考评单 | 绩效 | — | SRM | 三期 |
-| 31 | `srm_performance_score` | 评分明细 | 绩效 | 考评单 | SRM | 三期 |
-| 32 | `srm_statement` | 对账单 | 结算 | — | SRM | 四期 |
-| 33 | `srm_statement_line` | 对账明细 | 结算 | 对账单 | SRM | 四期 |
-| 34 | `srm_invoice` | 发票 | 结算 | — | 门户 | 四期 |
-| 35 | `srm_risk_event` | 风险事件 | 风险 | — | SRM / 外部服务 | 四期 |
+| 1 | `srm_category` | 采购品类 | 基础数据 | — | SRM | v0.1 |
+| 2 | `srm_plant` | 工厂 / 收货地点 | 基础数据 | — | SRM（手工维护或导入） | v0.1 |
+| 3 | `srm_supplier` | 供应商 | 供应商主数据 | — | SRM | v0.1 |
+| 4 | `srm_supplier_contact` | 供应商联系人 | 供应商主数据 | 供应商 | SRM / 门户 | v0.1 |
+| 5 | `srm_supplier_certificate` | 资质证书 | 供应商主数据 | 供应商 | SRM / 门户 | v0.1 |
+| 6 | `srm_supplier_category` | 供货品类资格 | 供应商主数据 | 供应商 | SRM | v0.1 |
+| 7 | `srm_supplier_application` | 准入申请 | 生命周期 | — | SRM（内部登记）/ 门户（邀请注册） | v0.1 |
+| 8 | `srm_material` | 物料（只读副本） | 基础数据 | — | 导入 | v0.2 |
+| 9 | `srm_supplier_bank_account` | 银行账户 | 供应商主数据 | 供应商 | SRM / 门户 | v0.2 |
+| 10 | `srm_supplier_change_request` | 信息变更单 | 生命周期 | — | SRM / 门户 | v0.2 |
+| 11 | `srm_contract` | 合同 / 协议 | 合同 | — | SRM | v0.3 |
+| 12 | `srm_contract_line` | 合同明细 | 合同 | 合同 | SRM | v0.3 |
+| 13 | `srm_supplier_disposition` | 供应商处置单（冻结 / 解冻 / 淘汰 / 黑名单） | 生命周期 | — | SRM | v0.3 |
+| 14 | `srm_delivery_record` | 交付记录（含检验结论） | 质量 | — | 导入 / 质检员录入 | v0.4 |
+| 15 | `srm_quality_issue` | 质量整改单（SCAR / 8D） | 质量 | — | SRM / 门户 | v0.4 |
+| 16 | `srm_supplier_audit` | 供应商审核 | 质量 | — | SRM | v0.4 |
+| 17 | `srm_supplier_audit_finding` | 审核问题项 | 质量 | 供应商审核 | SRM | v0.4 |
+| 18 | `srm_kpi` | 绩效指标 | 绩效 | — | SRM | v0.5 |
+| 19 | `srm_performance_review` | 绩效考评单 | 绩效 | — | SRM | v0.5 |
+| 20 | `srm_performance_score` | 评分明细 | 绩效 | 考评单 | SRM | v0.5 |
+| 21 | `srm_risk_event` | 风险事件 | 风险 | — | SRM（手工登记） | v0.5 |
+| 22 | `srm_supplier_invitation` | 门户邀请 | 门户 | — | SRM | v0.6 |
+| 23 | `srm_sourcing_event` | 寻源单（询价 / 招标 / 竞价） | 寻源 | — | SRM | v0.7 |
+| 24 | `srm_sourcing_item` | 寻源明细 | 寻源 | 寻源单 | SRM | v0.7 |
+| 25 | `srm_sourcing_invitation` | 寻源邀请 | 寻源 | —（lookup 寻源单） | SRM | v0.7 |
+| 26 | `srm_quotation` | 报价单 | 寻源 | — | 门户 | v0.7 |
+| 27 | `srm_quotation_line` | 报价明细 | 寻源 | 报价单 | 门户 | v0.7 |
+| 28 | `srm_price_record` | 价格记录（价格库） | 寻源 | — | SRM | v0.7 |
+
+**从原设计移出核心的对象**（原 35 个中的 11 个，[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md)）：
+
+| 对象 | 去向 |
+|---|---|
+| `srm_purchase_order`、`srm_po_line`、`srm_asn`、`srm_asn_line` | ERP 集成后的**门户镜像**：对象定义保留在 §4.5，现阶段不建 |
+| `srm_receipt`、`srm_inspection` | 由 `srm_delivery_record` 的导入字段替代（实收数量、实到日、检验结论、不合格数） |
+| `srm_statement`、`srm_statement_line`、`srm_invoice` | 留在 ERP，不做；付款进度在 ERP 集成后作为门户镜像 |
+| `srm_purchase_request` | 留在 ERP / OA，客户明确要求时再评估 |
+| `srm_source_list` | 客户驱动主题（寻源上线后） |
 
 **刻意没有建的对象**：审批记录、审批步骤、流程节点（平台 flow 提供）；评标结果表
 （定标结果直接写在报价明细的中标字段上）；通知记录（平台通知提供）；操作日志
-（平台字段历史与审计提供）。
+（平台字段历史与审计提供）；集成日志（ERP 集成立项时再定）。
 
 ## 3. 关系图
 
@@ -118,8 +129,28 @@ erDiagram
   srm_category ||--o{ srm_supplier_category : ""
   srm_category ||--o{ srm_category : "上级品类"
   srm_category ||--o{ srm_material : ""
-  srm_supplier_application }o--o| srm_supplier : "批准后关联"
+  srm_supplier_application }o--o| srm_supplier : "资料审核通过时关联"
+  srm_supplier ||--o{ srm_supplier_change_request : "变更"
+  srm_supplier ||--o{ srm_supplier_disposition : "处置"
+  srm_supplier ||--o{ srm_supplier_invitation : "门户邀请"
+
+  srm_supplier ||--o{ srm_contract : ""
+  srm_contract ||--o{ srm_contract_line : "明细"
+  srm_material ||--o{ srm_contract_line : ""
+
+  srm_supplier ||--o{ srm_delivery_record : "交付"
+  srm_material ||--o{ srm_delivery_record : ""
+  srm_delivery_record ||--o| srm_quality_issue : "不合格生成"
   srm_supplier ||--o{ srm_supplier_audit : "审核"
+  srm_supplier_audit ||--o{ srm_supplier_audit_finding : "问题项"
+  srm_supplier_audit_finding |o--o| srm_quality_issue : "转整改"
+  srm_performance_review |o--o{ srm_quality_issue : "C 级改善"
+  srm_performance_review |o--o{ srm_supplier_disposition : "D 级处置草稿"
+
+  srm_supplier ||--o{ srm_performance_review : ""
+  srm_performance_review ||--o{ srm_performance_score : "评分"
+  srm_kpi ||--o{ srm_performance_score : ""
+  srm_supplier ||--o{ srm_risk_event : ""
 
   srm_sourcing_event ||--o{ srm_sourcing_item : "明细"
   srm_sourcing_event ||--o{ srm_sourcing_invitation : "邀请"
@@ -130,25 +161,6 @@ erDiagram
   srm_sourcing_item ||--o{ srm_quotation_line : ""
   srm_quotation_line ||--o| srm_price_record : "中标生成"
   srm_material ||--o{ srm_price_record : ""
-  srm_supplier ||--o{ srm_contract : ""
-
-  srm_supplier ||--o{ srm_purchase_order : ""
-  srm_purchase_order ||--o{ srm_po_line : "订单行"
-  srm_asn ||--o{ srm_asn_line : "送货明细"
-  srm_po_line ||--o{ srm_asn_line : ""
-  srm_po_line ||--o{ srm_receipt : "收货"
-  srm_receipt ||--o{ srm_inspection : "检验"
-  srm_inspection ||--o| srm_quality_issue : "不合格生成"
-
-  srm_supplier ||--o{ srm_statement : ""
-  srm_statement ||--o{ srm_statement_line : "对账明细"
-  srm_receipt ||--o| srm_statement_line : ""
-  srm_statement ||--o{ srm_invoice : "发票"
-
-  srm_supplier ||--o{ srm_performance_review : ""
-  srm_performance_review ||--o{ srm_performance_score : "评分"
-  srm_kpi ||--o{ srm_performance_score : ""
-  srm_supplier ||--o{ srm_risk_event : ""
 ```
 
 **master_detail 与 lookup 的取舍**：子记录离开父记录没有意义、权限应跟随父记录时
@@ -168,7 +180,7 @@ erDiagram
 
 ### 4.1 供应商主数据
 
-**`srm_supplier` 供应商**（OWD `public_read`；开启字段历史）
+**`srm_supplier` 供应商**（OWD `public_read`：品类经理、采购主管、系统管理员改别人建的和存量导入的供应商，SQE、质量经理为写证书编辑供应商，经按岗位授 `edit` 的共享规则 `srm_supplier_edit_*`（可改不可删，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470) 的裁定写法）；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：基本信息、工商与税务〔`credit_code`、`registration_no`、`taxpayer_type`、`registered_capital`、`legal_representative`〕、外部系统〔`erp_vendor_code`〕）
 
 | 字段 | 类型 | 说明 / 约束 |
 |---|---|---|
@@ -180,8 +192,9 @@ erDiagram
 | `registration_no` | text | 境外供应商在注册地的登记号或税号（如增值税号、雇主识别号）；`country != 'cn'` 时必填并显示。对象声明组合唯一索引 `country` + `registration_no`（BR-01） |
 | `supplier_type` | select | `manufacturer` 生产商 / `distributor` 代理分销 / `service` 服务商 / `logistics` 物流商 |
 | `status` | select（stageField） | 见 §5.1 生命周期状态机 |
-| `grade` | select | `a` / `b` / `c` / `d`，最近一期绩效发布时写入 |
+| `grade` | select | `grade_a` / `grade_b` / `grade_c` / `grade_d`（同考评单），最近一期绩效发布时写入 |
 | `latest_score` | number | 最近一期绩效总分（存储字段，供看板使用） |
+| `preferred` | boolean（只读） | 优选供应商，默认 false；与 `grade` 同时写入（`srm_performance_publish` / `srm_appeal_resolve`）：最近一期已发布等级为 A 时为 true，其他等级为 false。列在「优选供应商」视图，供 v0.7 寻源邀请参考（03 §10 第 6 步，v0.5） |
 | `qualification_alert` | boolean | 默认 false；任一必备资质类型没有「有效且已核验」的证书时由 flow 置为 true（BR-04），补齐并经 SQE 核验后才恢复为 false |
 | `risk_level` | select | `low` / `medium` / `high` |
 | `registered_capital` | currency | 注册资本 |
@@ -191,72 +204,109 @@ erDiagram
 | `address` | address | 注册地址 |
 | `website` | url | |
 | `is_related_party` | boolean | 默认 false；存在关联关系申报时为 true（FR-904） |
-| `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；协议生效时由合同 flow 置为 true |
-| `erp_vendor_code` | text | ERP 供应商编码，唯一；准入批准并推送 ERP 后回写 |
-| `portal_position` | text | 门户岗位标识，如 `srm_vendor_sup0000128`；开通门户时写入，只读。校验规则：非空时必须以 `srm_vendor_` 开头（没开通门户的供应商为空） |
+| `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；有生效中的质量协议 / 廉洁协议时为 true，由 `srm_contract_agreement_recalc` 在协议进入或离开「生效」时重算（协议到期、终止又没有续上的回到 false），只由 flow 写入（v0.3） |
+| `erp_vendor_code` | text | ERP 供应商编码，唯一；预留，ERP 集成前空着或由采购员手工填写 |
+| `last_change_request` | lookup → 信息变更单（只读） | 最近一次写回本档案的变更单，由 `srm_change_apply` 写入（v0.2） |
+| `portal_position` | text | 门户岗位标识，如 `srm_vendor_sup0000128`；开通门户时写入，只读。校验规则：非空时必须以 `srm_vendor_` 开头（没开通门户的供应商为空）。v0.6 加 |
+| `legacy_imported` | boolean | 默认 false；存量导入的供应商为 true（v0.2）。只能在新建时置为 true：`readonlyWhen: previous.legacy_imported != true`，已建档的供应商重复导入时该列被忽略；只有 `srm_admin` 可写 |
+| `legacy_reviewed` | boolean | 默认 false；品类经理核对后经「确认复核」按钮置为 true。`legacy_imported && !legacy_reviewed` 的供应商列在「存量待复核」视图（v0.2） |
 | `contact_count` | summary | `count` 联系人 |
+| `primary_contact_count` | summary | `count` 联系人，条件 `is_primary == true`；联系人的主联系人守卫规则读它（v0.2） |
 | `expired_certificate_count` | summary | `count` 资质证书，条件 `status == 'expired'` |
+| `default_bank_account_count` | summary | `count` 银行账户，条件 `is_default == true`；「每家至多一个默认账户」的校验读它（v0.2） |
+| `open_disposition_count` | summary | `count` 处置单，条件 `status == 'in_review'`；「同一家供应商同时只能有一张审批中的处置单」的校验读它（v0.3） |
+| `blacklisted_on` / `blacklist_until` | date（只读） | 黑名单名录（v0.5）：拉入黑名单的处置单执行时写入拉黑日期和禁入期满日（拉黑日期 + `blacklist_years` 年）。期满前 30 天和当天由 `srm_blacklist_expiry_notice` 提醒，只提醒，解除仍走「解除黑名单」处置单；解除后保留为最近一次拉黑的记录 |
+| `blacklist_disposition` / `blacklist_reason` | lookup → 处置单 / textarea（只读） | 拉黑的处置单与处置原因，与上两项同时写入（v0.5） |
+| `open_risk_event_count` | summary | `count` 风险事件，条件 `status in ['open', 'mitigating']`（v0.5） |
+
+关键信息锁定（v0.2）：`name`、`country`、`credit_code`、`registration_no`、`legal_representative`、
+`registered_capital`、`address` 在 `potential` / `qualifying` 期间可以直接改；准入通过后（合格、冻结、
+淘汰、黑名单）只能经信息变更单修改。实现为校验规则 `key_info_via_change_request`：这些字段有变化而
+`last_change_request` 没变时拒绝写入；`last_change_request` 只读，只有写回 flow 能带着它一起写。
+不用 `readonlyWhen`，因为它连系统身份的写入也挡，写回 flow 就写不进去。
 
 **`srm_supplier_contact` 供应商联系人**（master_detail → 供应商；OWD `controlled_by_parent`）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `name` | text | 必填 |
-| `contact_role` | multiselect | `admin` 主账号 / `sales` 商务 / `logistics` 物流 / `quality` 质量 / `finance` 财务 |
+| `contact_function` | multiselect | `admin` 主账号 / `sales` 商务 / `logistics` 物流 / `quality` 质量 / `finance` 财务（字段名不用 `role`，平台保留词） |
 | `mobile` / `email` | phone / email | email 必填（门户邀请与通知用） |
 | `portal_user` | user | 已开通门户账号时关联的平台用户；该用户同时被任命到供应商的门户岗位（见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)） |
-| `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人（校验规则） |
+| `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人。守卫：校验规则在供应商 `primary_contact_count > 0` 时拒绝再设一位（插入，或更新时由否改是），导入同样适用；同一批写入里的两位拦不住（objectstack#25477），由「主联系人重复」视图兜底。更换主联系人由「设为主联系人」screen flow 以系统身份先清掉旧的再设新的 |
 | `active` | boolean | 默认 true |
 
-**`srm_supplier_bank_account` 银行账户**（master_detail → 供应商）
+**`srm_supplier_bank_account` 银行账户**（master_detail → 供应商；OWD `controlled_by_parent`；v0.2）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `bank_name` / `branch_name` | text | 开户行 / 支行 |
-| `account_name` | text | 必须与供应商名称一致（校验规则，境外供应商除外） |
-| `account_no` | text | 字段级权限：仅应付会计、采购管理员可读（BR-20） |
+| `bank_name` / `branch_name` | text | 开户行（必填）/ 支行 |
+| `account_name` | text | 必填；中国供应商（`country == 'cn'`）必须与供应商全称一致（校验规则），境外供应商不校验 |
+| `account_no` | text | 必填；脱敏规则 `bank_account`（只留后 4 位）+ `requiredPermissions: ['srm_view_bank_account_no']`：只有持该能力的权限集（`srm_finance`、`srm_supplier_admin`）读到完整值，其他人读到脱敏值且不能按它筛选排序（BR-20，04 §4.2） |
 | `swift_code` | text | 境外账户 |
-| `currency` | select | `cny` / `usd` / `eur` / … |
-| `status` | select | `pending_verify` 待核验 / `active` 有效 / `inactive` 停用 |
-| `verified_by` | user | 核验人（应付会计） |
-| `is_default` | boolean | 默认 false |
+| `currency` | select | `cny` / `usd` / `eur` / `jpy` / `hkd`，默认 `cny` |
+| `status` | select（stageField，只读） | `pending_verify` 待核验（新建默认）/ `active` 有效 / `inactive` 停用；只由 flow 写入，状态机 `pending_verify → active ⇄ inactive` |
+| `verified_by` | user（只读） | 核验人（应付会计），由「核验银行账户」screen flow 写入 |
+| `is_default` | boolean | 默认 false；只有 `active` 的账户可设为默认（校验规则，新建与修改都拦；不用 `readonlyWhen`，变更单停用原账户时要同时取消默认）；每家至多一个默认账户（校验规则读供应商的 `default_bank_account_count`） |
+| `erp_bank_id` | text（只读） | 预留，ERP 集成前空着 |
+
+锁定：开户行、支行、户名、账号、SWIFT、币种在任何状态下都 `readonlyWhen` 只读（新建时可填）——
+`pending_verify` 期间整条记录不可改，`active` / `inactive` 账户的修改走信息变更单（v0.2 M4）。
+新建与核验是两个人：采购侧（`srm_supplier_admin`）新建，应付会计经 `srm_bank_verify` 核验，
+flow 拒绝新建人核验自己建的账户（03 §13）。
 
 **`srm_supplier_certificate` 资质证书**（master_detail → 供应商）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `cert_type` | select | `business_license` 营业执照 / `iso9001` / `iatf16949` / `iso14001` / `iso45001` / `production_license` 生产许可 / `ccc` 3C 认证 / `other` |
-| `is_mandatory` | boolean | 默认 false；由 flow 按供货品类的必备资质清单写入，门户只读 |
-| `cert_no` / `issuer` | text | |
+| `is_mandatory` | boolean | 默认 false；证书新建（或改类型）和品类资格新增时，由 flow 按该供应商全部品类的 `mandatory_cert_types` 标记为 true（`srm_certificate_mandatory_mark`、`srm_grant_mandatory_mark`，03 §11），只标记、不取消；存量导入时按表格填写（导入时还没有品类资格）；门户只读 |
+| `cert_no` / `issuer` | text | 存量导入的证书 `cert_no` 必填（`requiredWhen: record.legacy_imported == true`），导入按「供应商 + 资质类型 + 证书编号」匹配 |
 | `valid_from` / `valid_to` | date | `valid_to >= valid_from`（跨字段校验） |
-| `attachment` | file | 扫描件，必填 |
+| `attachment` | file | 扫描件；`requiredWhen: record.legacy_imported != true`——表格导入带不了文件，存量证书复核时补传 |
 | `status` | select | `valid` 有效 / `expiring` 即将到期 / `expired` 已过期，由 flow 按 `valid_to` 维护，门户只读 |
 | `verified` | boolean | 默认 false；SQE 经「核验证书」screen flow 置为 true；供应商修改编号、有效期或附件后由 flow 重置为 false，门户只读 |
+| `legacy_imported` | boolean | 默认 false；存量导入的证书为 true，同供应商的同名字段（只在新建时可置为 true，只有 `srm_admin` 可写）（v0.2） |
 
 **`srm_category` 采购品类**（OWD `public_read`）：`code`、`name`、`parent`（`tree`，
-上级品类）、`category_manager`（user）、`sqe`（user）、`is_direct`（boolean，直接
-物料）、`risk_class`（`high` / `medium` / `low`，决定准入是否需要现场审核与样品）、
+上级品类）、`category_manager`（user）、`sqe`（user）、`buyer`（user，采购员）、`evaluator`（user，需求部门
+评分人，持 `srm_evaluator` 岗位；`buyer` 与 `evaluator` 随 v0.5 绩效评分加入，见 §4.7 `scorer_type`）、`is_direct`（boolean，直接
+物料）、`material_class`（共享选项列表 `srm_material_class`：`class_a` 战略类 / `class_b` 重要类 /
+`class_c` 一般类（选项值至少 2 个字符，所以不用单字母），与体系文件的物资 A / B / C 分类同源，决定准入审批是否会签质量经理、
+审核频次和绩效周期）、`risk_class`（`high` / `medium` / `low`，决定准入是否需要现场
+审核与样品；A 类默认 `high`，B 类中涉及危化品、特种设备的也设 `high`）、
 `mandatory_cert_types`（multiselect，必备资质类型）。
 
 **`srm_supplier_category` 供货品类资格**（master_detail → 供应商）：`category`
 （lookup）、`status`（`trial` 试供 / `qualified` 合格 / `suspended` 暂停）、
 `approved_date`、`source_application`（lookup 准入申请）。同一供应商同一品类唯一。
+处置单冻结时由 flow 写三个只读字段（v0.3）：`status_before_freeze`（`trial` / `qualified`，暂停前的状态）、
+`freeze_scope`（`all` / `category`，哪种范围的冻结暂停了它）、`freeze_disposition`（lookup 处置单）。
+解冻只恢复同一范围冻结的资格，原本就暂停的资格没有冻结记录，不会被解冻恢复。
 
-**`srm_material` 物料**（ERP 镜像，OWD `public_read`，内部只读）：`erp_material_id`
-（唯一）、`material_code`、`name`、`specification`、`uom`、`category`（lookup）、
-`active`。
+**`srm_material` 物料**（只读副本，OWD `public_read`，见下方说明；v0.2）：`erp_material_no`
+（组织内唯一，导入匹配键）、`material_code`、`name`、`specification`、`uom`、`category`（lookup）、
+`active`。用平台导入按 `erp_material_no` 从 ERP 导出表格导入，可重复执行；采购员只
+维护 `category` 关联，其他字段对采购员只读（FLS），新建、删除只有 `srm_admin`。ERP 集成后改为
+upsert 写入，结构不变。
 
-**`srm_plant` 工厂 / 收货地点**（ERP 镜像）：`erp_plant_id`、`code`、`name`、
+> **可改不可删**：物料归执行导入的管理员所有。平台的 `modifyAllRecords` 同时放开删除
+> （[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470)），所以持 `srm_buyer` 的岗位（采购员、采购主管、采购总监）不用它，而是经按岗位授
+> `edit` 的共享规则 `srm_material_edit_*` 改别人导入的物料，能写哪些字段由 `allowEdit` 与 FLS 决定；
+> `srm_admin` 本来就能删物料，直接用 `modifyAllRecords`。日常重复导入的表格**不带** `category` 列，以免覆盖采购员维护的关联；导入说明见
+> [`data/samples/README.md`](../../data/samples/README.md)。
+
+**`srm_plant` 工厂 / 收货地点**（手工维护或导入）：`erp_plant_id`（预留）、`code`、`name`、
 `legal_entity`（法人名称或组织节点）、`address`。
 
 ### 4.2 生命周期
 
-**`srm_supplier_application` 准入申请**（OWD `private`；公开表单匿名提交）
+**`srm_supplier_application` 准入申请**（OWD `private`；v0.1 由内部登记，v0.6 起由受邀供应商在门户填写；公开表单匿名提交待平台，见 01 FR-201）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `application_no` | autonumber | `APP{YYYY}{00000}`，按年重置 |
-| `source` | select | `self_registered` 自助注册 / `invited` 邀请 |
+| `source` | select | `internal` 内部登记（v0.1 默认）/ `invited` 邀请（v0.6）/ `self_registered` 自助注册（待平台） |
 | `company_name` | text | 必填 |
 | `country` | select | 必填，默认 `cn`，选项同供应商的 `srm_country` |
 | `credit_code` / `registration_no` | text | 规则同供应商：中国供应商填统一社会信用代码，境外供应商填当地注册号或税号 |
@@ -267,41 +317,127 @@ erDiagram
 | `privacy_consent` | boolean | 默认 false；「必须勾选」由校验规则保证 |
 | `related_party_declaration` | textarea | 关联关系申报 |
 | `status` | select（stageField） | 见 §5.2 |
-| `duplicate_check` | select | `pass` / `duplicate` / `blacklisted`，受理 flow 写入 |
+| `duplicate_check` | select | `pass` / `duplicate` / `blacklisted` / `reapply`（命中已淘汰的供应商：不建新档，申请指向旧档，允许继续），受理 flow 写入 |
 | `risk_class` | select | 受理时从申请品类复制的最高风险等级，只读；决定是否需要现场审核 |
-| `audit_passed` | boolean | 默认 false；现场审核结果为通过或有条件通过时由 flow 置为 true |
+| `material_class` | select | 受理时从申请品类复制的最高物资类别（`srm_material_class`），只读；决定准入审批是否会签质量经理（03 §12） |
+| `audit_passed` | boolean | 只读，默认 false；准入审核完成时由 `srm_audit_admission_apply` 写入：结论为通过或有条件通过时为 true，否则为 false |
+| `audit_result` | select（只读） | 准入审核结论 `pass` / `conditional` / `fail`，同一 flow 写入；有条件通过的申请批准后品类资格为 `trial`（WI-01 6.6.2） |
+| `audit_report` | file | 不建：v0.4 前的过渡设计，审核报告在 `srm_supplier_audit.report` 上 |
 | `reviewer` | user | 初审人（品类经理） |
+| `review_escalated` | boolean | 只读，默认 false；初审人就是新建人或推进到准入评审的人时，`srm_admission_approval` 把品类经理一级上提给采购总监并写 true（03 §3 第 6 步） |
 | `sqe` | user | 负责审核的 SQE |
-| `supplier` | lookup → 供应商 | 批准时关联或新建的供应商 |
+| `supplier` | lookup → 供应商 | 品类经理把申请推进到「资料审核」时新建（或 `reapply` 时关联旧档）的供应商；`submitted` 阶段只有申请记录，不建主数据 |
 | `reject_reason` | textarea | |
 | `cycle_days` | number | 从提交到批准的天数，批准时由 flow 写入（准入周期指标） |
 
-**`srm_supplier_audit` 供应商审核**（OWD `private`）：`audit_no`、`supplier`
-（lookup）、`application`（lookup，可空）、`audit_type`（`admission` 准入 / `annual`
-年度 / `special` 专项）、`audit_date`、`auditors`（user，多选）、`checklist_score`
-（number）、`result`（`pass` / `conditional` 有条件通过 / `fail`）、`findings`
-（richtext）、`report`（file）、`sample_result`（`not_required` / `pass` / `fail`）。
+> v0.1（内部代录，见 [07 §1](./07-delivery-plan.md#1-分期路线图)）先实现一个子集：申请由内部人员为已登记的
+> 潜在或淘汰供应商发起，直接关联 `supplier`；申请品类用多值 lookup `applied_categories`（不经匿名表单，
+> 可以读品类对象）；不含现场审核分支和公司资料等表单字段；`approval_status` 记录审批节点的结论。
+> 本表其余字段随 v0.4（供应商审核）和 v0.6（门户、邀请注册）补齐。
 
-**`srm_supplier_change_request` 信息变更单**（二期）：`supplier`、`change_type`
-（`basic` 基本信息 / `bank_account` 银行账户 / `address` 地址 / `contact` 联系人）、
-`before_value` / `after_value`（json，变更前后快照）、`reason`、`status`、
-`purchase_approver` / `finance_approver`（user）、`applied_at`（审批通过后写回档案
-的时间）。
+**`srm_supplier_audit` 供应商审核**（OWD `private`，内部读靠权限集的 `viewAllRecords`：年度计划由系统生成、SQE 之间要互相接手，
+SQE、质量经理经共享规则 `srm_supplier_audit_edit_*` 改所有审核（可改不可删，objectstack#25470 的裁定写法）；只有质量岗位有 `allowEdit`，删除不开放；v0.4）
 
-**`srm_supplier_disposition` 供应商处置单**（二期）：`supplier`、`action`
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `audit_no` | autonumber | `AUD{YYYY}{00000}` |
+| `supplier` | lookup | 必填 |
+| `audit_type` | select | `admission` 准入 / `annual` 年度 / `special` 专项 |
+| `application` | lookup → 准入申请 | 准入审核必填，必须是本供应商、进行中的申请 |
+| `plan_year` | number（只读） | 年度计划生成时写入，按「供应商 + 计划年度」防重 |
+| `planned_date` / `audit_date` | date | 计划中时计划日期必填；完成时审核日期必填 |
+| `auditors` | user（多选） | 审核员；年度计划默认品类的 SQE |
+| `status` | select（stageField） | `planned` 计划中 / `done` 已完成 / `cancelled` 已取消；`planned → done / cancelled`，`cancelled → planned`，完成后不再变 |
+| `cancel_reason` | textarea | 取消时必填（如不需现场复审的 B 类供应商、经批准以资料审核代替一次复审，WI-01 6.9） |
+| `checklist_score` / `lowest_block_score` | number | 审核总分、最低审核块得分（0–100），完成时必填 |
+| `result` | select | `pass` / `conditional` 有条件通过 / `fail`，完成时必填；按 `audit_score_thresholds` 校验，只拦「高判」：通过要求总分 ≥ pass 线、每块 ≥ floor 线、没有严重不符合项和否决项；有条件通过要求总分 ≥ floor 线、严重不符合项不超过 1 项、没有否决项（WI-01 6.6.1） |
+| `sample_result` | select | `not_required` / `pass` / `fail` |
+| `report` / `scoresheet` | file | 审核报告、审核评分表（QR-03） |
+| `serious_finding_count` / `veto_finding_count` | summary | 严重不符合项数、否决项数，校验结论用 |
+
+检查表原设计为 repeater（检查项、评分、备注）。平台的 repeater 不能声明子字段（列名、类型、选项与翻译都没处写；objectstack#25681 裁定有类型的列表用子对象），
+表单只能当无结构表格编辑，所以逐条评分留在评分表附件里，系统记总分和最低审核块得分；问题项改为子对象：
+
+**`srm_supplier_audit_finding` 审核问题项**（master_detail → 供应商审核，`controlled_by_parent`；v0.4）：`title` 问题项（必填）、
+`description` 事实描述、`severity`（`serious` 严重不符合 / `general` 一般不符合 / `observation` 观察项）、`veto` 否决项（boolean）、
+`requirement` 整改要求、`quality_issue`（lookup → 整改单，只读）。不符合项经审核上的「转整改单」screen flow
+`srm_audit_finding_to_scar` 各生成一张 `srm_quality_issue`（`source = audit`，`audit` 指向本审核；严重不符合 → `critical`，
+一般不符合 → `major`）并回填 `quality_issue`，转出后问题项只读；观察项不转。
+
+**`srm_supplier_change_request` 信息变更单**（OWD `private`；v0.2）。门户上线前由采购侧代供应商在
+供应商档案下新建，新建即进入审批（03 §5）。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `change_no` | autonumber | `CHG{YYYY}{00000}` |
+| `supplier` | lookup → 供应商 | 必填；新建后只读 |
+| `change_type` | select | `basic` 基本信息 / `bank_account` 银行账户 / `address` 地址 / `contact` 联系人；新建后只读 |
+| `reason` | textarea | 必填 |
+| `new_name` / `new_credit_code` / `new_registration_no` / `new_legal_representative` / `new_registered_capital` | text / currency | 基本信息的新值，至少填一项，留空的保持原值 |
+| `new_address` | address | 地址变更必填 |
+| `bank_account` | lookup → 银行账户 | 被替换的原账户：必须属于本供应商、状态为 `active`；新建后只读 |
+| `new_bank_name` / `new_branch_name` / `new_account_name` / `new_account_no` / `new_swift_code` / `new_currency` | text / select | 新账户。户名规则同银行账户；`new_account_no` 同样脱敏并要求 `srm_view_bank_account_no`，所以银行账户变更只能由持该能力的岗位（品类经理、采购主管）发起 |
+| `contact` | lookup → 联系人 | 联系人变更必填，必须属于本供应商；新值 `new_contact_name` / `new_mobile` / `new_email` |
+| `status` | select（stageField，只读） | `in_review` 审批中 / `applied` 已生效 / `rejected` 已驳回；只由 flow 写入 |
+| `approval_status` | select（只读） | 审批节点镜像：`pending` / `approved` / `rejected` / `returned` 退回修改 / `recalled` |
+| `purchase_approver` / `finance_approver` | user（只读） | 两级审批的实际审批人，flow 从审批记录写入 |
+| `reject_reason` | textarea（只读） | 驳回时的审批意见 |
+| `before_value` / `after_value` | json（只读） | 新建时快照的当前档案 / 写回后的档案；银行账号不进快照（BR-20） |
+| `applied_at` | datetime（只读） | 写回时间 |
+| `new_bank_account` | lookup → 银行账户（只读） | 银行账户变更写回时新建的账户 |
+
+新值用分类型字段而不是直接编辑 json：表单能按类型显示、校验，退回后发起人能直接改。变更内容只在新建时和
+`approval_status == 'returned'` 期间可改（`readonlyWhen`），审批中平台锁定记录。
+
+**`srm_supplier_disposition` 供应商处置单**（OWD `private`，内部岗位全部可读；v0.3）：
+`disposition_no`（自动编号 `DSP{YYYY}{00000}`）、`supplier`、`action`
 （`freeze` / `unfreeze` / `eliminate` / `blacklist` / `remove_blacklist`）、
-`scope`（`all` 全部品类 / `category` 指定品类）、`categories`、`reason`（必填）、
-`effective_date`、`status`。
+`scope`（`all` 全部品类 / `category` 指定品类，只有冻结和解冻可以指定品类）、`categories`（多值 lookup 品类，
+指定品类时必填）、`reason`（必填）、`effective_date`（默认当天）、`status`（`draft` 草稿 / `in_review` 审批中 /
+`applied` 已执行 / `rejected` 已驳回 / `cancelled` 已作废；草稿与作废随 v0.5）、`submitted_by`（user，只读：草稿的提交人，v0.5）、
+`performance_review`（lookup → 考评单，只读：绩效结果应用生成的草稿指回来源考评单，v0.5）、
+`approval_status`（审批节点写入）、只读的 `category_approver`（发起人不是品类经理时才有
+这一级，[03 §5](./03-processes-and-automation.md#5-p2-信息变更与供应商处置)）/ `director_approver` / `gm_approver` /
+`compliance_approver`、`reject_reason`、`applied_at`。
 
-### 4.3 寻源
+新建即进入审批，供应商、动作、范围和品类只在新建时填写，原因和生效日期在被退回修改期间可改。
+**草稿**（v0.5）只由 flow 生成（高风险事件，[03 §11](./03-processes-and-automation.md#11-p10-资质与风险监控资质-v01风险事件-v05)；
+绩效结果应用，03 §10），原因由 flow 写好；品类经理或采购主管经「提交审批」进入审批（提交人写入 `submitted_by` 并成为记录所有者，
+审批以它为发起人），或经「作废」放弃（作废理由写入 `reject_reason`）。状态机：`draft` → `in_review` / `cancelled`，
+`in_review` → `applied` / `rejected`；`initialStates` 为 `in_review`、`draft`。提交时再校验一次动作与供应商当前状态、
+是否已有审批中的处置单（草稿期间供应商状态可能已变）。审批通过即执行，
+`effective_date` 记录业务生效日，供采购员在 ERP 同步冻结标志时参照。新建时校验动作与供应商当前状态
+（[§5.1](#51-供应商-srm_supplierstatus)）：
 
-**`srm_sourcing_event` 寻源单**（OWD `private`，按品类共享给品类团队，见 04）
+| 动作 | 供应商当前状态 | 执行结果 |
+|---|---|---|
+| 冻结（全部品类） | `qualified` | 供应商 → `frozen`；未暂停的品类资格 → `suspended` |
+| 冻结（指定品类） | `qualified` | 供应商不变；所选品类中未暂停的资格 → `suspended` |
+| 解冻（全部品类） | `frozen` | 供应商 → `qualified`；全部品类冻结暂停的资格恢复为冻结前的状态 |
+| 解冻（指定品类） | `qualified` | 供应商不变；所选品类中指定品类冻结暂停的资格恢复 |
+| 淘汰 | `potential` / `qualified` / `frozen` | 供应商 → `eliminated`；品类资格全部 `suspended`，清掉冻结记录 |
+| 拉入黑名单 | `qualified` / `frozen` / `eliminated` | 供应商 → `blacklisted`；品类资格全部 `suspended`，清掉冻结记录 |
+| 解除黑名单 | `blacklisted` | 供应商 → `eliminated`（只能再走准入） |
+
+同一家供应商同时只能有一张审批中的处置单（读供应商的 `open_disposition_count`），免得两张单子审完后互相覆盖。
+淘汰和黑名单清掉冻结记录，是为了重新准入后再冻结、解冻时，不会把没有重新准入的品类恢复。
+
+**`srm_supplier_invitation` 门户邀请**（OWD `private`；v0.6）：`supplier`（lookup，
+可空：存量供应商批量邀请时填）、`company_name`、`contact_name`、`contact_email`、
+`token`（text，只读，flow 生成）、`expires_at`、`status`（`sent` / `accepted` / `expired` /
+`revoked`）、`application`（lookup，供应商接受邀请并提交申请后回填）、`invited_by`（user）。
+邀请注册是 v0.6 的默认注册方式（01 FR-202）；实现方式按 07 §6 V5 的结论。
+
+### 4.3 寻源（v0.7）
+
+**`srm_sourcing_event` 寻源单**（OWD `public_read`，预算、目标价、上次价格靠 FLS 保护，
+不另做按品类的共享规则，见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `event_no` | autonumber | `RFQ{YYYY}{00000}` |
 | `title` | text | 必填 |
-| `sourcing_type` | select | `rfq` 询价 / `tender` 邀请招标 / `reverse_auction` 反向竞价（五期）/ `single_source` 单一来源 |
+| `sourcing_type` | select（共享选项列表 `srm_sourcing_type`） | `rfq` 询价 / `tender` 邀请招标 / `single_source` 单一来源 / `external_tender` 外部招标（依法必须招标的项目在专业平台进行，这里只登记结果）；`reverse_auction` 反向竞价为客户驱动主题 |
 | `category` | lookup → 品类 | 必填，决定可邀请的合格名录与审批路径 |
 | `plant` | lookup → 工厂 | 交货地点 |
 | `currency` | select | 报价币种 |
@@ -314,7 +450,7 @@ erDiagram
 | `status` | select（stageField） | 见 §5.3；用户不可直接改（FLS 只读），只经发布、开标、下一轮、提交定标、取消等 screen flow 推进 |
 | `round` | number | 当前报价轮次，默认 1 |
 | `invited_count` | summary | `count` 邀请 |
-| `submitted_quote_count` | summary | `count` 报价单，条件 `status == 'submitted'`；进入下一轮时上一轮报价变为 `superseded`，所以只计当前轮（封标期间内部也能看到「已报价 N 家」） |
+| `submitted_quote_count` | summary | `count` 报价单，条件 `status == 'submitted'`；进入下一轮时上一轮报价变为 `superseded`，所以只计当前轮（封标期间内部也能看到「已报价 N 家」）。BR-07「有效报价少于 3 家」按当前轮次的这个计数判断，新一轮发布到首家提交之间为 0 属正常 |
 | `awarded_amount` | currency | 定标总金额，定标 flow 计算后写入 |
 | `savings_amount` | currency | 节约额 =（预算或上次价格 − 定标价）× 数量，定标 flow 写入 |
 | `low_competition_reason` | textarea | 有效报价少于 3 家时必填（BR-07） |
@@ -372,16 +508,52 @@ erDiagram
 （lookup）、`source_contract`（lookup）、`status`（`active` / `expired` /
 `superseded` 被替代）、`erp_info_record_id`（推送 ERP 后回写）。
 
-### 4.4 合同
+### 4.4 合同（v0.3）
 
-**`srm_contract` 合同 / 协议**：`contract_no`（`CT{YYYY}{00000}`）、`title`、
-`contract_type`（`framework` 框架协议 / `price_agreement` 价格协议 / `purchase`
-采购合同 / `quality_agreement` 质量协议 / `integrity` 廉洁协议 / `nda` 保密协议）、
-`supplier`、`legal_entity`、`amount`、`start_date` / `end_date`、`auto_renew`
-（boolean）、`source_event`、`status`（见 §5.5）、`signed_file`（file）、
-`esign_request_id`（电子签流水号）、`legal_reviewer`（user）。
+**`srm_contract` 合同 / 协议**（OWD `private`，内部读靠权限集的 `viewAllRecords`：品类经理、采购主管互相接手草稿，法务改条款，采购员、采购总监给别人建的合同上传签署件，经按岗位授 `edit` 的共享规则 `srm_contract_edit_*`（可改不可删，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470) 的裁定写法）；能改哪些字段由 `allowEdit` 与 FLS 决定；开启字段历史；表单分组：合同信息、审批、签署、外部系统）
 
-### 4.5 订单协同
+| 字段 | 类型 | 说明 / 约束 |
+|---|---|---|
+| `contract_no` | autonumber | `CT{YYYY}{00000}`，按年重置 |
+| `title` | text | 必填，可搜索 |
+| `contract_type` | select | 共享选项列表 `srm_contract_type`：`framework` 框架协议 / `price_agreement` 价格协议 / `purchase` 采购合同 / `quality_agreement` 质量协议 / `integrity` 廉洁协议 / `nda` 保密协议 |
+| `supplier` | lookup → 供应商 | 必填；只能是「合格」供应商（校验规则 `supplier_qualified`，新建时经一跳读供应商状态，07 §2.1 第 7 步）。供应商详情页显示合同相关列表 |
+| `category` | lookup → 品类 | 主要品类，可空；到期提醒通知它的品类经理 |
+| `legal_entity` | text | 签约法人 |
+| `amount` | currency | 合同金额：采购合同为合同总额，框架协议为年度预计金额；合同审批按它分档（03 §12） |
+| `currency` | select | `cny` / `usd` / `eur` / `jpy` / `hkd`，默认 `cny` |
+| `line_amount` | summary | `sum` 明细 `amount` |
+| `start_date` / `end_date` | date | 必填；`end_date >= start_date` |
+| `auto_renew` | boolean | 默认 false；到期扫描为它生成续签草稿 |
+| `legal_reviewer` | user | 法务审核人，合同审批第 1 级；不填时由法务岗位审批；不能是起草人（校验规则 `legal_reviewer_not_drafter`），也不能是提交人（提交时检查） |
+| `status` | select（stageField，只读） | 见 §5.5；只由 flow 写入 |
+| `renewed_from` | lookup → 合同（只读） | 续签草稿指回原合同，由 `srm_contract_renew` 写入 |
+| `submitted_by` | user（只读） | 提交人，由 `srm_contract_submit` 写入；与起草人一起不得审批本合同（BR-11） |
+| `approval_status` | select（只读） | 审批节点写入的审批结论：`pending` / `approved` / `rejected` / `returned` 退回修改 / `recalled` 已撤回 |
+| `legal_approver` / `category_approver` / `director_approver` / `gm_approver` | user（只读） | 各级实际审批人，由 `srm_contract_approval` 写入 |
+| `reject_reason` | textarea（只读） | 驳回意见，由 `srm_contract_approval` 写入 |
+| `signed_file` / `signed_date` | file / date | 签署件、签署日期；只在 `signing` 期间可改（`readonlyWhen`）；生效时两者必填（校验规则 `signed_before_active`） |
+| `esign_request_id` | text（只读） | 电子签流水号，预留；电子签接入为客户驱动主题 |
+| `erp_contract_no` | text（只读） | 预留，唯一 |
+| `source_event` | lookup → 寻源单 | 来源寻源单，v0.7 随寻源单对象加入 |
+
+锁定：合同信息分组的字段只在草稿期间和被退回修改期间可改（`readonlyWhen: status != 'draft' && approval_status != 'returned'`）；
+审批中平台锁定记录。
+
+**`srm_contract_line` 合同明细**（master_detail → 合同，OWD `controlled_by_parent`，合同表单内联编辑）：`line_no`（必填）、
+`material`（lookup，可空）、`description`（必填）、`quantity`、`uom`、`unit_price`、`tax_rate`（percent，小数存储）、`amount`
+（currency，只读，= `quantity × unit_price`，由平台按字段 `expression` 计算后存储，合同的 `line_amount` 汇总它）、
+`valid_from` / `valid_to`。只有草稿或被退回修改的合同可以增改明细（`script` 规则经一跳读合同状态与审批结论）。价格协议的明细在合同生效时
+可经 flow 生成价格记录（v0.7 起）。
+
+### 4.5 订单协同（预留：ERP 集成后的门户镜像，现阶段不建）
+
+本节的四个对象（采购订单、订单行、送货单、送货明细）的记录系统是 ERP。按
+[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md) 第 5 条，它们只在 ERP 集成落地后作为
+**门户镜像**建立：对象定义在核心，ERP 来的字段对内部岗位只读、只有集成账号能写，供应商
+在门户的动作（确认、答复交期、送货）写在镜像自己的字段里。没有集成时门户不显示这些入口。
+字段设计保留如下，集成立项时直接沿用；收货记录和来料检验不再单独建对象，由 §4.6 的
+交付记录替代。
 
 **`srm_purchase_order` 采购订单**（ERP 来源；OWD `private`，内部按工厂共享）
 
@@ -417,93 +589,159 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 `ship_quantity`（≤ 订单行 `open_quantity − in_transit_quantity`，BR-14）、`batch_no`、
 `production_date`、`line_status`（`shipped` / `received` / `cancelled`，收货 flow 维护）。
 
-**`srm_receipt` 收货记录**（ERP / WMS 来源，行级）：`erp_receipt_id`（唯一）、
-`po_line`、`asn_line`（可空）、`supplier`、`material`、`plant`、`receipt_date`、
-`received_quantity`、`accepted_quantity`、`rejected_quantity`、`movement_type`
-（`receipt` 收货 / `return` 退货）、`amount`（currency，数量 × 订单行单价，flow 写入，
-采购支出口径）、`on_time`（boolean，收货 flow 按
-`receipt_date <= promised_date` 判定）、`reconciled`（boolean，是否已进对账单）、
-`settlement_mode`（共享选项列表，核心只有 `standard` 一项，默认 `standard`；扩展包可以追加
-自己的结算方式，例如大宗物料包的 `bulk`，核心的月度对账只处理 `standard` 的收货）。
+订单行上原设计的 `received_quantity`、`returned_quantity`、`in_transit_quantity` 汇总依赖收货
+记录与送货明细，集成立项时按当时的集成范围重定。
 
-### 4.6 质量
+### 4.6 质量（v0.4）
 
-**`srm_inspection` 来料检验**（ERP / QMS 来源或 IQC 录入）：`erp_inspection_id`
-（唯一）、`inspection_no`、`receipt`（lookup）、`supplier`、`material`、`lot_quantity`、
-`sample_quantity`、`defect_quantity`、`result`（`pass` 合格 / `fail` 不合格 /
-`concession` 让步接收）、`severity`（`critical` 严重 / `major` 主要 / `minor` 次要）、
-`defect_description`、`inspector`（user）、`inspection_date`、`photos`（image）。
+**`srm_delivery_record` 交付记录**（OWD `public_read`，内部只读；SQE 导入，IQC 检验员录入；删除只给 `srm_admin`）
 
-**`srm_quality_issue` 质量整改单 SCAR**
+只为算绩效和开整改单，不做业务：不改库存、不对账。每月从 ERP 导出表格导入，按
+`erp_receipt_no` + `erp_order_no` + `erp_line_no` 幂等匹配：一条订单行可以分几次到货，每次到货
+（收货单的一行）是一条记录，只按订单号 + 行号匹配会让第二次到货覆盖第一次。没有质量系统的客户由
+质检员逐条录入。ERP 集成后改为 upsert 写入，结构不变。导入说明与试导结论见
+[交付记录导入说明](../implementation/delivery-import.md)。
+
+指标要的值（`on_time`、`period`、`received_quantity_mn`）是带 `expression` 的存储字段：引擎在每次
+新建和修改时按表达式算好写入，导入、手工录入和以后的 upsert 走同一条写入路径，表格里带了这几列
+也会被重算覆盖。不用 record_change flow（原设计的 `srm_delivery_apply`）：表达式在同一次写入里完成，
+不需要写入后再更新一次记录。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `erp_receipt_no` / `erp_order_no` / `erp_line_no` | text | ERP 收货单号、订单号与订单行号，必填，三者组合唯一（导入匹配键） |
+| `supplier` / `material` / `plant` | lookup | 必填（工厂可空）。导入时物料按 ERP 物料号找（找不到再按名称），工厂按工厂编码找（找不到再按名称），供应商按全称找 |
+| `required_date` / `promised_date` | date | 需求日期（必填）/ 供应商承诺日期（可空） |
+| `receipt_date` | date | 实到日，必填 |
+| `ordered_quantity` / `received_quantity` / `accepted_quantity` | number | 订单数量 / 实收数量（必填）/ 合格数量；不小于 0，合格数量与不良数不大于实收数量 |
+| `uom` | text | |
+| `on_time` | boolean | 存储表达式：`receipt_date <= promised_date`，没有承诺日期时按 `required_date` |
+| `inspection_result` | select | `pass` 合格 / `fail` 不合格 / `concession` 让步接收 / `not_inspected` 未检；必填，默认未检 |
+| `severity` | select | `critical` 严重 / `major` 主要 / `minor` 次要；不合格时必填 |
+| `defect_quantity` | number | 不良数（PPM 口径）；不合格、让步接收时必填；判批合格的也可以有少量不良，照样计入 PPM |
+| `defect_description` | textarea | |
+| `amount` | currency | 交付金额（ERP 导出带金额时写入，用于供应商维度的支出分析） |
+| `period` | text | 存储表达式：实到日期的年月，如 `2026-10`，供考评 flow 按期汇总 |
+| `received_quantity_mn` | number | 存储表达式：实收数量 ÷ 1,000,000。PPM = Σ不良数 ÷ Σ`received_quantity_mn`，看板用两个合计之比得出（[05 §4.1](./05-experience-and-analytics.md#41-指标口径)） |
+| `portal_position` | text | v0.6 加；供应商在门户只能看本公司的交付记录 |
+
+**`srm_quality_issue` 质量整改单 SCAR**（OWD `public_read`：自动开的单属于系统、SQE 之间要互相接手，
+SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改所有整改单（可改不可删，objectstack#25470 的裁定写法）；能改哪些字段由权限集与 FLS 决定，删除只给 `srm_admin`）
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `issue_no` | autonumber | `SCAR{YYYY}{00000}` |
 | `supplier` / `material` | lookup | |
-| `inspection` | lookup | 来源检验（可空） |
-| `source` | select | `iqc` 来料 / `production` 制程 / `customer` 客户投诉 / `audit` 审核发现 |
+| `delivery_record` | lookup | 来源交付记录（可空） |
+| `audit` | lookup（只读） | 来源审核（可空）；审核问题项「转整改单」时写入 |
+| `performance_review` | lookup → 考评单（只读） | 来源考评单（可空）；C 级考评结果发布时由 `srm_performance_apply` 写入（v0.5） |
+| `source` | select（共享选项列表 `srm_quality_issue_source`） | `iqc` 来料 / `production` 制程 / `customer` 客户投诉 / `audit` 审核发现 / `performance` 绩效改善 |
 | `severity` | select | 同检验 |
 | `problem_description` | richtext | D2 问题描述，必填 |
 | `status` | select（stageField） | 见 §5.6 |
 | `sqe` | user | 负责 SQE |
-| `containment_due` / `final_due` | datetime / date | 创建时按严重度计算：临时措施 72 小时，最终回复 30 天 |
-| `containment_action` | richtext | D3，供应商填写 |
-| `root_cause` | richtext | D4 |
-| `corrective_action` / `preventive_action` | richtext | D5–D7 |
-| `evidence` | file | 整改证据 |
+| `containment_due` / `final_due` | datetime / date | 只读，创建时按参数算好：临时措施 `scar_containment_hours`（示例 72 小时），最终回复 `scar_final_days`（示例 30 天）；问题复发重新打开时按重开时间重算 |
+| `containment_action` | richtext | D3，供应商填写（v0.6 前由 SQE 代填）；提交临时措施后必填 |
+| `root_cause` | richtext | D4；提交根因与措施后必填 |
+| `corrective_action` / `preventive_action` | richtext | D5–D6 / D7；纠正措施提交后必填 |
+| `evidence` | file（多个） | 整改证据 |
 | `sqe_comment` | textarea | 审核意见，退回时必填 |
 | `is_overdue` | boolean | 默认 false，逾期 flow 维护 |
 | `claim_amount` | currency | 索赔金额 |
-| `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（已计入对账单扣款，由对账生成 flow 写入，防止重复扣款） |
+| `claim_status` | select | `none` / `proposed` / `supplier_accepted` / `disputed` / `settled`（财务已在 ERP 扣款，由应付会计从「供应商已接受」手工标记，选项对其他人不可选；SRM 不生成扣款）；不是 `none` 时必须填索赔金额 |
 
-### 4.7 绩效
+整改单上 8D 内容在关闭或撤销后只读。
 
-**`srm_kpi` 绩效指标**：`code`、`name`、`dimension`（`quality` / `cost` / `delivery` /
-`service`）、`method`（`auto` 自动 / `manual` 人工）、`weight`（percent）、
-`scoring_rule`（textarea，评分规则说明，例如「OTD ≥ 98% 得满分，每低 1% 扣 5 分」）、
-`active`。
+8D 不设分步记录（原设计的 `steps` repeater 取消，2026-10-26 裁定）：门户整改回复页按上表现有字段分段显示
+（D2 `problem_description`、D3 `containment_action`、D4 `root_cause`、D5–D7 `corrective_action` / `preventive_action`、
+`evidence`、`sqe_comment`），`status` 即 8D 进度，QP-04 的控制点都由这些字段覆盖。平台已裁定对象上的 repeater 不声明
+子字段、有类型的列表要用子对象（objectstack#25681），核心不为此增加对象（对象数按 07 §1 不变）。页面需要时间点的，
+v0.6 U5 可以加两个由现有状态流转 flow 写入的日期时间字段（临时措施提交时间、根因与措施提交时间）。客户要求逐步记录
+责任人和日期的（如汽车行业），放客户层，或在门槛 2 之前以新增字段的方式加。
 
-**`srm_performance_review` 绩效考评单**：`review_no`、`supplier`、`period`（text，
-如 `2026Q3`）、`period_start` / `period_end`（date）、`quality_score` /
-`cost_score` / `delivery_score` / `service_score` / `total_score`（number，存储字段，
-由算分 flow 写入，供看板使用）、`grade`（`a` / `b` / `c` / `d`）、`status`（见 §5.7）、
-`otd_rate` / `lot_pass_rate`（percent）、`ppm`（number）、`ack_on_time_rate`（percent）、
-`reviewer`（user）、`appeal_reason`、`appeal_result`。
+### 4.7 绩效（v0.5）
 
-**`srm_performance_score` 评分明细**（master_detail → 考评单）：`kpi`（lookup）、
-`raw_value`（number，自动指标的原始值）、`score`（number，0–100）、`weight`
-（percent，快照）、`scorer`（user，人工指标的评分人）、`comment`、`scored`
-（boolean，默认 false）。
+**`srm_kpi` 绩效指标**（OWD `public_read`；采购总监经共享规则 `srm_kpi_director_edit` 改全部指标，包括
+种子建的示例指标，不用 `modifyAllRecords`，所以不能删除；删除只给 `srm_admin`，不再使用的指标停用；开启字段历史；
+表单分组：基本信息、评分规则）：`code`（唯一）、`name`、`dimension`（共享选项列表 `srm_kpi_dimension`：
+`quality` 质量 / `cost` 成本 / `delivery` 交付 / `service` 服务 / `hse` 安全环保，扩展包可追加；
+安全环保按 QP-01 6.7.2 单列一维）、`method`（`auto` 自动 / `manual` 人工，默认人工）、`auto_metric`（自动指标对应
+考评单上的比率字段：`otd_rate` / `lot_pass_rate` / `ppm` / `ack_on_time_rate`；自动指标必填，人工指标不填）、
+`weight`（percent）、`active`（默认 true）、`scoring_rule`（textarea，评分规则说明，例如「OTD ≥ 98% 得满分，
+每低 1% 扣 5 分」）、`full_score_value` / `zero_score_value`（number，自动指标必填：原始值达到满分值得 100 分、
+达到零分值得 0 分，之间线性计分、越界取 0 或 100；满分值大于零分值时越高越好，反之越低越好〔PPM〕；比率按百分点填，
+两者不能相同）、`scorer_type`（评分人：`category_manager` 品类经理〔默认〕/ `buyer` 采购员 / `sqe` SQE /
+`evaluator` 需求部门评分人；人工指标和没有数据的自动指标按它从供应商的品类上取评分人，03 §10 第 3 步）。
+启用的指标权重必须大于 0。
 
-### 4.8 结算
+现阶段一套全局方案：**启用指标的权重合计应为 100%**。跨记录合计写不成单条校验规则（改权重往往要连改几条），
+所以由视图「启用指标」检查——按维度分组，权重列的合计即总权重、分组表头是各维度小计；考评生成 flow 再守一次
+（03 §10 第 1 步）。示例指标库按 QP-01 附录 D，权重取参数 `perf_kpi_weights`；订单响应及时率要 ERP 订单确认数据，
+集成前不启用。按物资类别分方案的接口预留为可选多选字段 `material_classes`（选项列表 `srm_material_class`，空 = 全部
+类别），有客户需要时再加，v0.5 不做（2026-10-24 裁定）。
 
-**`srm_statement` 对账单**：`statement_no`（`ST{YYYY}{MM}{0000}`，按月流水）、
-`supplier`、`legal_entity`、`period_start` / `period_end`、`currency`、
-`receipt_amount` / `return_amount` / `deduction_amount`（summary，按明细类型带条件
-求和）、`net_amount`（currency，不含税，由 flow 计算为收货 − 退货 − 扣款后存储）、
-`tax_amount`（currency，flow 按明细税率计算）、`invoiced_amount`（summary：`sum` 发票
-`amount_excl_tax`，条件 `verify_status != 'mismatch'`）、`status`（见 §5.8）、
-`supplier_confirmed_at`、`dispute_reason`、`erp_doc_no`。
+**`srm_performance_review` 绩效考评单**（OWD `public_read`，内部只读：由 flow 生成和推进，评分只经「提交评分」
+screen flow；删除只给 `srm_admin`，删掉后可补跑生成；开启字段历史；`supplier` + `period` 唯一）：`review_no`
+（`PR{YYYY}{00000}`）、`supplier`、`cycle`（`monthly` / `quarterly` / `yearly`，按供应商所供最高物资类别取参数
+`perf_cycle`）、`period`（text，月度 `2026-10`、季度 `2026Q3`、年度 `2026`）、`period_start` / `period_end`（date）、
+`quality_score` / `cost_score` / `delivery_score` / `service_score` / `hse_score` / `total_score`（number，存储字段，
+由汇总分级写入，供看板使用）、`grade`（`grade_a` / `grade_b` / `grade_c` / `grade_d`；平台的选项值至少两个字符）、
+`status`（见 §5.7）、`otd_rate` / `lot_pass_rate`（percent）、`ppm`（number）、`ack_on_time_rate`（percent，
+ERP 集成前为空）、`delivery_count`（number，本期交付行数）、`data_incomplete`（boolean，默认 false：本期没有交付记录或
+某项启用的自动指标没有数据时为 true，该项不给零分，07 R7）、`score_due`（date，评分截止日，转人工评分时为当天 +
+`perf_score_days`）、`approval_status`（审批结论，审定发布的审批节点写入）、`reviewer`（user，审定人）、`review_comment`
+（审定意见：通过或退回重评时采购总监的意见）、`published_date`（date）、`appeal_reason`、`appeal_date`（date，申诉登记日）、
+`appeal_recorded_by`（user，代录人）、`appeal_result`、`appeal_outcome`（`maintained` 维持原结果 / `adjusted` 调整总分）、
+`appeal_handled_by`（user，处理申诉的采购总监）、`void_reason`（v0.5 P3 加入后面这些字段）。
+自动指标由交付记录按 `period` 汇总，比率字段存小数（0.985 即 98.5%）；flow 写的字段一律只读。
+维度得分是该维度各评分明细按权重的加权平均（0–100，没有该维度的指标时为空），总分是全部明细的 `Σ(score × weight)`
+（启用指标权重合计 100%），都保留两位小数，等级按两位小数的总分判断。
 
-**`srm_statement_line` 对账明细**（master_detail → 对账单）：`line_type`（`receipt` /
-`return` / `deduction` 质量索赔或其他扣款）、`receipt`（lookup，可空）、
-`quality_issue`（lookup，扣款来源，可空）、`po_no`、`material`、`quantity`、
-`unit_price`、`tax_rate`、`amount`、`disputed`（boolean，默认 false）、`dispute_note`。
+**`srm_performance_score` 评分明细**（master_detail → 考评单，`controlled_by_parent`）：`kpi`（lookup）、
+`raw_value`（number，自动指标的原始值，与指标的满分值、零分值同一单位：比率按百分点，PPM 按 PPM）、`score`（number，0–100）、
+`weight`（percent，生成时从指标快照）、`scorer`（user，人工指标的评分人）、`comment`、`scored`（boolean，默认 false；
+自动指标算出得分时为 true，没有数据时为 false 并在 `comment` 写明）、`defaulted`（boolean，默认 false，「未评」：评分截止时
+还没有评分，由扫描任务按参数 `perf_missing_score` 取默认分，v0.5 P3）；回避改派（#65，03 §10 第 3 步）由 flow 写的只读字段
+`reassigned_from`（user，最近一次改派前的评分人，生成时未指派的为空）、`reassigned_by`（user，改派的采购总监）、`reassign_reason`
+（textarea，回避原因）、`reassigned_date`（date）。
 
-**`srm_invoice` 发票**：`invoice_type`（`vat_special` 专票 / `vat_normal` 普票 /
-`e_invoice` 数电票 / `overseas` 境外发票）、`invoice_code` / `invoice_no`、`supplier`、
-`statement`（lookup）、`invoice_date`、`amount_excl_tax` / `tax_amount` / `total_amount`
-（currency）、`file`、`verify_status`（`pending` / `verified` / `mismatch`）、
-`erp_ap_doc_no`、`payment_status`（`unpaid` / `partially_paid` / `paid`）、`paid_amount`、
-`paid_date`（后两项由 ERP 回写）。发票代码 + 号码唯一。
+### 4.8 结算（不做，留在 ERP）
 
-### 4.9 风险
+对账单、对账明细、发票三个对象从核心移除（[ADR-0008](../adr/0008-order-to-pay-stays-in-erp.md)）：
+对账与开票的记录系统是 ERP，发票查验要接税务接口。SRM 保留的只有：整改单上的索赔金额与
+结论（供财务扣款参考）；ERP 集成后在门户镜像上提供付款进度（付款状态、付款日、凭证号
+三个字段）。原字段设计见本文件 2026-10-23 之前的版本（git 历史）。
 
-**`srm_risk_event` 风险事件**：`supplier`、`risk_type`（`qualification` 资质 /
-`legal` 司法诉讼 / `operation` 经营异常 / `financial` 财务 / `delivery` 交付 /
-`quality` 质量 / `esg` 环境社会治理 / `sanction` 制裁名单）、`severity`、`source`
-（`system` / `external_api` / `manual`）、`external_ref`（外部服务的事件编号，去重用）、
-`description`、`status`（`open` / `mitigating` / `closed`）、`mitigation_plan`、`owner_note`。
+### 4.9 风险（v0.5）
+
+**`srm_risk_event` 风险事件**：`supplier`、`risk_type`（共享选项列表 `srm_risk_type`：
+`qualification` 资质 / `legal` 司法诉讼 / `operation` 经营异常 / `financial` 财务 /
+`delivery` 交付 / `quality` 质量 / `esg` 环境社会治理 / `sanction` 制裁名单）、`severity`、
+`source`（`system` / `external_api` / `manual`；现阶段只有 `system` 与 `manual`，外部企业
+信息服务的自动拉取为客户驱动主题）、`external_ref`（外部服务的事件编号，去重用）、
+`description`、`status`（`open` / `mitigating` / `closed`）、`mitigation_plan`、`owner_note`、
+`disposition`（lookup，`high` 级事件生成的处置单草稿）。
+
+实现（v0.5）：OWD `public_read`；品类经理、采购主管、SQE、质量经理要能接手别人登记的和系统生成的事件，用按岗位授 `edit`
+的共享规则 `srm_risk_event_edit_*`（可改不可删，[objectstack#25470](https://github.com/objectstack-ai/objectstack/issues/25470) 的裁定写法）。
+开启字段历史，门户不可见。
+
+| 字段 | 类型 | 说明 / 约束 |
+|---|---|---|
+| `event_no` | autonumber | `RSK{YYYY}{00000}` |
+| `supplier` | lookup → 供应商 | 必填，新建后只读；供应商详情页的风险事件列表 |
+| `risk_type` | select | 共享选项列表 `srm_risk_type`，必填 |
+| `severity` | select | `high` / `medium` / `low`，默认 `medium`；`high` 触发 `srm_risk_event_apply` |
+| `source` | select（只读） | 手工登记为 `manual`（默认值）；`system` 只由 flow 写入；`external_api` 预留 |
+| `certificate` | lookup → 资质证书（只读） | 资质类系统事件指回过期的必备证书；同一证书有未关闭的事件时不重复建 |
+| `description` | textarea | 必填 |
+| `status` | select（stageField） | `open` 未处理（open）→ `mitigating` 处理中（open）/ `closed` 已关闭（won）；`mitigating` → `open` / `closed`；`closed` → `open`（关错或风险复现时重新打开） |
+| `mitigation_plan` | textarea | 应对措施 |
+| `owner_note` | textarea | 处理结论，`closed` 时必填（`requiredWhen`）；资质恢复自动关闭时由 flow 写入 |
+| `disposition` | lookup → 处置单（只读） | 高风险事件生成或并入的冻结处置单草稿 |
+| `external_ref` | text（只读） | 外部服务的事件编号，外部拉取上线后按它去重 |
+
+关闭后类型、严重度、描述、应对措施只读。
 
 ## 5. 状态机
 
@@ -517,11 +755,16 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | 值 | 标签 | kind | 允许跳转到 |
 |---|---|---|---|
 | `potential` ★ | 潜在 | open | `qualifying`、`eliminated` |
-| `qualifying` | 准入中（准入申请进入资料审核时） | open | `qualified`、`potential`（准入未通过） |
-| `qualified` | 合格 | won | `frozen`、`eliminated`、`blacklisted` |
+| `qualifying` | 准入中（准入申请进入资料审核时） | open | `qualified`、`potential`（准入未通过）、`eliminated`（淘汰后重新准入未通过，回到淘汰） |
+| `qualified` ★ | 合格（只有存量导入的供应商可以建档即合格） | won | `frozen`、`eliminated`、`blacklisted` |
 | `frozen` | 冻结 | lost | `qualified`、`eliminated`、`blacklisted` |
 | `eliminated` | 淘汰 | lost | `qualifying`（只能经新的准入申请重新走全流程，不能直接恢复）、`blacklisted` |
 | `blacklisted` | 黑名单 | lost | `eliminated`（解除黑名单，需单独审批） |
+
+**初始状态**：`status` 的默认值是 `legacy_imported ? 'qualified' : 'potential'`，导入表格不带状态列；
+插入时的校验规则 `initial_status_by_source` 要求「合格」与「存量导入」同真同假，所以普通新建只能从
+「潜在」开始准入。这样重复导入不会把冻结、淘汰的供应商改回合格（存量导入见
+[导入说明](../implementation/legacy-supplier-import.md)）。
 
 「资质异常」不是状态，而是 `qualification_alert` 标志：它不改变供应商是否合格，
 只阻止新的寻源邀请（BR-04），资质更新后自动解除。
@@ -551,7 +794,7 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `awarded` | 已定标 | won | — |
 | `cancelled` | 已取消 / 流标 | lost | — |
 
-### 5.4 采购订单 `srm_purchase_order.status`
+### 5.4 采购订单 `srm_purchase_order.status`（预留，ERP 集成后）
 
 | 值 | 标签 | kind | 允许跳转到 |
 |---|---|---|---|
@@ -565,11 +808,17 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `rejected_by_supplier` | 供应商拒绝 | lost | `change_pending`、`cancelled` |
 | `cancelled` | 已取消 | lost | — |
 
-### 5.5 合同 `srm_contract.status`
+### 5.5 合同 `srm_contract.status`（v0.3）
 
-`draft` ★（open）→ `in_review` 审批中（open）→ `signing` 签署中（open）→ `active`
-生效（won）→ `expired` 已到期（lost）/ `terminated` 已终止（lost）；`in_review` 可退回
-`draft`，`rejected` 审批未通过（lost）。
+| 值 | 标签 | kind | 允许跳转到 |
+|---|---|---|---|
+| `draft` ★ | 草稿 | open | `in_review`（「提交审批」screen flow） |
+| `in_review` | 审批中 | open | `signing`（审批通过）、`draft`（提交人撤回）、`rejected`（驳回）；退回修改时仍为审批中，审批结论为 `returned` |
+| `signing` | 签署中 | open | `active`（「确认生效」screen flow）、`terminated` |
+| `active` | 生效 | won | `expired`（到期扫描）、`terminated` |
+| `expired` | 已到期 | lost | — |
+| `terminated` | 已终止 | lost | — |
+| `rejected` | 审批未通过 | lost | — |
 
 ### 5.6 质量整改单 `srm_quality_issue.status`
 
@@ -584,21 +833,23 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 
 ### 5.7 绩效考评单 `srm_performance_review.status`
 
-`calculating` ★ 自动算分（open）→ `scoring` 人工评分（open）→ `reviewing` 审定中
-（open）→ `published` 已发布（won）→ `appealed` 申诉中（open）→ `published`；
-作废为 `void`（lost）。
-
-### 5.8 对账单 `srm_statement.status`
-
 | 值 | 标签 | kind | 允许跳转到 |
 |---|---|---|---|
-| `draft` ★ | 草稿 | open | `sent` |
-| `sent` | 待供应商确认 | open | `supplier_confirmed`、`disputed` |
-| `disputed` | 有差异 | open | `sent`（处理后重发） |
-| `supplier_confirmed` | 供应商已确认 | open | `finance_confirmed`、`disputed` |
-| `finance_confirmed` | 双方已确认 | open | `invoiced` |
-| `invoiced` | 已开票 | open | `paid` |
-| `paid` | 已付款 | won | — |
+| `calculating` ★ | 自动算分 | open | `scoring`、`void` |
+| `scoring` | 人工评分 | open | `reviewing`、`void` |
+| `reviewing` | 审定中 | open | `published`、`scoring`（采购总监退回重评）、`void` |
+| `appealed` | 申诉中 | open | `published` |
+| `published` | 已发布 | won | `appealed` |
+| `void` | 已作废 | lost | — |
+
+`calculating` 只存在于一次生成运行之内：生成 flow 建单、建评分明细、算完自动指标后在同一次运行里转 `scoring`；
+中途失败留下的 `calculating` 考评单在下次运行时删掉重建（03 §10 第 1 步）。作废只在人工评分阶段，由采购总监经「作废」
+screen flow 写明理由（例如供应商本期实际没有供货）；作废的考评单仍占着 `supplier` + `period`，同期要重新考评时由系统管理员
+删除后补跑生成。
+
+### 5.8 对账单
+
+不做（§4.8）。
 
 ## 6. 编码规则
 
@@ -612,11 +863,13 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | 寻源单 | `RFQ{YYYY}{00000}` | RFQ202600317 | 按年 |
 | 报价单 | `QT{YYYY}{000000}` | QT2026001024 | 按年 |
 | 合同 | `CT{YYYY}{00000}` | CT202600088 | 按年 |
-| 送货单 | `ASN{YYYYMMDD}{0000}` | ASN202610220015 | 按日 |
 | 整改单 | `SCAR{YYYY}{00000}` | SCAR202600007 | 按年 |
-| 对账单 | `ST{YYYY}{MM}{0000}` | ST2026100031 | 按月 |
+| 供应商审核 | `AUD{YYYY}{00000}` | AUD202600012 | 按年 |
+| 考评单 | `PR{YYYY}{00000}` | PR202600210 | 按年 |
+| 风险事件 | `RSK{YYYY}{00000}` | RSK202600009 | 按年 |
+| 送货单（预留） | `ASN{YYYYMMDD}{0000}` | ASN202610220015 | 按日 |
 
-采购订单、收货、检验、物料、工厂沿用 ERP 编号，不在 SRM 内另行编号。
+物料、交付记录、工厂沿用 ERP 编号，不在 SRM 内另行编号。
 
 ## 7. 元数据示例
 
