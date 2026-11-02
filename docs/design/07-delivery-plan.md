@@ -276,6 +276,7 @@ test/                            # 仓库根目录
 | PF18 | objectstack#29050 直接触发 flow（REST trigger）不按启动人的权限读 `recordId`，按钮入口（#16370）会答「不存在」 | 门户能启动的系统身份 screen flow（确认索赔、申诉、提交变更申请、准入补充后重新提交） | 每条 flow 进门自己查名册（`portal_user` = 本人、`active == true`，与成员键同条件），元数据测试守住（04 §3.7） | 2026-11-02 新提 |
 | PF19 | 平台既定行为（objectstack#3407 起）：数据层剔除对只读字段的写入，flow 节点只在步骤结果里给警告（`droppedFields`），写入照样算成功；`runAs: 'user'` 的 flow 因此写不进字段级只读的 `portal_user` | 门户开通（名册写入） | 「开通门户」以 `runAs: 'user'` 任命门户岗位，名册由系统身份的子 flow `srm_portal_roster_write` 写；平台拒绝直接启动系统身份的 autolaunched flow，子 flow 只经开通 flow 进入（04 §3.3）；`test/portal-invitation.test.ts` 的探针盯着平台行为 | 平台既定行为，长期做法（2026-11-02 U3 实测，总监裁定不另提 issue） |
 | PF20 | objectstack#29095 邮件模板的渲染上下文只有 `appName`，没有部署地址（`OS_BASE_URL`），flow 发出的邮件拼不出能点开的完整链接 | 供应商侧通知邮件（05 §5） | 邮件正文写「登录门户查看」和单号，站内信带单据链接；模板数据给出相对路径 `path`，客户可在模板覆盖层写上自己的门户域名 | 2026-11-02 U6 新提 |
+| PF21 | objectstack#29171（功能缺口，待维护者裁定）引用的目标记录对当前用户不可读时，lookup 只显示「受限记录」（18.1.0 显示原始 ID，objectui#13335 已改），不显示名称 | 门户页面上指向品类、物料、内部员工的关联字段（准入申请的品类、整改单的物料和负责 SQE） | 引用对象上加 flow 写入的只读文本快照字段（`category_names`、`material_name`、`sqe_name` 等），门户只读快照（hotsrm#95，裁定线程 2026-11-02 选 B）；平台做了以后快照字段保留不删 | 2026-11-02 出口验收新提 |
 
 其他代码和文档里指向平台的临时做法，2026-10-26 核对结果：
 
