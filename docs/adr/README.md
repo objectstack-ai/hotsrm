@@ -8,13 +8,14 @@
 |---|---|---|
 | [0001](./0001-declarative-only.md) | 只用元数据实现，不依赖应用代码 | 已采纳 |
 | [0002](./0002-packs-composed-into-one-app.md) | 扩展包在构建时与核心合成一个应用 | 已采纳（接入规则由 0009 收窄） |
-| [0003](./0003-portal-isolation-by-supplier-position.md) | 门户按「每家供应商一个岗位」隔离 | 已采纳 |
+| [0003](./0003-portal-isolation-by-supplier-position.md) | 门户按「每家供应商一个岗位」隔离 | 已被 0010 取代 |
 | [0004](./0004-sealed-bid.md) | 封标：开标前内部读不到报价，截止后供应商改不了报价 | 已采纳 |
 | [0005](./0005-governance-and-system-share-parameters.md) | 体系文件与系统共用一份参数，源文件用 Markdown | 已采纳 |
 | [0006](./0006-single-org-with-business-units.md) | 多法人默认用单组织加业务单元树，不开墙 | 已采纳 |
 | [0007](./0007-china-first-with-overseas-seams.md) | 中国优先，为出海留三个口子（币种、中英双语、供应商标识按国家区分） | 已采纳 |
 | [0008](./0008-order-to-pay-stays-in-erp.md) | 订单到付款不进核心，ERP 集成延后；核心收到 27 个对象 | 已采纳 |
 | [0009](./0009-core-first-pack-criteria-and-customer-layer.md) | 先做核心包；扩展包的准入标准与接入规则；客户个性化放客户层；核心 API 名冻结 | 已采纳，收窄 0002 |
+| [0010](./0010-portal-isolation-by-membership-key.md) | 门户按「联系人名册上的成员键」隔离 | 已采纳，取代 0003 |
 
 ## 写法
 

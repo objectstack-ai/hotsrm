@@ -9,7 +9,8 @@ import { Supplier, SupplierBankAccount, SupplierCertificate, SupplierContact } f
 // 结论写在 07 §6.2「结果」列；U2（隔离基础）、U3（门户开通）直接复用这里的夹具：
 // - 门户用户经真实的组织邀请（角色 external）注册并接受邀请进组织，不是直接改成员表；
 // - 环境的成员策略为 invite-only（04 §3.3 开通前提）：注册不自动入组织，接受邀请才入，且以 external 入；
-// - 门户岗位、门户权限集、supplier.portal_position 在这里是实测夹具（PROBE 模块），U2 落地正式元数据后改用正式的。
+// - 门户岗位、门户权限集、supplier.portal_position 在这里是测平台行为用的实测夹具（PROBE 模块，方案 A 的形状），不是应用元数据；
+//   正式元数据（ADR-0010）的隔离验收见 test/portal-isolation.test.ts。
 process.env.OS_AUTH_MEMBERSHIP_POLICY = 'invite-only';
 
 const SYS = { context: { isSystem: true } };

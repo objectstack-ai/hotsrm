@@ -23,11 +23,11 @@
 1. **声明式优先，托管云今天就能跑**：托管云上安装的应用包只合并元数据，包里的代码
    （钩子、插件、任务函数）不执行。所以全部规则都用元数据表达——对象、校验规则、
    RLS、flow、审批。需要代码的写法只作为自托管部署的可选增强，单独标注。
-2. **供应商之间零可见**：每家开通门户的供应商对应一个平台**岗位**（如
-   `srm_vendor_sup0000128`，首次开通时由管理员新建），它的门户用户被任命到这个岗位；每张面向供应商的单据
-   在创建时冗余该岗位标识，门户 RLS 只放行 `portal_position in current_user.positions`
-   的行。解析不到岗位时策略不放行任何行（fail-closed）。详见
-   [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)。
+2. **供应商之间零可见**：门户账号登记在供应商联系人的 `portal_user` 上，平台据此为每个请求解析
+   **成员键** `current_user.portal_supplier_ids`（当前用户作为在职联系人所属的供应商）；门户 RLS 只放行
+   `supplier in current_user.portal_supplier_ids` 的行。键取不到或为空时策略不放行任何行（fail-closed）。
+   详见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离) 与
+   [ADR-0010](../adr/0010-portal-isolation-by-membership-key.md)。
 3. **封标**：报价截止前，内部任何角色（包括 AI 助手）都读不到报价。报价上有一个
    开标时才写入的 `bid_opened` 标志，内部 RLS 只放行 `bid_opened == true` 的报价；
    截止后供应商的修改由校验规则用 `now()` 比较冗余在报价上的截止时间来拒绝，

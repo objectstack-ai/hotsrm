@@ -235,7 +235,9 @@ ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预�
   这次通过不算数，通知审批人并重新开一轮同级审批。
 - 执行以系统身份改供应商状态和品类资格（结果见 [02 §4.2](./02-domain-model.md#42-生命周期) 处置单），
   处置单置为「已执行」，通知发起人并提醒在 ERP 同步冻结标志；驳回不改供应商，记下驳回意见。
-- 通知供应商与门户账号回收随门户（v0.6）；冻结后不能新建合同由合同的校验规则负责（v0.3 C1）。
+- 门户账号回收（v0.6，ADR-0010）：淘汰、拉入黑名单执行时清掉该供应商全部联系人上的 `portal_user`，门户访问在下一个
+  请求就失效，不靠人工停用联系人；冻结不动门户（[04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）。
+  通知供应商随 v0.6 U6；冻结后不能新建合同由合同的校验规则负责（v0.3 C1）。
 - 处置单草稿（v0.5）：高风险事件（§11）和绩效结果应用（§10 第 6 步）由 flow 生成草稿，不直接发起审批。品类经理或
   采购主管在草稿上点「提交审批」（screen flow `srm_disposition_submit`），审批 flow 在草稿变为审批中时发起，发起人
   是提交人（`submitted_by`；手工新建的处置单是新建人），品类经理一级的判断与 BR-11 比对都按发起人；不需要处置时点
@@ -498,7 +500,7 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_contract_expiry_notice` / `srm_contract_expire_sweep` | time_relative：`end_date` −60 / −30 / −7 天 / schedule：每日 01:10（追赶式） | 合同 | v0.3 |
 | `srm_contract_renew` | 子 flow：到期扫描调用 | 合同 → 续签草稿、明细 | v0.3 |
 | `srm_contract_agreement_recalc` | record_change：质量协议 / 廉洁协议进入或离开 `active` | 合同 → 供应商 | v0.3 |
-| `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单 | v0.3 |
+| `srm_disposition_approval` / `srm_disposition_apply` | record_change | 处置单（淘汰 / 黑名单时 → 联系人 `portal_user` 清空，v0.6） | v0.3 |
 | `srm_scar_create` | record_change：交付记录不合格 | 交付记录 → 整改单 | v0.4 |
 | `srm_scar_review` | record_change：状态→`action_submitted` | 整改单 | v0.4 |
 | `srm_scar_reopen` | record_change：状态 `closed`→`open` | 整改单 | v0.4 |
@@ -513,7 +515,6 @@ flow 属于 ERP 集成后的门户镜像，现阶段不建。
 | `srm_risk_event_apply` | record_change：风险事件新建或改为高风险 | 风险事件 → 处置单（草稿） | v0.5 |
 | `srm_blacklist_expiry_notice` | time_relative：供应商 `blacklist_until` −30 / 0 天 | 供应商（黑名单） | v0.5 |
 | `srm_invitation_send` / `srm_invitation_expire_sweep` | record_change / schedule | 门户邀请 | v0.6 |
-| `srm_portal_position_backfill` | record_change：供应商 `portal_position` 写入 | 供应商 → 带 `portal_position` 的单据 | v0.6 |
 | `srm_single_source_approval` | record_change：状态→`approval_pending` | 寻源单 | v0.7 |
 | `srm_event_publish` | record_change：状态→`published` | 寻源单 | v0.7 |
 | `srm_bid_close_sweep` | schedule：每 10 分钟 + api 心跳 | 寻源单、报价单 | v0.7 |

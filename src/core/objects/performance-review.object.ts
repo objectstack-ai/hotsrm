@@ -7,7 +7,7 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 // 驳回即退回重评 → 发布后可代录申诉一次（srm_appeal_submit），采购总监处理（srm_appeal_resolve）后回到已发布。
 // 全部字段由 flow 写入，对用户只读。
 // 同一供应商同一期间只有一张考评单（唯一索引兜底，flow 先查后建，重复运行不重复建）。
-// 门户上线（v0.6）时加 portal_position，供应商只看本公司已发布的考评单（04 §3）。
+// 门户只看本公司已发布（含申诉中）的考评单，按 supplier 读成员键隔离（04 §3.2，ADR-0010）。
 export const PerformanceReview = ObjectSchema.create({
   name: 'srm_performance_review',
   label: '绩效考评单',

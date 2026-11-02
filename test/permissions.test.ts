@@ -55,11 +55,12 @@ describe('internal permissions', () => {
     expect(Object.values(objects).filter((object) => object.sharingModel === 'public_read_write').map((object) => object.name)).toEqual([]);
   });
 
+  // 读共享规则只给门户岗位（门户隔离由 test/portal-isolation.test.ts 守着），对应岗位要有读权限
   it('only shares edit access with positions that hold edit permission on the object', () => {
     for (const rule of SrmSharingRules) {
       const position = SrmPositions.find((p) => p.name === rule.sharedWith.value);
       expect(position, rule.name).toBeTruthy();
-      expect(visibility(position!.name)[rule.object] ?? '', rule.name).toContain('E');
+      expect(visibility(position!.name)[rule.object] ?? '', rule.name).toContain(rule.accessLevel === 'read' ? 'R' : 'E');
     }
   });
 

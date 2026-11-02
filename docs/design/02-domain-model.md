@@ -36,14 +36,13 @@
 9. **每个对象显式声明 OWD**（`sharingModel`），这是平台 lint 的强制项；门户相关
    对象的 OWD 和 RLS 设计见 [04](./04-security-and-portal.md)。
 10. **金额用 `currency`，比例用 `percent`，附件用 `file`，地址用 `address`**。
-11. **面向供应商的单据冗余门户岗位**：每张供应商要看的**顶层**单据都带一个
-    `portal_position`（text，只读）字段，在创建时由 flow 从供应商档案复制过来，
-    门户 RLS 只认它（见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)）。
-    带这个字段的对象：准入申请、变更单、寻源邀请、报价单、价格记录、合同、整改单、
-    考评单（订单、送货单、付款进度等 ERP 集成后的门户镜像同理）。它们的
-    `master_detail` 子对象（报价明细、合同明细、评分明细）用
-    `controlled_by_parent` 跟随父记录，不重复冗余。字段本身在 v0.6 门户上线时再加，
-    不提前。注意 `controlled_by_parent` 的
+11. **面向供应商的单据带供应商引用**：每张供应商要看的**顶层**单据都有 `supplier` 引用，门户 RLS 写成
+    `supplier in current_user.portal_supplier_ids`，成员键由联系人上的 `portal_user` 解析（见
+    [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)，[ADR-0010](../adr/0010-portal-isolation-by-membership-key.md)），
+    单据上不冗余任何门户字段。门户可读的对象：供应商、准入申请、变更单、合同、交付记录、整改单、考评单，以后的
+    寻源邀请、报价单、价格记录同理（订单、送货单等 ERP 集成后的门户镜像也一样）。它们的 `master_detail` 子对象
+    （联系人、证书、银行账户、品类资格、合同明细、评分明细、报价明细）用 `controlled_by_parent` 跟随父记录。
+    注意 `controlled_by_parent` 的
     **写**同样跟随父记录：改子记录要求对父记录有编辑权。所以凡是门户要改子记录的
     地方（订单行答复、证书维护），门户对父记录授予编辑权，再用字段级权限把父记录
     的字段全部设为只读（见 [04 §3.2](./04-security-and-portal.md#32-各对象的门户策略)）。
@@ -207,7 +206,6 @@ erDiagram
 | `quality_agreement_signed` / `integrity_agreement_signed` | boolean | 默认 false；有生效中的质量协议 / 廉洁协议时为 true，由 `srm_contract_agreement_recalc` 在协议进入或离开「生效」时重算（协议到期、终止又没有续上的回到 false），只由 flow 写入（v0.3） |
 | `erp_vendor_code` | text | ERP 供应商编码，唯一；预留，ERP 集成前空着或由采购员手工填写 |
 | `last_change_request` | lookup → 信息变更单（只读） | 最近一次写回本档案的变更单，由 `srm_change_apply` 写入（v0.2） |
-| `portal_position` | text | 门户岗位标识，如 `srm_vendor_sup0000128`；开通门户时写入，只读。校验规则：非空时必须以 `srm_vendor_` 开头（没开通门户的供应商为空）。v0.6 加 |
 | `legacy_imported` | boolean | 默认 false；存量导入的供应商为 true（v0.2）。只能在新建时置为 true：`readonlyWhen: previous.legacy_imported != true`，已建档的供应商重复导入时该列被忽略；只有 `srm_admin` 可写 |
 | `legacy_reviewed` | boolean | 默认 false；品类经理核对后经「确认复核」按钮置为 true。`legacy_imported && !legacy_reviewed` 的供应商列在「存量待复核」视图（v0.2） |
 | `contact_count` | summary | `count` 联系人 |
@@ -232,9 +230,9 @@ erDiagram
 | `name` | text | 必填 |
 | `contact_function` | multiselect | `admin` 主账号 / `sales` 商务 / `logistics` 物流 / `quality` 质量 / `finance` 财务（字段名不用 `role`，平台保留词） |
 | `mobile` / `email` | phone / email | email 必填（门户邀请与通知用） |
-| `portal_user` | user | 已开通门户账号时关联的平台用户；该用户同时被任命到供应商的门户岗位（见 [04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)） |
+| `portal_user` | user | 门户账号（v0.6）：已开通门户时关联的平台用户。字段级只读，只由 flow 写入（开通门户写入；淘汰、拉黑时 `srm_disposition_apply` 清空）。联系人是门户的**成员名册**：成员键 `portal_supplier_ids`（`userField: portal_user`、`valueField: supplier`、`filter: active == true`）把在职联系人上的门户账号解析为所属供应商，门户 RLS 只认它（[04 §3](./04-security-and-portal.md#3-供应商门户的数据隔离)，ADR-0010）。同一用户只登记在一位联系人上 |
 | `is_primary` | boolean | 默认 false；每家供应商至多一位主联系人。守卫：校验规则在供应商 `primary_contact_count > 0` 时拒绝再设一位（插入，或更新时由否改是），导入同样适用；同一批写入里的两位拦不住（objectstack#25477），由「主联系人重复」视图兜底。更换主联系人由「设为主联系人」screen flow 以系统身份先清掉旧的再设新的 |
-| `active` | boolean | 默认 true |
+| `active` | boolean | 默认 true；也是成员键的过滤条件，停用即收回门户访问；门户只读 |
 
 **`srm_supplier_bank_account` 银行账户**（master_detail → 供应商；OWD `controlled_by_parent`；v0.2）
 
@@ -623,7 +621,6 @@ false，BR-13）、`received_quantity`（summary：`sum` 收货记录 `accepted_
 | `amount` | currency | 交付金额（ERP 导出带金额时写入，用于供应商维度的支出分析） |
 | `period` | text | 存储表达式：实到日期的年月，如 `2026-10`，供考评 flow 按期汇总 |
 | `received_quantity_mn` | number | 存储表达式：实收数量 ÷ 1,000,000。PPM = Σ不良数 ÷ Σ`received_quantity_mn`，看板用两个合计之比得出（[05 §4.1](./05-experience-and-analytics.md#41-指标口径)） |
-| `portal_position` | text | v0.6 加；供应商在门户只能看本公司的交付记录 |
 
 **`srm_quality_issue` 质量整改单 SCAR**（OWD `public_read`：自动开的单属于系统、SQE 之间要互相接手，
 SQE、质量经理、应付会计经共享规则 `srm_quality_issue_edit_*` 改所有整改单（可改不可删，objectstack#25470 的裁定写法）；能改哪些字段由权限集与 FLS 决定，删除只给 `srm_admin`）

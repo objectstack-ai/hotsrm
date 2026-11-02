@@ -122,7 +122,8 @@ R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — �
 | 风险事件 | `public_read` | 品类经理、采购主管、SQE、质量经理 |
 | 绩效指标 | `public_read` | 采购总监（`srm_kpi_director_edit`） |
 
-门户上线（v0.6）后，门户 RLS 叠加在这些 OWD 与共享规则之上，共享规则只授给内部岗位（ADR-0003）。
+门户上线（v0.6）后，门户 RLS 叠加在这些 OWD 与共享规则之上。上表的编辑共享规则只授内部岗位；门户另有三条只授
+`srm_portal_user` 的**读**共享规则（准入申请、变更单、合同，§3.1 第 4 条），行范围由门户 RLS 限定到本公司（ADR-0010）。
 
 **`controlled_by_parent` 的写入规则**：子记录（联系人、证书、银行账户、合同明细、报价
 明细）的修改要求对父记录有编辑权。所以门户对供应商、报价单都授予编辑权，再用字段级
@@ -130,39 +131,42 @@ R 读 · C 建 · E 改 · D 删 · F 仅经 flow / screen flow 写入 · — �
 
 ## 3. 供应商门户的数据隔离
 
-### 3.1 机制：每家供应商一个门户岗位
+### 3.1 机制：联系人名册上的成员键
 
 ```mermaid
 flowchart LR
-  U1[门户用户 李四<br/>A 公司商务] -- 任命 --> P1[岗位<br/>srm_vendor_sup0000128]
-  U2[门户用户 王五<br/>A 公司财务] -- 任命 --> P1
-  P1 -- 挂载 --> PS[权限集<br/>srm_portal_supplier]
-  S1[供应商 A<br/>portal_position = srm_vendor_sup0000128]
-  D1[A 的报价 / 订单 / 对账单<br/>portal_position = srm_vendor_sup0000128]
-  D2[B 的报价 / 订单 / 对账单<br/>portal_position = srm_vendor_sup0000311]
-  PS -. RLS: portal_position in current_user.positions .-> S1
-  PS -. 放行 .-> D1
-  PS -. 不放行 .-> D2
+  U1[门户用户 李四<br/>A 公司商务] -- portal_user --> C1[联系人<br/>供应商 A，在职]
+  U2[门户用户 王五<br/>A 公司财务] -- portal_user --> C2[联系人<br/>供应商 A，在职]
+  C1 & C2 -. 成员键 portal_supplier_ids .-> K[current_user.portal_supplier_ids = A]
+  U1 & U2 -- 任命 --> P[静态岗位 srm_portal_user<br/>挂 srm_portal_supplier]
+  K -. RLS: supplier in current_user.portal_supplier_ids .-> D1[A 的合同 / 整改单 / 考评单]
+  K -. 不放行 .-> D2[B 的合同 / 整改单 / 考评单]
 ```
 
-1. 每家开通门户的供应商有一个专属岗位，命名 `srm_vendor_<供应商编号小写>`，挂载
-   门户权限集。该供应商的所有门户用户都任命到这个岗位。
-2. 供应商档案和它的每张顶层单据都带 `portal_position` 字段，在单据创建时由 flow 从
-   供应商档案复制，门户只读。`master_detail` 子记录跟随父记录。
-3. 门户权限集上的 RLS 只放行 `portal_position in current_user.positions` 的行。平台在
-   每个请求里解析当前用户持有的岗位；RLS 编译为数据库过滤条件。字段为空、用户
-   没有岗位，都匹配不到任何行（fail-closed）。
-4. **防止冒用内置岗位**：每个带 `portal_position` 的对象都有一条校验规则，值必须以
-   `srm_vendor_` 开头。否则一个被误写成 `everyone`（平台给所有登录用户的内置岗位）
-   的单据会对全体用户可见。字段为空是允许的：没开通门户的供应商，其单据本来就不该被
-   任何门户用户看到。
+1. **名册**：门户账号登记在供应商联系人的 `portal_user` 上（02 §4.1）。联系人上声明成员键
+   `portal_supplier_ids`（`ObjectSchema.membershipKeys`：`userField: 'portal_user'`、`valueField: 'supplier'`、
+   `filter: 'active == true'`）。平台每个请求以系统身份读一次名册，得到「当前用户作为在职联系人所属的供应商」，
+   作为 `current_user.portal_supplier_ids` 交给 RLS。
+2. **门户 RLS 只认这个键**：供应商自身 `id in current_user.portal_supplier_ids`，带 `supplier` 引用的顶层单据
+   `supplier in current_user.portal_supplier_ids`，必要时叠加状态条件（§3.2）。`master_detail` 子记录跟随父记录。
+   单据上不冗余任何门户字段。
+3. **fail-closed**：键取不到、为空、超过 1,000 个值、名册读失败、同名键被声明两次，平台一律丢弃读这个键的
+   策略并拒绝；用户没有门户岗位时整个对象无权访问。故障只会表现为「门户看不到数据」。
+4. **private 对象两把锁**：`external` 成员对 OWD 一律按「仅本人」处理（§3.3），权限集上的 RLS 只在
+   `public_read` 对象上解除这个下限。准入申请、变更单、合同是 `private`，各有一条只授 `srm_portal_user` 的读
+   共享规则（合同只共享 §3.2 的可见状态），共享放进来的行再由 RLS 限定到本公司。共享规则本身是全量授权，
+   所以隔离测试同时检查元数据：门户能读的每个对象都必须有读成员键的 RLS（或是子对象）。
+5. **授权就是写名册**：`portal_user` 字段级只读，任何岗位都不能在界面或 REST 上写，只由 flow 写入（开通门户
+   写入；淘汰、拉黑时清空）；在职标志 `active` 对门户只读，门户管理员不能恢复被停用的账号。
+6. **岗位是静态的**：全体门户用户任命到 `srm_portal_user`，本公司门户管理员再任命到 `srm_portal_admin`；不再为
+   每家供应商建岗位。
 
 **为什么选这个方案**
 
 | 方案 | 托管云今天可用 | 代价 | 结论 |
 |---|---|---|---|
-| A 每家供应商一个门户岗位 | 可用：只用到岗位、RLS、flow | 每家供应商首次开通时管理员要新建一个岗位定义；每张顶层单据冗余一个字段 | **推荐** |
-| B 成员键，RLS 写成 `supplier in current_user.portal_supplier_ids` | 18.1.0 起可用元数据声明（`ObjectSchema.membershipKeys`），不再需要代码；此前只能写 membership resolver 插件 | 声明式写法待 U2 实测 | 待评估（§3.5） |
+| A 每家供应商一个门户岗位，单据冗余 `portal_position` | 可用 | 每家供应商首次开通要管理员新建岗位定义；每个对象多一个冗余字段、一条前缀校验、一个回填 flow | 被取代（ADR-0003 → ADR-0010） |
+| B 成员键，RLS 写成 `supplier in current_user.portal_supplier_ids` | 可用：18.1.0 起元数据声明（`ObjectSchema.membershipKeys`，objectstack#25234），平台代码解析，不需要应用代码 | 名册写入即授权，`portal_user` 必须只由 flow 写 | **采用**（2026-11-02 实测通过） |
 | C 记录所有者设为供应商用户 | 可用 | 一家供应商多个用户时只有所有者能看；破坏「所有者 = 内部经办人」的语义 | 不采用 |
 | D 每家供应商一个组织（多组织隔离） | 需要企业版多组织许可 | 一张寻源单要同时给多家供应商看，跨组织做不到 | 不采用 |
 
@@ -170,20 +174,20 @@ flowchart LR
 
 | 对象 | 门户读 | 门户写 | 说明 |
 |---|---|---|---|
-| 供应商 | 本公司 | 只能改资料字段（§4.2）；名称、地址、银行账户等关键信息走变更单 | RLS 在供应商自身的 `portal_position` 上；授予编辑权是为了让门户能维护证书等子记录 |
-| 联系人、证书、银行账户、品类资格 | 跟随供应商 | 证书可增改；联系人和银行账户仅门户管理员可增 | `controlled_by_parent` |
-| 准入申请 | 本公司 | 「退回补充」状态时可改 | |
-| 变更单 | 本公司 | 只经「提交变更申请」screen flow（门户管理员） | v0.6 |
+| 供应商 | 本公司 | 只能改资料字段（§4.2）；名称、地址、银行账户等关键信息走变更单 | RLS 在供应商自身的 `id` 上；授予编辑权是为了让门户能维护证书等子记录；内部评估类字段（关联方、优选、风险事件数等）门户不可见 |
+| 联系人、证书、银行账户、品类资格 | 跟随供应商 | 证书可增（v0.6 U2；修改随 U4 的「核验证书」一起放开）；联系人和银行账户仅门户管理员可增，门户管理员可改联系人手机 | `controlled_by_parent`；联系人的 `portal_user`、`active` 门户只读 |
+| 准入申请 | 本公司 | 「退回补充」状态时可改（U4） | `private`：读共享规则 + RLS |
+| 变更单 | 本公司 | 只经「提交变更申请」screen flow（门户管理员，U4） | `private`：读共享规则 + RLS |
 | 寻源邀请 | 本公司 | 可改 `status`（接受 / 拒绝）与拒绝原因 | 邀请上有寻源单的快照，门户不读寻源单本身 |
 | 报价单 | 本公司 | `status in ['draft','submitted'] && bid_opened == false` 的本公司报价 | 写策略 `using` 限定可改哪些行，`check` 限定改完仍属本公司；上一轮的 `superseded` 报价不可改 |
 | 报价明细 | 跟随报价单 | 跟随报价单；只能改单价、交期、税率、起订量、备注 | 截止后由校验规则锁定（BR-06）；金额、中标字段、快照字段只读 |
 | 价格记录 | 本公司 | — | |
-| 合同 | 本公司且 `status in ['signing','active','expired','terminated']` | — | 草稿与审批中的合同不可见 |
+| 合同 / 合同明细 | 本公司且 `status in ['signing','active','expired','terminated']` | — | 草稿与审批中的合同不可见；`private`：读共享规则只共享这几种状态，RLS 再限定本公司 |
 | 交付记录 | 本公司 | — | 供应商看到的是用于算分的交付结果 |
 | 整改单 | 本公司 | 供应商回复字段 | `sqe_comment`、`claim_amount` 只读 |
-| 考评单 / 评分明细 | 本公司且 `status == 'published'` | 只经「申诉」screen flow | 未发布的考评不可见 |
+| 考评单 / 评分明细 | 本公司且 `status in ['published','appealed']` | 只经「申诉」screen flow（U5） | 未发布的考评不可见；申诉只能对已发布的考评提起，申诉期间照常可见 |
 | 采购订单 / 订单行、送货单 / 明细 | 预留（ERP 集成后） | 订单行的答复字段；送货单只经 screen flow | 订单头授予编辑权但字段全部 FLS 只读 |
-| 寻源单、寻源明细、审核、风险事件、门户邀请 | 不可见 | — | 门户权限集不授予这些对象 |
+| 寻源单、寻源明细、审核、风险事件、处置单、门户邀请 | 不可见 | — | 门户权限集不授予这些对象；处置结果体现在供应商状态上 |
 
 ### 3.3 门户账号的开通与回收
 
@@ -196,10 +200,11 @@ flowchart LR
 - **不放进业务单元**：门户岗位是组织级岗位，数据只经岗位和权限集授予；
 - **OWD 对它一律视为仅本人**：`public_read` / `public_read_write` 对它不开放，只读写自己拥有的和共享给它的行
   （记录共享或共享规则，18.1.0 起公开对象上的共享也能到达 `external` 成员）；它持有的岗位或权限集上的行策略
-  （RLS）解除这个下限并限定行范围——门户权限集的 `portal_position in current_user.positions` 正是这样起作用的；
+  （RLS）在 `public_read` 对象上解除这个下限并限定行范围——门户权限集的 `supplier in current_user.portal_supplier_ids`
+  正是这样起作用的；`private` 对象上 RLS 解除不了下限，要再加共享（§3.1 第 4 条，2026-11-02 实测）；
   `controlled_by_parent` 子对象跟随主记录。
 
-所以门户用户能看到的数据只来自 §3.1 的门户岗位和门户权限集，内部权限集即使误设了 `isDefault` 也不会漏给他们
+所以门户用户能看到的数据只来自 §3.1 的门户岗位、门户权限集和只授门户岗位的读共享规则，内部权限集即使误设了 `isDefault` 也不会漏给他们
 （内部权限集仍一律不设 `isDefault`，R2 照常审查；07 §6 V5 已实测）。`org_external` 是平台保留名，岗位不能用它命名。
 
 **环境前提**：开门户的环境，成员策略（Setup → 认证 → 成员，平台设置 `auth.membership_policy`，或环境变量
@@ -209,41 +214,35 @@ flowchart LR
 
 **开通**：由组织管理员（组织角色 `owner` / `admin`，通常由 SRM 系统管理员兼任）操作；品类经理、采购主管
 （`srm_supplier_admin`）提出开通需求，自己做不了：平台只让组织管理员发邀请、写岗位任命和权限集授予，委托管理
-（`adminScope`）又只能在业务单元内任命，`external` 成员不进业务单元（07 §6 V2、V3 实测）。
+（`adminScope`）又只能在业务单元内任命，`external` 成员不进业务单元（07 §6 V2、V3 实测）。不需要新建任何岗位定义
+（ADR-0010）。
 
 1. 在组织成员页按联系人邮箱发出邀请，角色选 `external`（flow 发不了邀请：平台规定邀请只经组织接口，07 §6 V3）；
-2. **该供应商第一次开通门户时**，由管理员在 Setup 新建岗位 `srm_vendor_<编号>`，并在
-   岗位定义里挂上门户权限集。平台把岗位视为环境级的**定义**（元数据），不是数据行，
-   所以这一步不能由 flow 完成，需要持有元数据编辑权限的管理员操作（已向平台提出
-   「按外部方在运行时建岗位并任命」，objectstack#25443；存量供应商批量开通时管理员
-   按清单批量建）；
-3. 运行「开通门户」screen flow（`runAs: 'user'`，以操作的组织管理员身份执行）：选择联系人、已加入的用户和
-   刚建的岗位 → 写入供应商的 `portal_position`，并把它回填到该供应商已有的单据上 → 把用户任命到该岗位 →
-   在联系人上写 `portal_user`；联系人 `contact_function` 含 `admin` 时，再把门户管理员权限集**直接授予该用户**
-   （同一家供应商的用户共用一个岗位，管理员能力只能按人授予）。任命和授权是数据行，18.1.0 起 `runAs: 'system'`
-   的 flow 不得写（objectstack#25251），`runAs: 'user'` 由组织管理员启动时能写，其他人启动被拒（07 §6 V2）；
-   flow 进门先检查操作人是组织管理员，不是就直接结束并说明；
-4. 同一供应商以后再开通账号，只需第 1、3 步。
+2. 运行「开通门户」screen flow（`srm_portal_enable`，v0.6 U3 实现；`runAs: 'user'`，以操作的组织管理员身份执行）：
+   选择联系人和已加入的用户 → 把用户任命到静态岗位 `srm_portal_user`，联系人 `contact_function` 含 `admin` 时再任命到
+   `srm_portal_admin` → 在联系人上写 `portal_user`。任命是数据行，18.1.0 起 `runAs: 'system'` 的 flow 不得写
+   （objectstack#25251），`runAs: 'user'` 由组织管理员启动时能写，其他人启动被拒（07 §6 V2）；flow 进门先检查操作人
+   是组织管理员，不是就直接结束并说明。写入 `portal_user` 后下一个请求起该用户即能看到本公司数据；flow 还要检查同一
+   用户没有登记在别的联系人上（登记在两家时两家的数据都能看到）；
+3. 同一供应商以后再开通账号，同样走第 1、2 步。
 
-岗位定义随开通门户的供应商数量增长（几百到上千个），设置界面的岗位列表会变长。
-这是方案 A 的主要运维代价。如果平台以后支持在元数据里声明成员集合（例如「当前用户
-作为联系人所属的供应商」），就可以改用方案 B 的写法，不再需要为每家供应商建岗位。
-
-**回收**：
+**回收**（下一个请求即生效，平台每个请求重读名册）：
 
 | 场景 | 动作 |
 |---|---|
-| 联系人离职 / 停用 | 组织管理员撤销岗位任命并移出组织；联系人 `active = false` |
+| 联系人离职 / 停用 | 联系人 `active = false`（名册过滤条件），下一个请求起看不到数据；组织管理员随后撤销门户岗位任命并移出组织 |
 | 供应商冻结 | 账号与门户功能保持不变：整改单仍要回复，资料仍要维护；冻结只阻止新的询价邀请（BR-03），新订单由 ERP 侧冻结标志拦截 |
-| 供应商淘汰 / 黑名单 | 处置 flow 通知组织管理员撤销该岗位的全部任命、把账号移出组织（处置 flow 以系统身份运行，审批后以审批人身份运行，都写不了任命，07 §6 V2）；撤销前门户用户仍能看到本公司数据，季度复核兜底 |
+| 供应商淘汰 / 黑名单 | `srm_disposition_apply` 执行时清掉该供应商全部联系人上的 `portal_user`，门户访问即刻失效，不靠人工停用联系人；岗位任命与组织成员身份由组织管理员随后移除（处置 flow 写不了任命，07 §6 V2）。重新准入通过后要重新开通门户 |
 | 季度复核 | 报表列出每家供应商的门户账号与在职联系人，差异由采购主管确认 |
 
 ### 3.4 RLS 示例
 
+v0.6 的实现在 `src/core/security/portal-permission-sets.ts`；下面的示例含 v0.7 寻源和预留的订单对象，说明写法。
+
 ```ts
 import { definePermissionSet } from '@objectstack/spec/security';
 
-const OWN = 'portal_position in current_user.positions';
+const OWN = 'supplier in current_user.portal_supplier_ids';
 
 export const PortalSupplier = definePermissionSet({
   name: 'srm_portal_supplier',
@@ -265,7 +264,6 @@ export const PortalSupplier = definePermissionSet({
     'srm_supplier.credit_code':             { readable: true,  editable: false },
     'srm_supplier.registration_no':         { readable: true,  editable: false },
     'srm_supplier.status':                  { readable: true,  editable: false },
-    'srm_supplier.portal_position':         { readable: true,  editable: false },
     'srm_supplier_certificate.status':      { readable: true,  editable: false },
     'srm_supplier_certificate.verified':    { readable: true,  editable: false },
     'srm_supplier_certificate.is_mandatory':{ readable: true,  editable: false },
@@ -283,7 +281,8 @@ export const PortalSupplier = definePermissionSet({
     // …父记录与子记录上其余门户不该改的字段同样列出
   },
   rowLevelSecurity: [
-    { name: 'portal_supplier_read',  object: 'srm_supplier',       operation: 'select', using: OWN },
+    // 供应商自身用 id 比较
+    { name: 'portal_supplier_read',  object: 'srm_supplier',       operation: 'select', using: 'id in current_user.portal_supplier_ids' },
     { name: 'portal_quote_read',     object: 'srm_quotation',      operation: 'select', using: OWN },
     {
       name: 'portal_quote_write',
@@ -293,32 +292,29 @@ export const PortalSupplier = definePermissionSet({
       using: `${OWN} && status in ['draft', 'submitted'] && bid_opened == false`,
       check: OWN,                                            // 改完的行仍须属于本公司
     },
-    { name: 'portal_supplier_write', object: 'srm_supplier',       operation: 'update', using: OWN, check: OWN },
+    { name: 'portal_supplier_write', object: 'srm_supplier',       operation: 'update',
+      using: 'id in current_user.portal_supplier_ids', check: 'id in current_user.portal_supplier_ids' },
     { name: 'portal_po_read',        object: 'srm_purchase_order', operation: 'select', using: OWN },
     { name: 'portal_po_write',       object: 'srm_purchase_order', operation: 'update', using: OWN, check: OWN },
     { name: 'portal_review_read',    object: 'srm_performance_review', operation: 'select',
-      using: `${OWN} && status == 'published'` },
+      using: `${OWN} && status in ['published', 'appealed']` },
     // …
   ],
 });
 ```
 
-### 3.5 方案 B：成员键
+### 3.5 成员键的实测与边界
 
-18.1.0 起，对象可以用元数据声明**成员键**（`ObjectSchema.membershipKeys`：`userField`、`valueField`、可选的
-`filter`，objectstack#25234），平台据此解析 `current_user.<键>`，不再需要应用代码。若在联系人对象上声明
-`portal_supplier_ids`（门户用户 → 所属供应商），RLS 可以直接写 `supplier in current_user.portal_supplier_ids`，
-不用每家供应商建一个岗位。是否改用、对象上的 `portal_position` 冗余如何处理，由 v0.6 U2 实测后定（ADR-0003 的
-修订走新 ADR）；在定下来之前仍按方案 A 设计。
+成员键在 v0.6 U2 限时实测后采用（2026-11-02，[ADR-0010](../adr/0010-portal-isolation-by-membership-key.md)），
+取代原来的「每家供应商一个门户岗位」（ADR-0003）。要点：
 
-此前只能由应用代码实现：自托管部署可以运行应用代码，此时可以把方案 A 换成方案 B：应用注册一个
-`rls-membership-resolver` 服务，声明键 `portal_supplier_ids`，按「当前用户作为
-`portal_user` 的在职联系人所属供应商」解析出供应商 id 集合；RLS 改写为
-`supplier in current_user.portal_supplier_ids`，单据不再需要 `portal_position` 冗余。
-
-注意两点：每个运行环境只取**一个**该服务，同一环境若有其他应用也要注册，需要合并成
-一个组合解析器；解析器抛错或漏键时相关策略匹配零行（fail-closed），所以它的故障表现
-为「门户看不到数据」而不是越权。
+- 解析由平台的安全插件完成，不是应用包代码：托管云关闭应用包代码（ADR-0001 的顾虑）不影响它。托管环境复测列为
+  v0.6 出口条件（07 §6.2 V6），覆盖「键为空」和「运行时不认识这个键」两种情形，期望都是拒绝、零行；
+- 每个键最多 1,000 个值，一个门户用户只属于一家供应商，远在上限内；
+- 名册的过滤条件只能读名册自己的列（不能读 `current_user`，也不能经引用读供应商状态），所以淘汰、拉黑时由
+  处置 flow 清掉 `portal_user`，而不是靠过滤条件读供应商状态（§3.3 回收）；
+- 同一个键名在同一环境只能有一个来源：若环境里另有应用也声明 `portal_supplier_ids`，两边都解析不出来、全部
+  拒绝。键名带 SRM 的语义，冲突的可能很小，发生时改名即可。
 
 ### 3.6 用户目录的可见范围
 
@@ -343,14 +339,19 @@ export const PortalSupplier = definePermissionSet({
 | 用例 | 方法 | 期望 |
 |---|---|---|
 | 交叉读 | 准备供应商 A、B 各一个门户用户；对 §3.2 每个对象，用 A 的身份按 B 的记录 id 读取 | 全部返回「不存在」，列表与搜索中不出现 |
-| 交叉写 | 用 A 的身份修改 B 的记录、或把自己记录的 `portal_position` 改成 B 的 | 全部拒绝 |
-| 冒用内置岗位 | 以系统身份把一条记录的 `portal_position` 写成 `everyone` | 校验规则拒绝 |
-| 开标后改价 | 开标后用中标供应商的身份修改本公司报价明细的单价或中标字段 | 拒绝 |
-| 自解资质异常 | 用门户身份把本公司过期证书的 `status` 改为有效，或修改有效期 | 改状态被拒绝；改有效期后 `verified` 被重置，资质异常不解除 |
-| 空岗位 | 新建一张尚未回填 `portal_position` 的单据 | 任何门户用户都看不到 |
-| 回收 | 撤销 A 用户的岗位任命后立即访问 | 看不到任何供应商数据 |
+| 交叉写 | 用 A 的身份修改 B 的记录、把自己的单据改挂到 B 名下、在 B 名下新建联系人或证书 | 全部拒绝 |
+| 冒用名册 | 用门户身份（含门户管理员）或任何内部岗位写联系人的 `portal_user`、改联系人归属或在职标志 | 拒绝或写入被丢弃，授权不变；只有 flow 能写 |
+| 开标后改价 | 开标后用中标供应商的身份修改本公司报价明细的单价或中标字段 | 拒绝（v0.7 寻源上线时加入） |
+| 自解资质异常 | 用门户身份把本公司过期证书的 `status` 改为有效，或修改有效期；新建证书时自带「已核验」 | 全部拒绝（v0.6 U2 门户只能新建证书；U4 放开修改时，改有效期重置 `verified`，资质异常不解除） |
+| 空名册 | 持门户岗位但不在任何在职联系人上的用户；联系人停用的用户；在名册上但没有门户岗位的用户；没开通门户的供应商的单据 | 每个对象零行 |
+| 回收 | 停用 A 用户的联系人、撤销其门户岗位任命、执行 A 的淘汰处置后立即访问 | 看不到任何供应商数据 |
 | 用户目录 | 用 A 的身份在界面和 REST API 上查询用户列表 | 看不到 B 的门户账号，也看不到内部员工的完整名单（§3.6） |
 | 多通道 | 以上用例分别经门户界面、REST API、导出、AI 助手执行 | 结果一致 |
+| 元数据守卫 | 检查门户权限集与共享规则 | 门户能读的每个对象都有读成员键的 RLS（或是子对象）；只授门户岗位的共享规则只有读权限且对象有这条 RLS；门户权限集不设 `isDefault`、不授删除 / 全量读写 / 导出；每个带供应商引用的对象要么授给门户，要么写明不授的理由 |
+
+自动化：`test/portal-isolation.test.ts` 覆盖除「开标后改价」以外的全部用例，在 CI 里跑，不得删除或跳过（AGENTS.md
+红线 2）；门户界面走的就是 REST API，导出经 REST 验证被拒；AI 助手以提问者身份查询、走同一套 RLS，v0.6 出口测试时
+在托管环境人工复核一次（07 §6.2 V6）。
 
 ## 4. 封标与字段级权限
 
@@ -392,7 +393,8 @@ export const PortalSupplier = definePermissionSet({
 | `srm_po_line.unit_price` / `quantity` / `required_date`（预留） | 内部、本公司门户 | 仅 ERP 集成 | 订单以 ERP 为准 |
 | `srm_quality_issue.claim_amount` | 内部、本公司门户 | SQE | |
 | `srm_performance_review.*_score` | 内部、本公司门户（已发布） | 算分 flow、评分人 | |
-| `*.portal_position` | 所有可读该记录的人 | 仅 flow | 隔离锚点，门户不可改 |
+| `srm_supplier_contact.portal_user` | 内部、本公司门户 | 仅 flow（字段级只读） | 门户名册：写入即授出这家供应商的门户数据（ADR-0010） |
+| `srm_supplier_contact.active` | 内部、本公司门户 | 内部（`srm_supplier_admin`）；门户只读 | 名册过滤条件，门户不能恢复被停用的账号 |
 | `srm_supplier` 的 `name`、`country`、`credit_code`、`registration_no`、`address`、`legal_representative`、`registered_capital`、`status`、`grade`、`qualification_alert`、`erp_vendor_code` | 内部、本公司门户 | 内部（关键信息变更走变更单） | 门户只读；门户可直接改的只有 `short_name`、`website`、`supplier_type`、`taxpayer_type`、`established_date` 等资料字段 |
 | `srm_supplier_certificate.status` / `is_mandatory` / `verified` | 内部、本公司门户 | 仅 flow 与「核验证书」screen flow | 防止供应商自行解除资质异常 |
 | `srm_quotation_line` 的 `amount`、`is_awarded`、`award_quantity`、`award_ratio` 及快照字段 | 所有可读报价的人 | 仅 flow | 防止供应商改金额或自报中标 |
