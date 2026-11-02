@@ -356,7 +356,7 @@ describe('performance scoring, grading, publishing and appeals', () => {
     expect(await row(Supplier.name, v.appeal!)).toMatchObject({ grade: 'grade_c', latest_score: 72.5 });
 
     // 评分人之外的岗位不能代录
-    expect(await refusal(sqe, 'srm_appeal_submit', id)).toContain('Supplier appeals are recorded by');
+    expect(await refusal(sqe, 'srm_appeal_submit', id)).toContain('portal administrator, or recorded by buyers');
     const { titles } = await runScreen(lead, 'srm_appeal_submit', id, () => ({ appeal_text: '示例申诉：本期两批让步接收已由客户确认合格' }));
     expect(titles).toHaveLength(1);
     expect(await review(id)).toMatchObject({

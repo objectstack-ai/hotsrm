@@ -651,7 +651,9 @@ export const en: TranslationData = {
           label: 'Claim Status',
           options: { none: 'No Claim', proposed: 'Proposed', supplier_accepted: 'Accepted by Supplier', disputed: 'Disputed', settled: 'Settled' },
         },
+        claim_response: { label: 'Supplier Claim Response' },
       },
+      _actions: { srm_claim_respond: { label: 'Respond to Claim' } },
       _views: {
         default: { label: 'All Corrective Action Requests' },
         board: { label: 'Corrective Action Board' },
@@ -799,7 +801,7 @@ export const en: TranslationData = {
         published_date: { label: 'Published On' },
         appeal_reason: { label: 'Appeal Reason' },
         appeal_date: { label: 'Appeal Date' },
-        appeal_recorded_by: { label: 'Appeal Recorded By' },
+        appeal_recorded_by: { label: 'Appeal Submitted By' },
         appeal_result: { label: 'Appeal Outcome' },
         appeal_outcome: { label: 'Appeal Decision', options: { maintained: 'Result Upheld', adjusted: 'Total Score Adjusted' } },
         appeal_handled_by: { label: 'Appeal Handled By' },
@@ -952,6 +954,25 @@ export const en: TranslationData = {
       label: 'Performance Grading and Publication',
       approvals: {
         director_review: { label: 'Procurement Director Sign-off' },
+      },
+    },
+    srm_scar_containment_notice: { label: 'Supplier Submitted Containment' },
+    srm_claim_respond: {
+      label: 'Respond to Claim',
+      successMessage: 'Claim response submitted',
+      screens: {
+        confirm: {
+          title: 'Respond to claim: {{ issue.issue_no }}',
+          description: 'Claim amount {{ issue.claim_amount }}. Once accepted, the buyer\'s finance team deducts it at settlement; if you disagree, give your reasons and the SQE will contact you.',
+          fields: {
+            decision: { label: 'Response', options: { accept: 'Accept the Claim', dispute: 'Dispute the Claim' } },
+            response_text: { label: 'Comment' },
+          },
+        },
+      },
+      refusals: {
+        refuse_member: { message: 'Claims are confirmed by the supplier on the portal; an offline confirmation is recorded by the SQE on the SCAR' },
+        refuse_status: { message: 'Only a proposed claim that has not been answered can be accepted or disputed' },
       },
     },
     srm_scar_review: {
@@ -1118,7 +1139,7 @@ export const en: TranslationData = {
         },
       },
       refusals: {
-        refuse_position: { message: 'Supplier appeals are recorded by buyers, buyer leads or category managers' },
+        refuse_position: { message: 'Appeals are submitted by the supplier\'s portal administrator, or recorded by buyers, buyer leads or category managers for suppliers without portal access' },
         refuse_status: { message: 'Only published reviews can be appealed' },
         refuse_once: { message: 'A review can be appealed only once, and this one has been appealed' },
         refuse_window: { message: `The appeal period has passed: a result can be appealed within ${APPEAL_DAYS} days of publication` },

@@ -135,6 +135,7 @@ test/                            # 仓库根目录
 ├── approval-matrix.test.ts      # 03 §12 每一行（v0.1 起）
 ├── portal-platform.test.ts      # 门户平台实测 V1–V5（§6.2，v0.6 U1）
 ├── portal-isolation.test.ts     # 04 §3.7 的交叉越权用例（v0.6）
+├── portal-response.test.ts     # 门户整改回复、索赔确认、绩效查看与申诉（v0.6 U5）
 ├── sealed-bid.test.ts           # 封标与截止锁价（v0.7）
 └── flows/*.test.ts              # 每条 flow 的正向与异常路径
 ```

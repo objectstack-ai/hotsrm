@@ -184,8 +184,8 @@ flowchart LR
 | 价格记录 | 本公司 | — | |
 | 合同 / 合同明细 | 本公司且 `status in ['signing','active','expired','terminated']` | — | 草稿与审批中的合同不可见；`private`：读共享规则只共享这几种状态，RLS 再限定本公司 |
 | 交付记录 | 本公司 | — | 供应商看到的是用于算分的交付结果 |
-| 整改单 | 本公司 | 供应商回复字段 | `sqe_comment`、`claim_amount` 只读 |
-| 考评单 / 评分明细 | 本公司且 `status in ['published','appealed']` | 只经「申诉」screen flow（U5） | 未发布的考评不可见；申诉只能对已发布的考评提起，申诉期间照常可见 |
+| 整改单 | 本公司 | 状态为 `open`、`containment_submitted` 的本公司整改单：只能改 D3–D7 与证据，状态只能走 待响应 → 已提交临时措施 → 已提交根因与措施；索赔只经「确认索赔」screen flow（U5） | 写策略 `using` 限定轮到供应商回复的行，`check` 限定改完仍属本公司、停在这三个状态；状态怎么走由 `status` 选项的 `visibleWhen` 按操作人限定（服务端执行）；其余字段（含 `sqe_comment`、`claim_amount`、`claim_status`）FLS 只读 |
+| 考评单 / 评分明细 | 本公司且 `status in ['published','appealed']` | 只经「申诉」screen flow，门户管理员（U5） | 未发布的考评不可见；申诉只能对已发布的考评提起，申诉期间照常可见；评分人、回避改派、审定人与审定意见、申诉处理人门户不可见（§4.2） |
 | 采购订单 / 订单行、送货单 / 明细 | 预留（ERP 集成后） | 订单行的答复字段；送货单只经 screen flow | 订单头授予编辑权但字段全部 FLS 只读 |
 | 寻源单、寻源明细、审核、风险事件、处置单、门户邀请 | 不可见 | — | 门户权限集不授予这些对象；处置结果体现在供应商状态上 |
 
@@ -342,6 +342,8 @@ export const PortalSupplier = definePermissionSet({
 | 交叉读 | 准备供应商 A、B 各一个门户用户；对 §3.2 每个对象，用 A 的身份按 B 的记录 id 读取 | 全部返回「不存在」，列表与搜索中不出现 |
 | 交叉写 | 用 A 的身份修改 B 的记录、把自己的单据改挂到 B 名下、在 B 名下新建联系人或证书 | 全部拒绝 |
 | 冒用名册 | 用门户身份（含门户管理员）或任何内部岗位写联系人的 `portal_user`、改联系人归属或在职标志 | 拒绝或写入被丢弃，授权不变；只有 flow 能写 |
+| 越过回复范围 | 用 A 的身份改本公司整改单的非回复字段（SQE 意见、索赔、问题描述、逾期标志）、把状态改成效果验证 / 关闭 / 撤销或退回、改轮到 SQE 的整改单 | 拒绝或写入被丢弃，值不变（v0.6 U5） |
+| 越权 screen flow | 用 A 的身份对 B 的整改单「确认索赔」、对 B 的考评单「申诉」，分别经记录页按钮和直接触发 flow；联系人停用后对本公司考评单申诉 | 按钮答「不存在」，直接触发被 flow 的名册检查拒绝，记录不变；恢复在职后本公司的申诉照常（v0.6 U5） |
 | 开标后改价 | 开标后用中标供应商的身份修改本公司报价明细的单价或中标字段 | 拒绝（v0.7 寻源上线时加入） |
 | 自解资质异常 | 用门户身份把本公司过期证书的 `status` 改为有效，或修改有效期；新建证书时自带「已核验」 | 全部拒绝（v0.6 U2 门户只能新建证书；U4 放开修改时，改有效期重置 `verified`，资质异常不解除） |
 | 空名册 | 持门户岗位但不在任何在职联系人上的用户；联系人停用的用户；在名册上但没有门户岗位的用户；没开通门户的供应商的单据 | 每个对象零行 |
@@ -394,6 +396,8 @@ export const PortalSupplier = definePermissionSet({
 | `srm_po_line.unit_price` / `quantity` / `required_date`（预留） | 内部、本公司门户 | 仅 ERP 集成 | 订单以 ERP 为准 |
 | `srm_quality_issue.claim_amount` | 内部、本公司门户 | SQE | |
 | `srm_performance_review.*_score` | 内部、本公司门户（已发布） | 算分 flow、评分人 | |
+| `srm_performance_review` 的 `reviewer`、`review_comment`、`appeal_handled_by`；`srm_performance_score` 的 `scorer`、`reassigned_from`、`reassigned_by`、`reassign_reason`、`reassigned_date` | 内部 | flow | 内部评价过程：评分人与回避信息不对被评供应商公开（GL-05）。两个对象声明了 `searchableFields`，门户的列表搜索不扫这些字段（02 §4.7） |
+| `srm_quality_issue` 的 D3–D7、`evidence`、`status` | 内部、本公司门户 | SQE；本公司门户（轮到供应商回复时，§3.2） | 门户在整改单上能改的只有这几项 |
 | `srm_supplier_contact.portal_user` | 内部、本公司门户 | 仅 flow（字段级只读） | 门户名册：写入即授出这家供应商的门户数据（ADR-0010） |
 | `srm_supplier_contact.active` | 内部、本公司门户 | 内部（`srm_supplier_admin`）；门户只读 | 名册过滤条件，门户不能恢复被停用的账号 |
 | `srm_supplier` 的 `name`、`country`、`credit_code`、`registration_no`、`address`、`legal_representative`、`registered_capital`、`status`、`grade`、`qualification_alert`、`erp_vendor_code` | 内部、本公司门户 | 内部（关键信息变更走变更单） | 门户只读；门户可直接改的只有 `short_name`、`website`、`supplier_type`、`taxpayer_type`、`established_date` 等资料字段 |

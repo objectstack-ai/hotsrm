@@ -4,7 +4,7 @@ import { gradeOf } from './params.js';
 
 // 处理绩效申诉（03 §10 第 7 步，FR-706）：采购总监在申诉中的考评单上写处理结果，选择维持原结果或调整总分；调整时
 // 等级按新总分取 perf_grade_min 重算（params.ts 的 GRADE_MIN），各评分明细与维度得分不变，处理结果里写明调整依据。
-// 处理后回到已发布，处理人、结论和结果留在考评单上；是该供应商最近一期时同步回写供应商等级、总分与优选标志；通知申诉代录人。
+// 处理后回到已发布，处理人、结论和结果留在考评单上；是该供应商最近一期时同步回写供应商等级、总分与优选标志；通知申诉提交人（门户管理员或内部代录人）。
 // 结果应用（srm_performance_apply）只在审定发布时触发，这里不重新应用：等级变了时通知供应商各品类的品类经理，核对按原等级
 // 开的整改单和生成的处置单草稿（来源考评单为本单），不需要的由品类经理作废，新等级需要处置的另行发起（03 §10 第 7 步）。
 // 处理人不能是本考评单的评分人（同审定发布的职责分离）。以系统身份运行，进门检查在 flow 里做。
@@ -142,7 +142,7 @@ export const AppealResolveFlow: Automation.Flow = {
     {
       id: 'notify',
       type: 'notify',
-      label: '通知申诉代录人',
+      label: '通知申诉提交人',
       config: {
         recipients: cel`has(review.appeal_recorded_by) && review.appeal_recorded_by != null ? review.appeal_recorded_by : null`,
         title: '考评单 {{ review.review_no }} 的申诉已处理',
