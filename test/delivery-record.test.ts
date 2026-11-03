@@ -218,14 +218,14 @@ describe('delivery record', () => {
         'required', // 6 不合格没有严重度
         'required', // 7 不合格没有不良数
         'rule_violation', // 8 不良数大于实收数
-        'created', // 9 表格带了期间、准时两列：被忽略，按实到日期重算
-        'UNIQUE_VIOLATION', // 10 同一张表里重复的行
+        'DUPLICATE_MATCH_KEY', // 9、10 同一张表里重复的行：18.3.0 起两行都不写（objectstack#26133）
+        'DUPLICATE_MATCH_KEY',
         'required', // 11 没有实到日期
         'created', // 12 数量带千分位「1,200」
         'min_value', // 13 负数（退货行）
         'reference_not_found', // 14 工厂写简称「一厂」
         'required', // 15 没有收货单号
-        'created', // 16 物料列写物料名称：按名称找到
+        'created', // 16 物料列写物料名称：按名称找到；表格带了期间、准时两列（值是错的）：被忽略，按实到日期重算
         'created', // 17 检验结论带尾随空格
         'reference_not_found', // 18 物料号小写
       ]);
@@ -233,8 +233,9 @@ describe('delivery record', () => {
       expect(dotted!.required_date).toBe('2026-10-08');
       const [compact] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090002' });
       expect([compact!.required_date, compact!.promised_date, compact!.receipt_date]).toEqual(['2026-10-08', '2026-10-08', '2026-10-09']);
-      const [ignored] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090009' });
-      expect([ignored!.period, ignored!.on_time]).toEqual(['2026-10', false]);
+      expect(await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090009' })).toEqual([]);
+      const [ignored] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090015' });
+      expect([ignored!.period, ignored!.on_time]).toEqual(['2026-10', true]);
       const [thousands] = await stack.rows(DeliveryRecord.name, { erp_receipt_no: '5000090011' });
       expect(thousands!.received_quantity).toBe(1200);
     });

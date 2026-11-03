@@ -7,7 +7,7 @@ import type * as Automation from '@objectstack/spec/automation';
 // 通过后经 srm_change_apply 写回档案；驳回不改主记录，把驳回意见写进 reject_reason 并通知发起人。
 //
 // 职责分离：发起人不能审批本人的变更单，两级审批人不能是同一人。平台审批服务还没有「提交人不得
-// 审批本人单据」的开关（objectstack#25446），岗位又可能兼任，所以每级通过后由 flow 读审批记录比对：
+// 审批本人单据」的开关（objectstack#25446；18.3.0 已提供 excludeSubmitter，改用见 hotsrm#96），岗位又可能兼任，所以每级通过后由 flow 读审批记录比对：
 // 撞人时这次通过不算数，通知审批人后重新开一轮同级审批（临时做法，平台支持后改为节点配置）。
 const snapshotOf = (v: string, keys: string[]) => ({
   dialect: 'cel' as const,

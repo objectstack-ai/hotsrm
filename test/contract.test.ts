@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 import { Category, Contract, ContractLine, Supplier } from '../src/core/objects';
 
@@ -57,13 +58,7 @@ describe('contract', () => {
     return stack.flows.resume({ flowName: flow, runId: started.runId }, {}, { as });
   };
   const toSigning = (id: string) => stack.hooks.run(Contract.name, 'update', { id, status: 'signing' }, { system: true });
-  const signedFile = async () => {
-    const name = `signed-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [
-      { key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' },
-    ]);
-    return String(file!.id);
-  };
+  const signedFile = (as?: string) => uploadedFile(stack, as, 'signed');
   // 系统身份把一份合同推进到生效（跳过界面），用于到期与续签的用例
   const activeContract = async (doc: Record<string, unknown>) => {
     const created = await draft(manager.token, doc);
@@ -202,7 +197,7 @@ describe('contract', () => {
       expect(res.status, await res.clone().text()).toBe(200);
     }
     expect((await contract(created.id)).status).toBe('signing');
-    await stack.hooks.run(Contract.name, 'update', { id: created.id, signed_file: await signedFile(), signed_date: day(0) }, { as: buyer.token });
+    await stack.hooks.run(Contract.name, 'update', { id: created.id, signed_file: await signedFile(buyer.token), signed_date: day(0) }, { as: buyer.token });
     await runScreen('srm_contract_activate', buyer.token, created.id);
     expect(await contract(created.id)).toMatchObject({ status: 'active', signed_date: day(0) });
   });

@@ -28,11 +28,11 @@ const none = { allowCreate: false, allowRead: true, allowEdit: false, allowDelet
 const readOnly = { readable: true, editable: false };
 const hidden = { readable: false, editable: false };
 
-// 供应商档案：门户只能改资料字段（04 §4.2），关键信息走变更单；内部评估类字段门户不可见。
-// 临时：risk_level 暂时可读——平台的默认搜索会扫描选项字段而不跳过调用者读不到的字段，隐藏它会让门户的供应商搜索
-// 整体被拒（objectstack#25672，主干已修、18.1.0 未含），升级到含修复的版本后加回隐藏
+// 供应商档案：门户只能改资料字段（04 §4.2），关键信息走变更单；内部评估类字段（含风险等级）门户不可见。
+// 18.3.0 起默认搜索只扫调用人能读的字段（objectstack#25672），隐藏 risk_level 不再让门户的供应商搜索整体被拒
 const supplierEditable = new Set(['short_name', 'website', 'supplier_type', 'taxpayer_type', 'established_date']);
 const supplierHidden = new Set([
+  'risk_level',
   'is_related_party',
   'preferred',
   'open_risk_event_count',

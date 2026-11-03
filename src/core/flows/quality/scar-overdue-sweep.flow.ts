@@ -51,8 +51,8 @@ const eachIssue = (key: string, collection: ReturnType<typeof cel>, title: strin
 // P7 步骤 5（03 §8，FR-605）：追赶式扫描，超过临时措施期限仍「待供应商响应」、或超过最终回复期限仍未进入
 // 效果验证的整改单置为逾期，通知负责 SQE 与质量经理（SQE 主管）。只处理还没标记逾期的整改单，
 // 重复运行不重复通知（03 §2.3 R2）；标志保留到关闭，供「SCAR 按期关闭率」统计（05 §4.1）。
-// 每小时跑一次。外部心跳（03 §2.3 R3）暂缺：api 触发的 flow 只能把签名密钥写死在元数据里，公开仓库不能这么做
-// （objectstack#25675），平台支持部署时注入密钥后再加 srm_scar_overdue_heartbeat。
+// 每小时跑一次。外部心跳（03 §2.3 R3）暂缺：18.3.0 起 api flow 能按名字引用部署时注入的密钥（config.secretRef，
+// objectstack#25675），srm_scar_overdue_heartbeat 见 hotsrm#98。
 // 供应商侧的逾期通知在 srm_scar_supplier_notice（is_overdue 置位时，v0.6 U6）。
 export const ScarOverdueSweepFlow: Automation.Flow = {
   name: 'srm_scar_overdue_sweep',

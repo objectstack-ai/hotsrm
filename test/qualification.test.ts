@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 import { Category, Supplier, SupplierCategory, SupplierCertificate } from '../src/core/objects';
 
@@ -24,14 +25,11 @@ describe('qualification monitoring', () => {
       { as: admin },
     )).id as string;
   const newCertificate = async (supplier: string, validTo: string, isMandatory: boolean, certType = 'iso9001') => {
-    const name = `cert-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [
-      { key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' },
-    ]);
+    const file = await uploadedFile(stack, admin, 'cert');
     const cert = await stack.hooks.run(
       SupplierCertificate.name,
       'insert',
-      { supplier, cert_type: certType, valid_from: day(-400), valid_to: validTo, is_mandatory: isMandatory, attachment: String(file!.id) },
+      { supplier, cert_type: certType, valid_from: day(-400), valid_to: validTo, is_mandatory: isMandatory, attachment: file },
       { as: admin },
     );
     return cert.id as string;

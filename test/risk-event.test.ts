@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 import { Category, RiskEvent, Supplier, SupplierCategory, SupplierCertificate, SupplierDisposition } from '../src/core/objects';
 
@@ -49,10 +50,7 @@ describe('risk events and the blacklist register', () => {
     expect(run.success, JSON.stringify(run)).toBe(true);
   };
   const certificate = async (supplier: string, validTo: string, isMandatory: boolean) => {
-    const name = `rsk-cert-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [
-      { key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' },
-    ]);
+    const file = await uploadedFile(stack, sqe.token, 'rsk-cert');
     return (
       await stack.hooks.run(
         SupplierCertificate.name,
@@ -64,7 +62,7 @@ describe('risk events and the blacklist register', () => {
           valid_from: day(-400),
           valid_to: validTo,
           is_mandatory: isMandatory,
-          attachment: String(file!.id),
+          attachment: file,
         },
         { as: sqe.token },
       )

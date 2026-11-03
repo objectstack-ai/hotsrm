@@ -80,7 +80,7 @@ export const SupplierViews = defineView({
       filter: [{ field: 'preferred', operator: 'equals', value: true }],
       sort: [{ field: 'latest_score', order: 'desc' }],
     },
-    // 同一批导入里的两位主联系人校验规则拦不住（objectstack#25477），在这里人工处理
+    // 兜底视图：18.3.0 起同一批导入里的第二位主联系人也被校验规则拦下（objectstack#25579），正常不会有数据
     primary_contact_conflict: {
       label: '主联系人重复',
       type: 'grid',

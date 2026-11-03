@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { uploadedFile } from './support/files';
 import { cel, composeStacks, defineStack } from '@objectstack/spec';
 import { Field } from '@objectstack/spec/data';
 import { stacks } from '../objectstack.composition';
@@ -153,19 +154,13 @@ describe('portal platform checks (v0.6 U1, V1–V5)', () => {
   };
   const hold = (who: string, position: string) =>
     stack.seed('sys_user_position', [{ user_id: uid[who], position, organization_id: orgId }]);
-  const attachment = async () => {
-    const name = `portal-probe-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [
-      { key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' },
-    ]);
-    return String(file!.id);
-  };
-  const certificateDoc = async (supplierId: string) => ({
+  const attachment = (as?: string) => uploadedFile(stack, as, 'portal-probe');
+  const certificateDoc = async (supplierId: string, uploader?: string) => ({
     supplier: supplierId,
     cert_type: 'iso14001',
     valid_from: '2025-01-01',
     valid_to: '2027-12-31',
-    attachment: await attachment(),
+    attachment: await attachment(uploader),
   });
   const get = async (who: string, path: string) => {
     const res = await stack.apiAs(token[who], 'GET', path);
@@ -201,7 +196,7 @@ describe('portal platform checks (v0.6 U1, V1–V5)', () => {
         { as: token.admin },
       );
       supplier[key] = String(row.id);
-      certificate[key] = String((await stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier[key]), { as: token.admin })).id);
+      certificate[key] = String((await stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier[key], token.admin), { as: token.admin })).id);
       await stack.hooks.run(SupplierContact.name, 'insert', { supplier: supplier[key], name: `联系人 ${key}`, email: `contact-${key}@supplier.test` }, { as: token.admin });
     }
 
@@ -404,11 +399,11 @@ describe('portal platform checks (v0.6 U1, V1–V5)', () => {
     });
 
     it('adds a certificate to its own supplier, at the engine and at REST, and not to another supplier', async () => {
-      const own = await stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier.a), asA());
+      const own = await stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier.a, token.supA), asA());
       expect(own.supplier).toBe(supplier.a);
-      const rest = await stack.apiAs(token.supA, 'POST', `/data/${SupplierCertificate.name}`, await certificateDoc(supplier.a));
+      const rest = await stack.apiAs(token.supA, 'POST', `/data/${SupplierCertificate.name}`, await certificateDoc(supplier.a, token.supA));
       expect(rest.status, await rest.clone().text()).toBeLessThan(300);
-      await expect(stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier.b), asA())).rejects.toMatchObject({
+      await expect(stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier.b, token.supA), asA())).rejects.toMatchObject({
         code: 'PERMISSION_DENIED',
       });
     });
@@ -439,7 +434,7 @@ describe('portal platform checks (v0.6 U1, V1–V5)', () => {
 
     it('needs edit on the parent: with read-only access to its supplier it can neither add nor edit a certificate', async () => {
       await expect(
-        stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier.c), { as: token.supC }),
+        stack.hooks.run(SupplierCertificate.name, 'insert', await certificateDoc(supplier.c, token.supC), { as: token.supC }),
       ).rejects.toMatchObject({ code: 'PERMISSION_DENIED', message: expect.stringContaining('master') });
       await expect(
         stack.hooks.run(SupplierCertificate.name, 'update', { id: certificate.c, valid_to: '2030-01-01' }, { as: token.supC }),

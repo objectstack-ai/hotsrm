@@ -143,7 +143,7 @@ sequenceDiagram
 | 3 开通门户 | 品类经理、采购主管提出（门户邀请）；组织管理员操作（v0.6） | 组织管理员按邀请邮箱在成员页邀请为 `external`，对方接受后运行「开通门户」（见 [04 §3.3](./04-security-and-portal.md#33-门户账号的开通与回收)）；准入邀请在开通后由供应商提交申请，所以这一步在步骤 1 之前；v0.1–v0.5 跳过 |
 | 4 补充资料 | 供应商 | 门户内补齐公司资料（门户可改的字段见 [04 §4.2](./04-security-and-portal.md#42-字段级权限fls)）、银行账户、证书；品类经理可「退回补充」（申请→`returned`，必须写退回意见 `return_reason`，通知申请联系人，v0.6 U6）。受邀申请由门户用户提交、属主是门户账号，品类经理和采购主管经共享规则「处理准入申请」（`srm_supplier_application` 的编辑规则，关联了供应商的申请）才能受理、退回；`srm_application_submit` 提交后通知发出邀请的人（门户邀请的 `created_by`）。供应商补齐后在申请上点「补充完成，重新提交」（screen flow `srm_application_resubmit`，v0.6）：写补充说明 `supplement_note`，申请回到 `doc_review`，通知初审人（没有初审人时通知最后修改申请的人，即退回申请的人）；只有申请所属供应商的门户用户能提交（flow 按门户名册检查）。应付会计经「核验银行账户」、SQE 经「核验证书」两个 screen flow 完成核验 |
 | 5 现场审核 | `risk_class == 'high'` | SQE 建供应商审核记录（`audit_type = admission`，关联本次申请），审核后录入总分、最低审核块得分、结论与问题项（结论按 `audit_score_thresholds` 校验，02 §4.2）。审核完成或改了结论时，flow `srm_audit_admission_apply` 把结论写回申请：`audit_result` 记结论，通过或有条件通过时 `audit_passed = true`，否则为 false，并通知初审人；已批准或已驳回的申请不再写。校验规则 `audit_before_review`：`risk_class == 'high' && audit_passed != true` 时申请不得进入 `admission_review`（FR-204）。申请上的勾选框只由 flow 写，品类经理改不了 |
-| 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'class_a'` 或 `risk_class == 'high'` 时第 2 级改为采购总监、`srm_quality_manager` 并行会签（`per_group`：两个岗位各一人通过，同岗位多人时任一人即可；任一人驳回即驳回）。初审人就是申请的新建人或把申请推进到准入评审的人时，品类经理一级上提给采购总监、与第 2 级合并（标准申请由采购总监审批，A 类或高风险由采购总监 + 质量经理会签），申请上 `review_escalated` 记为 true；不要求另一位品类经理，免得只有一位品类经理的品类卡住（平台没有「不可自审」选项，objectstack#25446；同合同、处置单的做法）。驳回 → 申请回 `doc_review` 并通知 |
+| 6 准入评审 | 申请→`admission_review` | flow `srm_admission_approval`：第 1 级 `field` 审批人 = `reviewer`（品类经理）；第 2 级 `position` = `srm_procurement_director`；`material_class == 'class_a'` 或 `risk_class == 'high'` 时第 2 级改为采购总监、`srm_quality_manager` 并行会签（`per_group`：两个岗位各一人通过，同岗位多人时任一人即可；任一人驳回即驳回）。初审人就是申请的新建人或把申请推进到准入评审的人时，品类经理一级上提给采购总监、与第 2 级合并（标准申请由采购总监审批，A 类或高风险由采购总监 + 质量经理会签），申请上 `review_escalated` 记为 true；不要求另一位品类经理，免得只有一位品类经理的品类卡住（平台没有「不可自审」选项，objectstack#25446，18.3.0 已提供 `excludeSubmitter`，改用见 hotsrm#96；同合同、处置单的做法）。驳回 → 申请回 `doc_review` 并通知 |
 | 7 批准后 | 审批通过 | 申请→`approved`，写入 `cycle_days`；供应商 `qualifying → qualified`；按申请品类建 `srm_supplier_category`（申请的 `audit_result` 为有条件通过时为 `trial`，否则 `qualified`，WI-01 6.6.2）；通知申请联系人（v0.6 U6）。ERP 建档与 `erp_vendor_code` 回写为预留集成点（06 §1） |
 | 8 未通过 | 终止 | 申请→`rejected`；供应商 `qualifying → potential`（`reapply` 的旧档回 `eliminated`）；v0.6 起 `srm_admission_rejection` 先通知申请联系人「未通过」（U6），再回收门户账号：清掉该供应商全部联系人的 `portal_user`、撤销门户邀请，有门户账号时通知组织管理员撤任命、移出组织（GL-10 6.6.1 c）。只有潜在、淘汰的供应商能申请（`supplier_admissible`），所以驳回总会让供应商退回，已合格供应商不受影响 |
 
@@ -224,7 +224,7 @@ flowchart TD
   从第 1 级重新审批（第 2 级退回时账户信息改过，采购要再确认）；第 1 级通过时清掉上一轮的财务审批人。
   18.0.0 时第 2 级不能退回（平台把第 2 个审批节点的提交人记成第 1 级审批人，objectstack#24817），18.1.0 修复后加回（2026-10-26）。
 - **职责分离（BR-11）**：发起人不能审批本人的变更单，两级审批人不能是同一人。平台没有「提交人不得审批」开关
-  （objectstack#25446），岗位又可能兼任，所以每级通过后 flow 读审批记录比对，撞人时这次通过不算数，通知审批人
+  （objectstack#25446；18.3.0 已提供 `excludeSubmitter`，改用见 hotsrm#96），岗位又可能兼任，所以每级通过后 flow 读审批记录比对，撞人时这次通过不算数，通知审批人
   并重新开一轮同级审批。审批人在节点开启时按岗位解析：只有一位采购主管且他就是发起人时，要再任命一位。
 
 ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预留集成点）。
@@ -288,7 +288,7 @@ ERP 侧的银行账户由财务按 SRM 的审批记录维护（ERP 集成为预�
 - **撤回**：提交人在审批中或退回修改期间撤回，审批结论为 `recalled`，`srm_contract_recalled` 把合同改回 `draft`，改完可以
   再次提交。
 - **职责分离（BR-11）**：起草人、提交人不能审批本合同，各级审批人不能是同一人；做法同变更单（§5）：每级通过后读审批记录
-  比对，撞人时这次通过不算数，通知审批人并重新开一轮同级审批（objectstack#25446）。
+  比对，撞人时这次通过不算数，通知审批人并重新开一轮同级审批（objectstack#25446；18.3.0 已提供 `excludeSubmitter`，改用见 hotsrm#96）。
 
 ## 7. P5 订单协同与 P6 送货收货（预留：ERP 集成后的门户镜像，现阶段不做）
 
@@ -491,7 +491,7 @@ GL-02 附录 A 按本表编写，制度里的岗位称谓经 `governance/org.yam
 冻结层级统一为上表，减少一个判断维度。
 
 职责分离：同一张单据的发起人不应出现在审批人中。平台审批服务目前**没有**内置
-「提交人不得审批本人单据」的开关（已提需求 objectstack#25446），本设计用两层保证：岗位
+「提交人不得审批本人单据」的开关（已提需求 objectstack#25446；18.3.0 已提供 `excludeSubmitter`，改用见 hotsrm#96），本设计用两层保证：岗位
 设置上，发起岗与审批岗不由同一人兼任；在 flow 中，审批人等于发起人时改用上一级岗位
 （`expression` 审批人），并用校验规则拦截提交人 = 审批人。详见 [04 §6](./04-security-and-portal.md#6-职责分离sod)。
 

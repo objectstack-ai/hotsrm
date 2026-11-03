@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { triggerFlow } from './support/flows';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 
 // v0.6 U4 门户自助维护（03 §3 第 4 步、§5、§11，04 §3.2、§4.2）：门户补证书 → SQE 核验后资质异常解除；门户管理员经
@@ -19,11 +21,7 @@ describe('portal self-service (v0.6 U4)', () => {
   const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
   const sys = async (object: string, doc: Row) => (await stack.hooks.run(object, 'insert', doc, { system: true })) as Row;
   const row = async (object: string, id: string) => (await stack.rows(object, { id }))[0]!;
-  const scan = async () => {
-    const name = `self-service-scan-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [{ key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' }]);
-    return String(file?.id);
-  };
+  const scan = (as?: string) => uploadedFile(stack, as, 'self-service-scan');
   const assign = (userId: string, position: string) => stack.seed('sys_user_position', [{ user_id: userId, position, ...org }]);
   const person = async (...positions: string[]): Promise<Person> => {
     const token = await stack.signUp(`ss-${positions.join('-')}-${++seq}@example.com`);
@@ -54,9 +52,13 @@ describe('portal self-service (v0.6 U4)', () => {
     if (started.status !== 'paused' || !started.runId) return started as Row;
     return (await stack.flows.resume({ flowName: flow, runId: started.runId }, input, { as })) as Row;
   };
-  // 绕过按钮直接启动 flow（任何成员都能经 trigger 入口启动系统身份的 screen flow，objectstack#25481）
-  const startDirect = async (as: string, flow: string, recordId: string, input: Row = {}) => {
-    const started = (await stack.flows.run(flow, { recordId }, { as })) as { runId?: string; status?: string };
+  // 绕过按钮直接启动 flow（任何成员都能经 trigger 入口启动系统身份的 screen flow，objectstack#25481）。
+  // 18.3.0 起 trigger 入口先以调用人身份读 recordId（objectstack#29050），读不到答 404，不产生运行，这里记作 not_found
+  const startDirect = async (as: string, object: string, flow: string, recordId: string, input: Row = {}) => {
+    const started = (await triggerFlow(stack, as, flow, object, recordId).catch((error) => {
+      if (/answered 404/.test(String(error))) return { status: 'not_found' };
+      throw error;
+    })) as { runId?: string; status?: string };
     if (started.status !== 'paused' || !started.runId) return started as Row;
     return (await stack.flows.resume({ flowName: flow, runId: started.runId }, input, { as })) as Row;
   };
@@ -152,7 +154,7 @@ describe('portal self-service (v0.6 U4)', () => {
     const uploaded = await stack.hooks.run(
       'srm_supplier_certificate',
       'insert',
-      { supplier: x.id, cert_type: 'iso9001', cert_no: `ISO-NEW-${seq}`, issuer: '示例认证机构', valid_from: day(-1), valid_to: day(1095), attachment: await scan() },
+      { supplier: x.id, cert_type: 'iso9001', cert_no: `ISO-NEW-${seq}`, issuer: '示例认证机构', valid_from: day(-1), valid_to: day(1095), attachment: await scan(p.token) },
       { as: p.token },
     );
     expect(await row('srm_supplier_certificate', String(uploaded.id))).toMatchObject({ verified: false, is_mandatory: true });
@@ -161,7 +163,7 @@ describe('portal self-service (v0.6 U4)', () => {
     await expect.poll(() => notified(String(uploaded.id), sqe.id)).toBe(true);
 
     // 门户用户自己核验不了，过期证书不能核验
-    expect((await startDirect(p.token, 'srm_certificate_verify', String(uploaded.id))).status).toBe('refused');
+    expect((await startDirect(p.token, 'srm_supplier_certificate', 'srm_certificate_verify', String(uploaded.id))).status).toBe('refused');
     expect((await runScreen(sqe.token, 'srm_supplier_certificate', 'srm_certificate_verify', x.iso)).status).toBe('refused');
 
     const verified = await runScreen(sqe.token, 'srm_supplier_certificate', 'srm_certificate_verify', String(uploaded.id));
@@ -279,10 +281,10 @@ describe('portal self-service (v0.6 U4)', () => {
     const plain = await portalUser(x.id);
     const pa = await portalUser(x.id, true);
     const input = { change_type: 'basic', reason: '冒名', new_name: '示例冒名有限公司' };
-    expect((await startDirect(plain.token, 'srm_change_submit', x.id, input)).status).toBe('refused');
-    expect((await startDirect(manager.token, 'srm_change_submit', x.id, input)).status).toBe('refused');
-    // 门户管理员伪造别家的供应商：名册对不上
-    expect((await startDirect(pa.token, 'srm_change_submit', y.id, input)).status).toBe('refused');
+    expect((await startDirect(plain.token, 'srm_supplier', 'srm_change_submit', x.id, input)).status).toBe('refused');
+    expect((await startDirect(manager.token, 'srm_supplier', 'srm_change_submit', x.id, input)).status).toBe('refused');
+    // 门户管理员伪造别家的供应商：18.3.0 起入口读不到别家供应商，答「不存在」（objectstack#29050）；flow 的名册检查是第二道防线
+    expect((await startDirect(pa.token, 'srm_supplier', 'srm_change_submit', y.id, input)).status).toBe('not_found');
     expect(await stack.rows('srm_supplier_change_request', { supplier: y.id })).toEqual([]);
     // 选别家的银行账户：变更单的校验规则拒绝
     const forged = await runScreen(pa.token, 'srm_supplier', 'srm_change_submit', x.id, {
@@ -307,8 +309,9 @@ describe('portal self-service (v0.6 U4)', () => {
     const p = await portalUser(supplier);
     const other = await portalUser((await qualifiedSupplier()).id);
 
-    expect((await startDirect(other.token, 'srm_application_resubmit', id, { note: '冒名' })).status).toBe('refused');
-    expect((await startDirect(manager.token, 'srm_application_resubmit', id, { note: '内部' })).status).toBe('refused');
+    // 别家的门户用户：入口读不到这张申请，答「不存在」（objectstack#29050）；内部员工读得到，由 flow 的名册检查拒绝
+    expect((await startDirect(other.token, 'srm_supplier_application', 'srm_application_resubmit', id, { note: '冒名' })).status).toBe('not_found');
+    expect((await startDirect(manager.token, 'srm_supplier_application', 'srm_application_resubmit', id, { note: '内部' })).status).toBe('refused');
     const run = await runScreen(p.token, 'srm_supplier_application', 'srm_application_resubmit', id, { note: '已补传 ISO 9001 证书' });
     expect(run.success, JSON.stringify(run)).toBe(true);
     expect(await row('srm_supplier_application', id)).toMatchObject({ status: 'doc_review', supplement_note: '已补传 ISO 9001 证书' });

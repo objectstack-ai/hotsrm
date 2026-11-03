@@ -38,8 +38,8 @@ export const SupplierAuditViews = defineView({
       data,
       columns: ['audit_no', 'supplier', 'audit_type', 'status'],
       filter: [{ field: 'status', operator: 'equals', value: 'planned' }],
-      // 临时：标题本应显示供应商，但日历把 lookup 值当对象渲染成「[object Object]」（objectui#13471），先用审核编号
-      calendar: { startDateField: 'planned_date', titleField: 'audit_no', colorField: 'audit_type' },
+      // 标题显示供应商名称（18.3.0 的控制台按 lookup 的显示名渲染，objectui#13471）
+      calendar: { startDateField: 'planned_date', titleField: 'supplier', colorField: 'audit_type' },
     },
     admission: {
       label: '准入审核',
