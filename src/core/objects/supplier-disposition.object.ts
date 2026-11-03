@@ -9,13 +9,12 @@ import { ObjectSchema, Field } from '@objectstack/spec/data';
 // 核对后经「提交审批」（srm_disposition_submit）进入审批，或经「作废」（srm_disposition_cancel）放弃。
 // 提交时同一套状态校验再跑一遍（供应商状态可能在草稿期间变了）。提交人记入 submitted_by 并接管记录所有权，
 // 审批 flow 以它为发起人（手工新建的处置单没有 submitted_by，发起人是新建人）。
-// 供应商、动作、范围和品类只在新建时填写。服务端新建时不看 readonlyWhen，新建表单却会按默认值
-// （状态「审批中」）把字段锁住，所以先判断记录已保存（有 id）。
-// 临时绕法（objectstack#25584），平台修复后去掉 id 判断
+// 供应商、动作、范围和品类只在新建时填写：记录一经保存（有 id）即只读。服务端和新建表单在新建时都不看
+// readonlyWhen（新建表单 18.3.0 起，objectui#13436）
 const created = P`has(record.id) && record.id != null`;
 // 原因与生效日期只在新建时和被退回修改期间可改；审批中平台锁定记录，审结后只读。
 // 草稿的原因由生成它的 flow 写好（如风险事件编号与描述），要换原因就作废草稿、手工新建
-const proposal = P`has(record.id) && record.id != null && record.approval_status != 'returned'`;
+const proposal = P`record.approval_status != 'returned'`;
 // 动作与供应商状态的组合在新建和草稿提交时各校验一次；「只能有一张审批中」在新建（非草稿）和提交时校验
 const allowedActions =
   `has(record.supplier.status) && !(`

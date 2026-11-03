@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { NOT_FOUND, triggerFlow } from './support/flows';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 import * as objects from '../src/core/objects';
 import { SupplierContact } from '../src/core/objects';
@@ -168,11 +170,7 @@ describe('portal isolation (04 §3.7)', () => {
   const sys = async (object: string, doc: Row) => (await stack.hooks.run(object, 'insert', doc, { system: true })) as Row;
   const seed = async (object: string, doc: Row) => (await stack.seed(object, [doc]))[0] as Row;
   // 证书扫描件：一条文件记录只能被一个字段引用，每张证书各建一条
-  const scan = async () => {
-    const name = `portal-scan-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [{ key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' }]);
-    return String(file?.id);
-  };
+  const scan = (as?: string) => uploadedFile(stack, as, 'portal-scan');
   const assign = (userId: string, position: string) => stack.seed('sys_user_position', [{ user_id: userId, position, ...org }]);
 
   // 门户用户：注册 → 组织角色改为 external → 任命门户岗位 → 在供应商联系人上登记 portal_user
@@ -345,6 +343,12 @@ describe('portal isolation (04 §3.7)', () => {
     expect(await names(await stack.apiAs(a.token, 'GET', '/data/srm_supplier'))).toEqual([A.name]);
     const search = await stack.apiAs(a.token, 'GET', `/data/srm_supplier?search=${encodeURIComponent('示例门户隔离')}`);
     expect(await names(search)).toEqual([A.name]);
+    // 风险等级对门户隐藏，搜索照常（objectstack#25672 在 18.3.0 修复前，隐藏它会让搜索整体被拒）
+    await stack.hooks.run('srm_supplier', 'update', { id: A.supplier, risk_level: 'medium' }, { system: true });
+    expect(await names(await stack.apiAs(a.token, 'GET', `/data/srm_supplier?search=${encodeURIComponent('示例门户隔离')}`))).toEqual([A.name]);
+    const [own] = (await stack.rows('srm_supplier', { id: A.supplier }, { as: a.token })) as Row[];
+    expect(own).toBeDefined();
+    expect(own!.risk_level ?? null).toBeNull();
     expect(await names(await stack.apiAs(a.token, 'POST', '/data/srm_supplier/query', {}))).toEqual([A.name]);
     for (const object of PORTAL_OBJECTS) {
       const res = await stack.apiAs(a.token, 'GET', `/data/${object}`);
@@ -423,25 +427,26 @@ describe('portal isolation (04 §3.7)', () => {
 
   // 系统身份运行的 screen flow 自己做隔离检查：别家的整改单、考评单一律拒绝，记录不变
   it('refuses the claim and appeal flows on another supplier\'s records', async () => {
-    // 两个入口都试：记录页按钮（action）和直接触发 flow（REST trigger，不经按钮所在页面的读取）。flow 以系统身份
-    // 读记录，所以隔离只能靠 flow 自己的名册检查
+    // 两个入口都试：记录页按钮（action）和直接触发 flow（REST trigger，不经按钮所在页面的读取）。18.3.0 起两个入口
+    // 都先以调用人身份读记录（objectstack#29050），别家的记录读不到，flow 不启动；flow 自己的名册检查仍保留，作第二道防线
+    // （内部员工等读得到记录的调用人由它拒绝，见 portal-self-service / portal-invitation）
     const run = async (who: Portal, object: string, flow: string, recordId: string, input: Row) => {
       const finish = async (start: Promise<unknown>) => {
-        let res = (await start.catch((e) => ({ status: 'error', error: e }))) as Row;
+        let res = (await start.catch((e) => ({ status: /answered 404/.test(String(e)) ? 'not_found' : 'error', error: e }))) as Row;
         for (let i = 0; i < 3 && res.status === 'paused' && res.runId; i++) {
           res = (await stack.flows.resume({ flowName: flow, runId: res.runId }, input, { as: who.token }).catch((e) => ({ status: 'error', error: e }))) as Row;
         }
         return String(res.status ?? (res.success === true ? 'completed' : 'failed'));
       };
       return {
-        // 按钮入口：记录对门户不可见，平台答「不存在」；直接触发：flow 的名册检查拒绝
+        // 按钮入口：记录对门户不可见，平台答「不存在」；直接触发：入口答 404「不存在」
         status: [
           await finish(stack.actions.run(object, flow, { as: who.token, recordId })),
-          await finish(stack.flows.run(flow, { recordId }, { as: who.token })),
+          await finish(triggerFlow(stack, who.token, flow, object, recordId)),
         ],
       };
     };
-    const REFUSED = { status: ['error', 'refused'] };
+    const REFUSED = { status: ['error', 'not_found'] };
     const foreign = String((await sys('srm_quality_issue', { supplier: B.supplier, severity: 'major', problem_description: '示例索赔隔离', claim_amount: 100, claim_status: 'proposed' })).id);
     B.visible.get('srm_quality_issue')!.push(foreign);
     expect(await run(a, 'srm_quality_issue', 'srm_claim_respond', foreign, { decision: 'accept' })).toEqual(REFUSED);
@@ -506,7 +511,7 @@ describe('portal isolation (04 §3.7)', () => {
     const created = await stack.hooks.run(
       'srm_supplier_certificate',
       'insert',
-      { supplier: A.supplier, cert_type: 'iso14001', cert_no: `ISO14-${++seq}`, valid_to: '2030-01-01', attachment: await scan() },
+      { supplier: A.supplier, cert_type: 'iso14001', cert_no: `ISO14-${++seq}`, valid_to: '2030-01-01', attachment: await scan(a.token) },
       { as: a.token },
     );
     expect(created.verified).toBe(false);
@@ -548,12 +553,11 @@ describe('portal isolation (04 §3.7)', () => {
     const bChange = B.visible.get('srm_supplier_change_request')![0]!;
     await expect(stack.hooks.run('srm_supplier_change_request', 'update', { id: bChange, reason: '冒名' }, { as: aAdmin.token })).rejects.toBeTruthy();
     // 系统身份的 screen flow：门户管理员伪造别家的供应商、门户用户伪造别家的准入申请，名册对不上即结束
-    const submit = (await stack.flows.run('srm_change_submit', { recordId: B.supplier }, { as: aAdmin.token })) as { status?: string };
-    expect(submit.status).toBe('refused');
-    const resubmit = (await stack.flows.run('srm_application_resubmit', { recordId: B.visible.get('srm_supplier_application')![0]! }, { as: a.token })) as { status?: string };
-    expect(resubmit.status).toBe('refused');
+    // 18.3.0 起入口先以调用人身份读记录（objectstack#29050），别家的记录读不到，答「不存在」，flow 不启动
+    await expect(triggerFlow(stack, aAdmin.token, 'srm_change_submit', 'srm_supplier', B.supplier)).rejects.toThrow(NOT_FOUND);
+    await expect(triggerFlow(stack, a.token, 'srm_application_resubmit', 'srm_supplier_application', B.visible.get('srm_supplier_application')![0]!)).rejects.toThrow(NOT_FOUND);
     // 核验证书只给 SQE / 质量经理
-    const verify = (await stack.flows.run('srm_certificate_verify', { recordId: own }, { as: aAdmin.token })) as { status?: string };
+    const verify = await triggerFlow(stack, aAdmin.token, 'srm_certificate_verify', 'srm_supplier_certificate', own);
     expect(verify.status).toBe('refused');
     expect((await stack.rows('srm_supplier_certificate', { id: bCert }))[0]!.valid_to).not.toBe('2041-01-01');
     expect((await stack.rows('srm_supplier_contact', { id: bContact }))[0]!.mobile ?? null).toBeNull();

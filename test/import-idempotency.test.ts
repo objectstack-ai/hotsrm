@@ -171,8 +171,9 @@ describe('legacy supplier import', () => {
     expect(certificates.results[0]!.error).toMatch(/Valid To|有效期至/i);
   });
 
-  // 同一批里的第二位主联系人校验规则看不到（objectstack#25477），由「主联系人重复」视图兜底
-  it('surfaces two primary contacts imported in the same sheet', async () => {
+  // 同一批里的第二位主联系人：18.3.0 起校验规则能数到同一批里先写入的行（objectstack#25579），第二行被拒；
+  // 「主联系人重复」视图保留作兜底
+  it('refuses a second primary contact imported in the same sheet', async () => {
     await importSuppliers('公司全称,国家 / 地区,统一社会信用代码,存量导入\n示例双主联系人有限公司,中国,91000000MA0LEGAC31,是\n');
     const contacts = await importContacts(
       [
@@ -181,11 +182,11 @@ describe('legacy supplier import', () => {
         '示例双主联系人有限公司,示例乙,b@shuangzhu.example.com,是',
       ].join('\n'),
     );
-    expect(contacts.errors).toBe(0);
+    expect(contacts.results.map((r) => r.ok), JSON.stringify(contacts)).toEqual([true, false]);
+    expect(contacts.results[1]!.error).toMatch(/primary contact|主联系人/i);
     const supplier = await supplierByName('示例双主联系人有限公司');
-    expect(supplier.primary_contact_count).toBe(2);
-    const conflicts = await stack.rows(Supplier.name, { primary_contact_count: { $gt: 1 } }, { as: importer });
-    expect(conflicts.map((s) => s.name)).toEqual(['示例双主联系人有限公司']);
+    expect(supplier.primary_contact_count).toBe(1);
+    expect(await stack.rows(Supplier.name, { primary_contact_count: { $gt: 1 } }, { as: importer })).toEqual([]);
   });
 
   it('keeps the legacy flag out of a category manager\'s hands', async () => {

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 import { Category, Supplier, SupplierCategory, SupplierCertificate, SupplierContact } from '../src/core/objects';
 
@@ -15,13 +16,7 @@ describe('supplier master data', () => {
     stack.hooks.run(Supplier.name, 'insert', { name: `测试供应商 ${++seq}`, credit_code: creditCode(), ...extra }, { as: admin });
 
   // 证书扫描件必填；一条文件记录只能被一个字段引用，所以每张证书各建一条
-  const newScan = async () => {
-    const name = `scan-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [
-      { key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' },
-    ]);
-    return String(file?.id);
-  };
+  const newScan = () => uploadedFile(stack, admin, 'scan');
 
   beforeAll(async () => {
     stack = await bootStack(config);

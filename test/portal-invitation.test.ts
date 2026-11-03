@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { NOT_FOUND, triggerFlow } from './support/flows';
+import { uploadedFile } from './support/files';
 import { cel, composeStacks, defineStack } from '@objectstack/spec';
 import { stacks } from '../objectstack.composition';
 
@@ -76,11 +78,8 @@ describe('portal invitation and opening (v0.6 U3)', () => {
   const positionsOf = async (who: string) =>
     (await ql.find('sys_user_position', { where: { user_id: uid[who] }, ...SYS })).map((p: Row) => String(p.position)).sort();
 
-  const attachment = async () => {
-    const name = `invitation-${++seq}.pdf`;
-    const [file] = await stack.seed('sys_file', [{ key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' }]);
-    return String(file!.id);
-  };
+  // 授权书由品类经理上传（邀请以品类经理身份新建）
+  const attachment = () => uploadedFile(stack, token.manager, 'invitation');
   // 品类经理先登记潜在供应商与联系人（总监裁定 2026-11-02：没有供应商档案就无法隔离）
   const supplierWithContact = async (label: string, extra: Row = {}) => {
     const n = ++seq;
@@ -262,7 +261,7 @@ describe('portal invitation and opening (v0.6 U3)', () => {
     // 按钮只给有门户访问能力的人；直接触发时 flow 只认调用者自己的名册行
     it('refuses an employee: the supplier comes from the caller’s own roster row', async () => {
       await expect(submitApplication(token.manager, X.supplier)).rejects.toThrow(/srm_portal_access/);
-      refused((await stack.flows.run('srm_application_submit', { recordId: X.supplier }, { as: token.manager })) as Row, /submitted by invited suppliers/);
+      refused(await triggerFlow(stack, token.manager, 'srm_application_submit', 'srm_supplier', X.supplier), /submitted by invited suppliers/);
     });
 
     // 直接触发 flow（不经记录页按钮）也一样：系统身份的 flow 只认调用者在该供应商上的名册行
@@ -270,7 +269,8 @@ describe('portal invitation and opening (v0.6 U3)', () => {
       // 按钮入口：别家的供应商对门户不可见，平台答「不存在」或 flow 拒绝
       const button = (await submitApplication(token.supA, X.supplier).catch((e) => ({ status: 'error', error: e }))) as Row;
       expect(['error', 'refused'], JSON.stringify(button)).toContain(button.status);
-      refused((await stack.flows.run('srm_application_submit', { recordId: X.supplier }, { as: token.supA })) as Row, /submitted by invited suppliers/);
+      // 直接触发：18.3.0 起入口先以调用人身份读供应商（objectstack#29050），别家供应商读不到，答「不存在」，不产生运行
+      await expect(triggerFlow(stack, token.supA, 'srm_application_submit', 'srm_supplier', X.supplier)).rejects.toThrow(NOT_FOUND);
       expect(await stack.rows('srm_supplier_application', { supplier: X.supplier })).toHaveLength(0);
       expect((await row('srm_supplier_invitation', String(invitationX.id))).application ?? null).toBeNull();
     });

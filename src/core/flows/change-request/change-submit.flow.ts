@@ -8,8 +8,8 @@ import type * as Automation from '@objectstack/spec/automation';
 // 以系统身份运行：门户对变更单只有读共享（ADR-0010 两把锁），新建要靠 flow。所以 flow 进门自己判断「是不是这家供应商的
 // 门户管理员」——持 srm_portal_admin 岗位，并且是这家供应商在职联系人上登记的门户账号（与成员键同一份名册）。供应商取自
 // 启动记录，但不信任它：伪造别家的 recordId 时名册对不上，直接结束。银行账户、联系人的归属由变更单上的校验规则再把一道关。
-// 临时做法：直接触发 flow（REST trigger）不像按钮那样先按启动人的权限读一遍 recordId（objectstack#29050），系统身份的 flow
-// 会读到别家的记录，所以名册检查留在 flow 里，平台补上后再评估。谁可以启动另见 objectstack#25481。
+// 18.3.0 起所有启动入口（按钮、直接触发）都先以启动人身份读 recordId，读不到答「不存在」（objectstack#29050），别家的
+// 供应商到不了这里；名册检查保留作第二道防线，并拦下读得到记录的内部员工和本公司的普通门户用户。谁可以启动另见 objectstack#25481。
 const uid = `current_user != null ? current_user.id : ''`;
 const allowed = `current_user != null && 'srm_portal_admin' in current_user.positions && supplier != null && membership != null`;
 const c = (source: string) => ({ dialect: 'cel' as const, source });

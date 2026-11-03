@@ -248,7 +248,8 @@ export const FinancePermissionSet = {
   },
 };
 
-// 管理员能删考评单要 modifyAllRecords，它连修改一起放开（objectstack#25470）：考评单字段对管理员一律只读
+// 管理员删考评单。不用 modifyAllRecords：18.3.0 起它压过同一权限集上的字段级只读（security-superuser-field-mask-inert），
+// 管理员就能改分数了。改为下方 AdminPermissionSet 的两条行级策略；字段对管理员一律只读
 const reviewFieldsReadOnly = Object.fromEntries(Object.keys(PerformanceReview.fields).map((field) => [`srm_performance_review.${field}`, readOnly]));
 
 // 系统管理员：维护品类与工厂等配置，执行物料导入和存量供应商、联系人、证书导入（04 §2.2）
@@ -268,8 +269,8 @@ export const AdminPermissionSet = {
     srm_delivery_record: { ...read, allowDelete: true, modifyAllRecords: true },
     // 指标库的配置与清理（04 §2.2）；删除自己没建的指标要 modifyAllRecords，同上
     srm_kpi: { ...write, allowDelete: true, modifyAllRecords: true },
-    // 删除错误生成的考评单（评分明细随之删除）后可补跑生成；删系统生成的记录要 modifyAllRecords，同交付记录
-    srm_performance_review: { ...read, allowDelete: true, modifyAllRecords: true },
+    // 删除错误生成的考评单（评分明细随之删除）后可补跑生成；删系统生成的记录要组织范围的写深度，字段仍只读（见上）
+    srm_performance_review: { ...read, allowEdit: true, allowDelete: true },
     srm_performance_score: { ...read, allowDelete: true },
     // 组织管理员通常兼任 SRM 系统管理员：「开通门户」以操作人身份读门户邀请（04 §3.3）
     srm_supplier_invitation: read,
@@ -281,6 +282,12 @@ export const AdminPermissionSet = {
     'srm_supplier_certificate.status': flowOwned,
     ...reviewFieldsReadOnly,
   },
+  // 考评单由系统生成、没有所有人：删除要一条准许这些行的删除策略；评分明细随主记录级联删除，平台要求对主记录有编辑权，
+  // 所以再给一条编辑策略。字段级权限全部只读（见上），编辑策略不让管理员改动任何字段
+  rowLevelSecurity: [
+    { name: 'srm_admin_review_delete', object: 'srm_performance_review', operation: 'delete', using: "review_no != ''" },
+    { name: 'srm_admin_review_update', object: 'srm_performance_review', operation: 'update', using: "review_no != ''" },
+  ],
 };
 
 // 法务：合同与明细读改（草稿期间改条款；提交后合同只读），审批由 flow 授予（04 §2.2）

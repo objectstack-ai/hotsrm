@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { triggerFlow } from './support/flows';
 import config from '../objectstack.config';
 import { Category, DeliveryRecord, Kpi, Material, PerformanceReview, PerformanceScore, Supplier, SupplierCategory } from '../src/core/objects';
 
@@ -127,7 +128,7 @@ describe('performance scorer reassignment for recusal', () => {
 
     // 自动算分的评分项没有评分人：按钮不显示，直接启动 flow 也拒绝
     expect(lines.OTD).toMatchObject({ scored: true, score: 100 });
-    const auto = (await stack.flows.run('srm_score_reassign', { recordId: String(lines.OTD!.id) }, { as: director.token })) as FlowResult;
+    const auto = (await triggerFlow(stack, director.token, 'srm_score_reassign', 'srm_performance_score', String(lines.OTD!.id))) as FlowResult;
     expect(auto).toMatchObject({ status: 'refused', refusalMessage: expect.stringContaining('scored automatically') });
   });
 

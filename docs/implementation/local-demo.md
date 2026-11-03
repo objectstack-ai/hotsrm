@@ -83,5 +83,4 @@ Windows PowerShell：`$env:HOTSRM_DEMO_PASSWORD="<自定密码>"; pnpm setup:loc
 
 | 现象 | 处理 | 跟踪 |
 |---|---|---|
-| 非管理员在人员选择框里输入文字搜索会报错 | 不输入，直接从下拉列表点选 | objectstack#25672 |
 | 审批通知标题是英文模板 “Approval requested / A decision on …” | 已知，验收时忽略 | objectstack#23978 |

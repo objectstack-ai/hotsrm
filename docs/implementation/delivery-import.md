@@ -65,18 +65,18 @@ ERP 里事后更正了检验结论或数量，把那个月重新导出再导一�
 ### 5.1 试导
 
 2026-10-24 用一份模拟的「脏」月度表格试导（[`data/samples/delivery-trial/`](../../data/samples/delivery-trial/srm_delivery_record.csv)，
-18 行，全部虚构），逐行结果由 [test/delivery-record.test.ts](../../test/delivery-record.test.ts) 钉住；2026-10-26 升级到平台 18.1.0 后复测。结论：
+18 行，全部虚构），逐行结果由 [test/delivery-record.test.ts](../../test/delivery-record.test.ts) 钉住；2026-10-26 升级到平台 18.1.0、2026-11-03 升级到 18.3.0 后复测。结论：
 
 | # | 表格里的问题 | 平台的结果 | 判断 |
 |---|---|---|---|
 | D1 | 日期写成 `2026.10.08`、`20261008` | 18.1.0 起按日期导入（此前整行 `invalid_date`） | 正确；不再需要清洗 |
 | D2 | 供应商写简称、工厂写「一厂」、物料号不存在 | `reference_not_found` | 正确拦截 |
-| D3 | 物料号小写 `ex-100004` | `reference_not_found`（查找区分大小写） | 平台限制，同 objectstack#25491；先清洗 |
+| D3 | 物料号小写 `ex-100004` | `reference_not_found`（查找区分大小写） | 先清洗；18.3.0 起可用映射的「转大写」（objectstack#25491，hotsrm#97） |
 | D4 | 物料列写的是物料名称 | 按名称找到并导入 | 正确（名称重复时报 ambiguous） |
 | D5 | 检验结论写 `OK` | `invalid_option` | 选项没有别名，objectstack#25582；先清洗。带尾随空格的「合格 」能导入 |
 | D6 | 不合格没写严重度、不良数；让步接收没写不良数 | `required` | 正确拦截 |
 | D7 | 不良数大于实收数 | 校验规则报错 | 正确拦截 |
-| D8 | 同一张表里重复的行 | 第二行 `UNIQUE_VIOLATION`，第一行正常导入 | 正确拦截 |
+| D8 | 同一张表里重复的行 | 18.3.0 起两行都 `DUPLICATE_MATCH_KEY`、都不写（此前第二行 `UNIQUE_VIOLATION`、第一行导入） | 正确拦截；去掉重复行后重导 |
 | D9 | 没有实到日期、没有收货单号 | `required` | 正确拦截 |
 | D10 | 退货行（负数量、负金额） | `min_value` | 正确拦截；退货不在交付记录里，导出时排除 |
 | D11 | 数量带千分位 `1,200` | 按 1200 导入 | 正确 |

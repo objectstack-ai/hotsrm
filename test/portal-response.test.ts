@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bootStack, type VerifyStack } from '@objectstack/verify';
+import { uploadedFile } from './support/files';
 import config from '../objectstack.config';
 import { Category, Material, PerformanceReview, PerformanceScore, QualityIssue, Supplier, SupplierContact } from '../src/core/objects';
 
@@ -33,11 +34,7 @@ describe('portal SCAR reply, claim and performance appeal', () => {
     return { token, id };
   };
   const reply = (as: Person, id: string, doc: Row) => stack.hooks.run(QualityIssue.name, 'update', { id, ...doc }, { as: as.token });
-  const file = async () => {
-    const name = `portal-evidence-${++seq}.pdf`;
-    const [created] = await stack.seed('sys_file', [{ key: `attachments/${name}`, name, mime_type: 'application/pdf', size: 1, scope: 'attachments', status: 'committed' }]);
-    return String(created?.id);
-  };
+  const file = (as?: string) => uploadedFile(stack, as, 'portal-evidence');
   // 站内信经消息服务异步投递：等到收齐 count 条（或超时）再读
   const inbox = async (userId: string, recordId: string, count = 1) => {
     const read = async () => (await stack.rows('sys_inbox_message', { user_id: userId })).filter((m) => String(m.action_url).endsWith(`/${recordId}`));
@@ -120,7 +117,7 @@ describe('portal SCAR reply, claim and performance appeal', () => {
     expect(await inbox(sqe.id, id)).toHaveLength(1);
 
     // D4–D7 与证据，提交后由负责 SQE 审核（srm_scar_review），审核期间锁定
-    const evidence = await file();
+    const evidence = await file(x.token);
     await reply(x, id, {
       root_cause: '示例：模具磨损未按计划更换',
       corrective_action: '示例：更换模具并复测首件',
@@ -137,7 +134,7 @@ describe('portal SCAR reply, claim and performance appeal', () => {
     const [returned] = await stack.rows(QualityIssue.name, { id }, { as: x.token });
     expect(returned).toMatchObject({ status: 'containment_submitted', sqe_comment: '示例：根因分析需附模具点检记录' });
 
-    await reply(x, id, { root_cause: '示例：模具磨损未按计划更换，点检记录见附件', evidence: [await file()] });
+    await reply(x, id, { root_cause: '示例：模具磨损未按计划更换，点检记录见附件', evidence: [await file(x.token)] });
     await reply(x, id, { status: 'action_submitted' });
     await decide(sqe, id, 'approve', '示例：同意');
     expect((await row(QualityIssue.name, id)).status).toBe('verifying');
